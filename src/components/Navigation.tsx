@@ -68,29 +68,19 @@ export default function Navigation({
           <h1 className="text-2xl font-bold ink-text tracking-tight">
             {currentMonth}
           </h1>
+            <span className="absolute left-full ml-16
+              flex items-center gap-3
+              px-7 py-3
+              text-lg font-extrabold tracking-wide
+              text-black-900
+              bg-amber-50
+              border-2 border-amber-700
+              rounded-lg
+              whitespace-nowrap">
 
-
-<span className="absolute left-full ml-16
-  flex items-center gap-3
-  px-7 py-3
-  text-lg font-extrabold tracking-wide
-  text-amber-700
-  bg-amber-50
-  border-2 border-amber-700
-  rounded-lg
-  whitespace-nowrap">
-
-  <Flame className="w-5 h-5 text-amber-600" />
-  1.5L/mo · $5.5k/mo · £4k/mo
-
-</span>
-
-
-
-
-
-
-
+              <Flame className="w-5 h-5 text-amber-600" />
+              5L | $5.5k | £4k /mo
+            </span>
 
           {/* Next Month Button */}
           {canGoNext && (
