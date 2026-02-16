@@ -128,12 +128,12 @@ export default function FocusTab({ currentMonth }: FocusTabProps) {
     Non Negotiables
   </h2>
 
-  <ul className="text-xl font-bold leading-relaxed space-y-3 text-purple-600 list-disc list-inside">
+  <ul className="text-xl font-bold leading-relaxed space-y-3 text-amber-600 list-disc list-inside">
 
-    <li>5 prayers (look at naushad, nadeem adn other people, they are religious and hard workers, your first and only client also was when you were religious, patient and not that hard working) </li>
+    <li>5 prayers (look at naushad, nadeem and other people, they are religious and hard workers, your first and only client also was when you were religious, patient and not that hard working) </li>
     <li>Avoid Yt, PS, P. Everytime you fall for that and destroy your efforts</li>
     <li>Daily outreach, else not gonna cut</li>
-    <li>focus on clearing engineering</li>
+    <li>Focus on clearing engineering</li>
     <li>Pray to ALLAH daily</li>
 
   </ul>
