@@ -118,21 +118,29 @@ export default function FocusTab({ currentMonth }: FocusTabProps) {
           Reset Month
         </button>
       </div>
-<div className="mb-16 max-w-3xl mx-auto">
+
+
+
+
+<div className="mb-16 max-w-4xl mx-auto">
 
   <h2 className="text-2xl font-bold mb-6 text-center tracking-tight">
-    GOALS
+    Non Negotiables
   </h2>
 
   <ul className="text-xl font-bold leading-relaxed space-y-3 text-purple-600 list-disc list-inside">
 
-    <li>Wake up at the same time every day.</li>
-    <li>Work in focused blocks without distractions.</li>
-    <li>Plan tomorrow before going to sleep.</li>
-    <li>Move your body daily.</li>
-    <li>Track progress honestly.</li>
+    <li>5 prayers (look at naushad, nadeem adn other people, they are religious and hard workers, your first and only client also was when you were religious, patient and not that hard working) </li>
+    <li>Avoid Yt, PS, P. Everytime you fall for that and destroy your efforts</li>
+    <li>Daily outreach, else not gonna cut</li>
+    <li>focus on clearing engineering</li>
+    <li>Pray to ALLAH daily</li>
 
   </ul>
+
+
+
+
 
 </div>
       <div className="grid grid-cols-2 gap-8">
