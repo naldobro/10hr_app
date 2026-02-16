@@ -141,15 +141,15 @@ export default function FocusTab({ currentMonth }: FocusTabProps) {
     </div>
 
     <div className="p-4">
+      • Remember your reason to starting and your stages: 1. 5lakh / $5.5k / £4k per month ➜ 2. 10lakh/mo + youtube ➜ 3. yt and startup "+400cr" ➜ 4. Dawah
+    </div>
+
+    <div className="p-4">
       • Avoid Yt, PS, P. Everytime you fall for that and destroy your efforts
     </div>
 
     <div className="p-4">
       • Daily outreach, else not gonna cut
-    </div>
-
-    <div className="p-4">
-      • Focus on clearing engineering
     </div>
 
     <div className="p-4">

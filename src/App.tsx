@@ -78,6 +78,10 @@ function App() {
 <div className="mb-10 text-center max-w-3xl mx-auto">
   <p className="text-xl font-bold leading-relaxed tracking-tight">
 
+
+      <span className="text-slate-500">Obsession is going crazy for your current milestone ⤴︎</span>
+
+
     <span className="block mb-2">
       <span className="text-slate-500">Remember</span> your goal, you are not a failure, you are just not working.
     </span>
