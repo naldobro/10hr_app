@@ -134,7 +134,7 @@ export default function FocusTab({ currentMonth }: FocusTabProps) {
     Non Negotiables
   </h2>
 
-  <div className="border border-amber-300 rounded-lg overflow-hidden bg-amber-50 text-xl font-bold text-amber-700">
+  <div className="border border-emerald-700 rounded-lg overflow-hidden text-xl font-bold text-amber-900">
 
     <div className="border-b border-amber-200 p-4">
       • 5 prayers (look at naushad, nadeem and other people, they are religious and hard workers, your first and only client also was when you were religious, patient and not that hard working)
