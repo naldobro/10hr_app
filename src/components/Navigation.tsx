@@ -70,18 +70,17 @@ export default function Navigation({
           </h1>
 
 
-
 <span className="absolute left-full ml-16
   px-7 py-3
   text-lg font-extrabold tracking-wide
-  text-red-950
-  bg-gradient-to-r from-red-100 via-red-50 to-white
-  border-2 border-red-400
-  rounded-xl
-  shadow-lg shadow-red-300/50
+  text-black
+  bg-amber-50
+  border-2 border-amber-200
+  rounded-2xl
   whitespace-nowrap">
-  1.5L/mo · $5.5k/mo · £4k/mo
+  🚀 1.5L/mo · $5.5k/mo · £4k/mo
 </span>
+
 
 
 
