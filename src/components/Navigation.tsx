@@ -70,7 +70,7 @@ export default function Navigation({
           </h1>
 
           {/* Milestone Badge */}
-          <span className="absolute left-full ml-6 px-5 py-1.5 text-xs font-semibold tracking-wide text-indigo-900 border-2 border-indigo-700 rounded-md bg-indigo-50 whitespace-nowrap">
+          <span className="absolute left-full ml-12 px-5 py-1.5 text-sm font-extrabold tracking-wide text-indigo-900 border-2 border-indigo-700 rounded-md bg-indigo-50 whitespace-nowrap">
             1. 5L/mo · $5.5k/mo · £4k/mo
           </span>
 
