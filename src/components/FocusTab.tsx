@@ -122,27 +122,51 @@ export default function FocusTab({ currentMonth }: FocusTabProps) {
 
 
 
+
+
+
+
+
+
 <div className="mb-16 max-w-4xl mx-auto">
 
   <h2 className="text-2xl font-bold mb-6 text-center tracking-tight">
     Non Negotiables
   </h2>
 
-  <ul className="text-xl font-bold leading-relaxed space-y-3 text-amber-600 list-disc list-inside">
+  <div className="border border-amber-300 rounded-lg overflow-hidden bg-amber-50 text-xl font-bold text-amber-700">
 
-    <li>5 prayers (look at naushad, nadeem and other people, they are religious and hard workers, your first and only client also was when you were religious, patient and not that hard working) </li>
-    <li>Avoid Yt, PS, P. Everytime you fall for that and destroy your efforts</li>
-    <li>Daily outreach, else not gonna cut</li>
-    <li>Focus on clearing engineering</li>
-    <li>Pray to ALLAH daily</li>
+    <div className="border-b border-amber-200 p-4">
+      • 5 prayers (look at naushad, nadeem and other people, they are religious and hard workers, your first and only client also was when you were religious, patient and not that hard working)
+    </div>
 
-  </ul>
+    <div className="border-b border-amber-200 p-4">
+      • Avoid Yt, PS, P. Everytime you fall for that and destroy your efforts
+    </div>
 
+    <div className="border-b border-amber-200 p-4">
+      • Daily outreach, else not gonna cut
+    </div>
 
+    <div className="border-b border-amber-200 p-4">
+      • Focus on clearing engineering
+    </div>
 
+    <div className="p-4">
+      • Pray to ALLAH daily
+    </div>
 
+  </div>
 
 </div>
+
+
+
+
+
+
+
+
       <div className="grid grid-cols-2 gap-8">
         <div className="paper-card rounded-2xl paper-shadow p-8 paper-border">
           <h3 className="text-xl font-bold ink-text mb-6">Major Goals</h3>
