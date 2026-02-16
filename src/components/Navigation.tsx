@@ -69,10 +69,19 @@ export default function Navigation({
             {currentMonth}
           </h1>
 
-          {/* Milestone Badge */}
-          <span className="absolute left-full ml-12 px-5 py-1.5 text-sm font-extrabold tracking-wide text-indigo-900 border-2 border-indigo-700 rounded-md bg-indigo-50 whitespace-nowrap">
-            1. 5L/mo · $5.5k/mo · £4k/mo
+                  {/* Milestone Badge */}
+          <span className="absolute left-full ml-16 
+            px-6 py-2.5 
+            text-base font-bold tracking-wide 
+            text-indigo-900 
+            bg-gradient-to-r from-indigo-100 to-indigo-50
+            border border-indigo-200 
+            rounded-full 
+            shadow-md shadow-indigo-200/60
+            whitespace-nowrap">
+            ✨ 1.5L/mo · $5.5k/mo · £4k/mo
           </span>
+
 
           {/* Next Month Button */}
           {canGoNext && (
