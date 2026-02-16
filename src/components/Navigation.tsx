@@ -62,11 +62,11 @@ export default function Navigation({
           </div>
         </div>
 
-        <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-3">
+        <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-4">
           <h1 className="text-2xl font-bold ink-text tracking-tight">{currentMonth}</h1>
           
           <span className="px-4 py-1 text-sm font-bold text-indigo-700 border-2 border-indigo-600 rounded-full">
-           LOCKED IN
+           1. 5lakb/mo / $5.5k/mo / £4k/mo
           </span>
           {canGoNext && (
             <button
