@@ -103,6 +103,8 @@ function App() {
     </span>
   </p>
 </div>
+
+
 <div className="mb-16 max-w-2xl mx-auto">
 
   <h2 className="text-2xl font-bold mb-6 text-center tracking-tight">
@@ -111,34 +113,37 @@ function App() {
 
   <div className="border border-black/20 rounded-lg overflow-hidden text-xl font-bold">
 
-    <div className="grid grid-cols-2 border-b border-black/20">
-      <div className="p-4 border-r border-black/20 text-indigo-600">1</div>
+    <div className="grid grid-cols-[80px_1fr] border-b border-black/20">
+      <div className="p-4 border-r border-black/20 text-indigo-600 text-center">1</div>
       <div className="p-4">Show up even when you don’t feel like it.</div>
     </div>
 
-    <div className="grid grid-cols-2 border-b border-black/20">
-      <div className="p-4 border-r border-black/20 text-blue-600">2</div>
+    <div className="grid grid-cols-[80px_1fr] border-b border-black/20">
+      <div className="p-4 border-r border-black/20 text-blue-600 text-center">2</div>
       <div className="p-4">Do the work before you judge the results.</div>
     </div>
 
-    <div className="grid grid-cols-2 border-b border-black/20">
-      <div className="p-4 border-r border-black/20 text-emerald-600">3</div>
+    <div className="grid grid-cols-[80px_1fr] border-b border-black/20">
+      <div className="p-4 border-r border-black/20 text-emerald-600 text-center">3</div>
       <div className="p-4">Protect your calendar like your future depends on it.</div>
     </div>
 
-    <div className="grid grid-cols-2 border-b border-black/20">
-      <div className="p-4 border-r border-black/20 text-amber-600">4</div>
+    <div className="grid grid-cols-[80px_1fr] border-b border-black/20">
+      <div className="p-4 border-r border-black/20 text-amber-600 text-center">4</div>
       <div className="p-4">Finish what you start, no excuses.</div>
     </div>
 
-    <div className="grid grid-cols-2">
-      <div className="p-4 border-r border-black/20 text-red-600">5</div>
+    <div className="grid grid-cols-[80px_1fr]">
+      <div className="p-4 border-r border-black/20 text-red-600 text-center">5</div>
       <div className="p-4">Repeat daily until discipline becomes identity.</div>
     </div>
 
   </div>
 
 </div>
+
+
+
   {activeTab === 'track' && <TrackTab currentMonth={currentMonth} />}
   {activeTab === 'focus' && <FocusTab currentMonth={currentMonth} />}
   {activeTab === 'statistics' && <StatisticsTab currentMonth={currentMonth} />}
