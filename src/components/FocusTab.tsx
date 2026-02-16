@@ -118,7 +118,23 @@ export default function FocusTab({ currentMonth }: FocusTabProps) {
           Reset Month
         </button>
       </div>
+<div className="mb-16 max-w-3xl mx-auto">
 
+  <h2 className="text-2xl font-bold mb-6 text-center tracking-tight">
+    GOALS
+  </h2>
+
+  <ul className="text-xl font-bold leading-relaxed space-y-3 text-purple-600 list-disc list-inside">
+
+    <li>Wake up at the same time every day.</li>
+    <li>Work in focused blocks without distractions.</li>
+    <li>Plan tomorrow before going to sleep.</li>
+    <li>Move your body daily.</li>
+    <li>Track progress honestly.</li>
+
+  </ul>
+
+</div>
       <div className="grid grid-cols-2 gap-8">
         <div className="paper-card rounded-2xl paper-shadow p-8 paper-border">
           <h3 className="text-xl font-bold ink-text mb-6">Major Goals</h3>
