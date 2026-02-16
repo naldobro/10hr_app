@@ -79,7 +79,7 @@ export default function Navigation({
               whitespace-nowrap">
 
               <Flame className="w-5 h-5 text-black-900" />
-              5L $5.5k £4k /mo
+              5L   $5.5k   £4k /mo
             </span>
 
           {/* Next Month Button */}
