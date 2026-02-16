@@ -71,16 +71,20 @@ export default function Navigation({
 
 
 <span className="absolute left-full ml-16
+  flex items-center gap-3
   px-7 py-3
   text-lg font-extrabold tracking-wide
-  text-black
+  text-amber-700
   bg-amber-50
-  border-2 border-amber-200
-  rounded-2xl
+  border-2 border-amber-700
+  rounded-lg
   whitespace-nowrap">
-  <span className="mr-1">🔥</span>
+
+  <Flame className="w-5 h-5 text-amber-600" />
   1.5L/mo · $5.5k/mo · £4k/mo
+
 </span>
+
 
 
 
