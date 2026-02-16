@@ -75,7 +75,7 @@ function App() {
 
       <main className="relative pt-[90px] pb-12 px-8 max-w-[1400px] mx-auto">
   {/* Motivational Message Banner */}
-<div className="mb-10 text-center max-w-2xl mx-auto">
+<div className="mb-10 text-center max-w-3xl mx-auto">
   <p className="text-xl font-bold leading-relaxed tracking-tight">
 
     <span className="block mb-2">
