@@ -78,11 +78,11 @@ function App() {
 <div className="mb-10 text-center max-w-3xl mx-auto">
   <p className="text-xl font-bold leading-relaxed tracking-tight">
 
-    <span className="block mb-2 text-slate-500">
+    <span className="block mb-10 text-slate-500">
       Obsession is going crazy for your current milestone ⤴︎
     </span>
 
-    <span>
+    <span className="block">
       <span className="text-slate-500">Remember</span> your goal, you are not a failure, you are just not working.
     </span>
 
@@ -102,7 +102,7 @@ function App() {
       <span className="text-amber-600">Every</span> day matters, every hour matters, every minute matters.
     </span>
 
-    <span className="block mt-6">
+    <span className="block mt-4">
       <span className="text-red-600">Now</span>, if you choose not to work, that's the whole story of why you are failing every day.
     </span>
   </p>
