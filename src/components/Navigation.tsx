@@ -78,8 +78,10 @@ export default function Navigation({
   border-2 border-amber-200
   rounded-2xl
   whitespace-nowrap">
-  🚀 1.5L/mo · $5.5k/mo · £4k/mo
+  <span className="mr-1">🔥</span>
+  1.5L/mo · $5.5k/mo · £4k/mo
 </span>
+
 
 
 
