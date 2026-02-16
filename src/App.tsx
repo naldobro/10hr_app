@@ -74,10 +74,20 @@ function App() {
       />
 
       <main className="relative pt-[90px] pb-12 px-8 max-w-[1400px] mx-auto">
-        {activeTab === 'track' && <TrackTab currentMonth={currentMonth} />}
-        {activeTab === 'focus' && <FocusTab currentMonth={currentMonth} />}
-        {activeTab === 'statistics' && <StatisticsTab currentMonth={currentMonth} />}
-      </main>
+  {/* Message Banner */}
+  <div className="mb-8 text-center">
+    <p className="text-lg leading-relaxed text-gray-800">
+      If your calendar looks bad, then how can you succeed<br />
+      it starts from doing now<br />
+      every day matters, every hour matters, every minute matters<br />
+      now if you choose not to work, that's the whole story of why you are failing every day
+    </p>
+  </div>
+
+  {activeTab === 'track' && <TrackTab currentMonth={currentMonth} />}
+  {activeTab === 'focus' && <FocusTab currentMonth={currentMonth} />}
+  {activeTab === 'statistics' && <StatisticsTab currentMonth={currentMonth} />}
+</main>
     </div>
   );
 }
