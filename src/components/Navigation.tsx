@@ -78,8 +78,8 @@ export default function Navigation({
               rounded-lg
               whitespace-nowrap">
 
-              <Flame className="w-5 h-5 text-amber-600" />
-              5L | $5.5k | £4k /mo
+              <Flame className="w-5 h-5 text-black-900" />
+              5L $5.5k £4k /mo
             </span>
 
           {/* Next Month Button */}
