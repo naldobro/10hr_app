@@ -64,6 +64,10 @@ export default function Navigation({
 
         <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-3">
           <h1 className="text-2xl font-bold ink-text tracking-tight">{currentMonth}</h1>
+          
+          <span className="px-4 py-1 text-sm font-bold text-indigo-700 border-2 border-indigo-600 rounded-full">
+           LOCKED IN
+          </span>
           {canGoNext && (
             <button
               onClick={() => onMonthChange('next')}
