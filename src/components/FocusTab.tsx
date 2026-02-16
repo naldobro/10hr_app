@@ -128,27 +128,27 @@ export default function FocusTab({ currentMonth }: FocusTabProps) {
 
 
 
-<div className="mb-16 max-w-4xl mx-auto">
+<div className="mb-16 max-w-5xl mx-auto">
 
   <h2 className="text-2xl font-bold mb-6 text-center tracking-tight">
     Non Negotiables
   </h2>
 
-  <div className="border border-emerald-700 rounded-lg overflow-hidden text-xl font-bold text-amber-900">
+  <div className="border-8 border-emerald-700 rounded-lg overflow-hidden text-xl font-bold text-amber-800">
 
-    <div className="border-b border-amber-200 p-4">
+    <div className="p-4">
       • 5 prayers (look at naushad, nadeem and other people, they are religious and hard workers, your first and only client also was when you were religious, patient and not that hard working)
     </div>
 
-    <div className="border-b border-amber-200 p-4">
+    <div className="p-4">
       • Avoid Yt, PS, P. Everytime you fall for that and destroy your efforts
     </div>
 
-    <div className="border-b border-amber-200 p-4">
+    <div className="p-4">
       • Daily outreach, else not gonna cut
     </div>
 
-    <div className="border-b border-amber-200 p-4">
+    <div className="p-4">
       • Focus on clearing engineering
     </div>
 
