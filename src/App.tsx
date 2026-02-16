@@ -74,13 +74,18 @@ function App() {
       />
 
       <main className="relative pt-[90px] pb-12 px-8 max-w-[1400px] mx-auto">
-  {/* Message Banner */}
-  <div className="mb-8 text-center">
-    <p className="text-lg leading-relaxed text-gray-800">
-      If your calendar looks bad, then how can you succeed<br />
-      it starts from doing now<br />
-      every day matters, every hour matters, every minute matters<br />
-      now if you choose not to work, that's the whole story of why you are failing every day
+  {/* Motivational Message Banner */}
+  <div className="mb-10 text-center bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-amber-200 rounded-xl p-8 shadow-sm">
+    <p className="text-2xl font-bold text-amber-900 mb-4 leading-relaxed">
+      Remember your goal, you are not a failure, you are just not working.<br />
+      If you work, you can do wonders.
+    </p>
+    <div className="h-px bg-amber-300 w-32 mx-auto my-4"></div>
+    <p className="text-lg text-gray-700 leading-relaxed">
+      If your calendar looks bad, then how can you succeed?<br />
+      It starts from doing now.<br />
+      Every day matters, every hour matters, every minute matters.<br />
+      Now, if you choose not to work, that's the whole story of why you are failing every day.
     </p>
   </div>
 
