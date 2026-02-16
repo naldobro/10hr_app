@@ -75,18 +75,18 @@ function App() {
 
       <main className="relative pt-[90px] pb-12 px-8 max-w-[1400px] mx-auto">
   {/* Motivational Message Banner */}
-  <div className="mb-10 text-center">
-    <p className="text-2xl font-bold text-grey-700 mb-4 leading-relaxed">
-      Remember your goal, you are not a failure, you are just not working.<br />
-      If you work, you can do wonders.
-    </p>
-    <p className="text-lg text-gray-700 leading-relaxed">
-      If your calendar looks bad, then how can you succeed?<br />
-      It starts from doing now.<br />
-      Every day matters, every hour matters, every minute matters.<br />
-      Now, if you choose not to work, that's the whole story of why you are failing every day.
-    </p>
-  </div>
+ <div className="mb-10 text-center">
+  <p className="text-2xl font-bold mb-4 leading-relaxed">
+    <span className="block text-gray-600">Remember your goal, you are not a failure, you are just not working.</span>
+    <span className="block text-gray-700">If you work, you can do wonders.</span>
+  </p>
+  <p className="text-lg leading-relaxed">
+    <span className="block text-gray-700">If your calendar looks bad, then how can you succeed?</span>
+    <span className="block text-gray-800">It starts from doing now.</span>
+    <span className="block text-gray-800">Every day matters, every hour matters, every minute matters.</span>
+    <span className="block text-gray-900">Now, if you choose not to work, that's the whole story of why you are failing every day.</span>
+  </p>
+</div>
 
   {activeTab === 'track' && <TrackTab currentMonth={currentMonth} />}
   {activeTab === 'focus' && <FocusTab currentMonth={currentMonth} />}
