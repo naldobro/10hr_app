@@ -62,21 +62,31 @@ export default function Navigation({
           </div>
         </div>
 
-        <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-4">
-          <h1 className="text-2xl font-bold ink-text tracking-tight">{currentMonth}</h1>
+            <div className="absolute left-1/2 -translate-x-1/2">
+        <div className="relative flex items-center justify-center">
           
-          <span className="px-4 py-1 text-sm font-bold text-indigo-700 border-2 border-indigo-600 rounded-full">
-           1. 5lakb/mo / $5.5k/mo / £4k/mo
+          <h1 className="text-2xl font-bold ink-text tracking-tight">
+            {currentMonth}
+          </h1>
+
+          {/* Milestone Badge */}
+          <span className="absolute left-full ml-6 px-5 py-1.5 text-xs font-semibold tracking-wide text-indigo-900 border-2 border-indigo-700 rounded-md bg-indigo-50 whitespace-nowrap">
+            1. 5L/mo · $5.5k/mo · £4k/mo
           </span>
+
+          {/* Next Month Button */}
           {canGoNext && (
             <button
               onClick={() => onMonthChange('next')}
-              className="p-2 hover:bg-amber-50 rounded-lg transition-all hover:scale-105 active:scale-95"
+              className="absolute -right-12 p-2 hover:bg-amber-50 rounded-lg transition-all hover:scale-105 active:scale-95"
             >
               <ChevronRight className="w-5 h-5 ink-text-muted" />
             </button>
           )}
+          
         </div>
+      </div>
+
 
         <div className="flex items-center gap-3 bg-amber-50 px-5 py-2.5 rounded-lg paper-border paper-shadow">
           <Flame className="w-6 h-6 text-amber-600" />
