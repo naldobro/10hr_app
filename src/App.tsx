@@ -75,32 +75,33 @@ function App() {
 
       <main className="relative pt-[90px] pb-12 px-8 max-w-[1400px] mx-auto">
   {/* Motivational Message Banner */}
- <div className="mb-10 text-center max-w-2xl mx-auto">
+<div className="mb-10 text-center max-w-2xl mx-auto">
   <p className="text-xl font-bold leading-relaxed tracking-tight">
-    <span className="block text-black opacity-100 mb-2">
-      your goal, you are not a failure, you are just not working.
+
+    <span className="block mb-2">
+      <span className="text-slate-500">Remember</span> your goal, you are not a failure, you are just not working.
     </span>
 
-    <span className="block text-black opacity-90 mb-6">
-      If you work, you can do wonders.
+    <span className="block mb-6">
+      <span className="text-indigo-600">If</span> you work, you can do wonders.
     </span>
 
-    <span className="block text-black opacity-80 mb-2">
-      If your calendar looks bad, then how can you succeed?
+    <span className="block mb-2">
+      <span className="text-blue-600">If</span> your calendar looks bad, then how can you succeed?
     </span>
 
-    <span className="block text-black opacity-85">
-      It starts from doing now.
+    <span className="block">
+      <span className="text-emerald-600">It</span> starts from doing now.
     </span>
 
-    <span className="block text-black opacity-90">
-      Every day matters, every hour matters, every minute matters.
+    <span className="block">
+      <span className="text-amber-600">Every</span> day matters, every hour matters, every minute matters.
     </span>
 
-    <span className="block text-black opacity-100 mt-6">
-      Now, if you choose not to work,
-      that's the whole story of why you are failing every day.
+    <span className="block mt-6">
+      <span className="text-red-600">Now</span>, if you choose not to work, that's the whole story of why you are failing every day.
     </span>
+
   </p>
 </div>
 
