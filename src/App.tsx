@@ -77,7 +77,7 @@ function App() {
   {/* Motivational Message Banner */}
  <div className="mb-10 text-center">
   <p className="text-2xl font-bold mb-4 leading-relaxed">
-    <span className="block text-gray-600">Remember your goal, you are not a failure, you are just not working.</span>
+    <span className="block text-gray-600"> your goal, you are not a failure, you are just not working.</span>
     <span className="block text-gray-700">If you work, you can do wonders.</span>
   </p>
   <p className="text-lg leading-relaxed">
