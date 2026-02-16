@@ -69,29 +69,20 @@ export default function Navigation({
             {currentMonth}
           </h1>
 
-         <span className="absolute left-full ml-16
-  px-7 py-3
-  text-lg font-extrabold tracking-wide
-  text-red-950
-  bg-red-50
-  border-2 border-red-300
+
+
+<span className="absolute left-full ml-16
+  px-8 py-3
+  text-lg font-black tracking-wide
+  text-black
+  bg-red-100
+  border-2 border-red-500
   rounded-xl
-  shadow-md shadow-red-200/60
+  shadow-lg shadow-red-400/60
   whitespace-nowrap">
   🚀 1.5L/mo · $5.5k/mo · £4k/mo
 </span>
 
-<span className="absolute left-full ml-16
-  px-7 py-3
-  text-lg font-extrabold tracking-wide
-  text-red-950
-  bg-gradient-to-r from-red-100 via-red-50 to-white
-  border-2 border-red-400
-  rounded-xl
-  shadow-lg shadow-red-300/50
-  whitespace-nowrap">
-  🚀 1.5L/mo · $5.5k/mo · £4k/mo
-</span>
 
 
 
