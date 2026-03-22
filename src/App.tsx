@@ -83,15 +83,15 @@ function App() {
     </span>
 
     <span className="block">
-      <span className="text-slate-500">Remember</span> your goal, you are not a failure, you are just not working.
+      <span className="text-slate-500">1.   </span> I am slave of ALLAH
     </span>
 
     <span className="block mb-6">
-      <span className="text-indigo-600">If</span> you work, you can do wonders.
+      <span className="text-indigo-600">2.   </span> My current jihad is to work hard and accomplish what i have thought off
     </span>
 
     <span className="block mb-2">
-      <span className="text-blue-600">If</span> your calendar looks bad, then how can you succeed?
+      <span className="text-blue-600">3.   </span> Always do the timer thing, its more important that you think. Always add timer when you work, lets you actually know how much you were able to work that day
     </span>
 
     <span className="block">
