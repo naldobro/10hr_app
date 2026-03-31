@@ -64,6 +64,11 @@ function App() {
 
   return (
     <div className="min-h-screen paper-texture">
+       <img
+    src="/profile.png"
+    alt="profile"
+    className="fixed top-4 right-4 w-10 h-10 rounded-full object-cover"
+  />
       <Navigation
         activeTab={activeTab}
         onTabChange={setActiveTab}
