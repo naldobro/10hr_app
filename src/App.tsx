@@ -124,12 +124,12 @@ function App() {
 
     <div className="grid grid-cols-[80px_1fr] border-b border-black/20">
       <div className="p-4 border-r border-black/20 text-indigo-600 text-center">1</div>
-      <div className="p-4">whatever stage of life you are in, follow the 10hr/day rule</div>
+      <div className="p-4">Whatever stage of life you are in, follow the 10hr/day rule</div>
     </div>
 
     <div className="grid grid-cols-[80px_1fr] border-b border-black/20">
       <div className="p-4 border-r border-black/20 text-blue-600 text-center">2</div>
-      <div className="p-4">Pray 5 times, its non negotiable, im failing because im not praying,</div>
+      <div className="p-4">Pray 5 times, its non negotiable, I'm failing because im not praying,</div>
     </div>
 
     <div className="grid grid-cols-[80px_1fr] border-b border-black/20">
@@ -139,7 +139,7 @@ function App() {
 
     <div className="grid grid-cols-[80px_1fr] border-b border-black/20">
       <div className="p-4 border-r border-black/20 text-amber-600 text-center">4</div>
-      <div className="p-4">Finish what you start, no excuses.</div>
+      <div className="p-4">Make goals and track progress each day</div>
     </div>
 
     <div className="grid grid-cols-[80px_1fr]">
