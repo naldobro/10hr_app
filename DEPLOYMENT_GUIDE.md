@@ -18,7 +18,7 @@ This is a **single-user personal productivity tracker** with no authentication. 
 3. Fill in the project details:
    - **Project name**: `10hr-day` (or any name you like)
    - **Database password**: Create a strong password (save this somewhere safe)
-   - **Region**: Choose the closest region to you for better performance
+   - **Region**: Choose the closest region to you for better performance    sdlfkjdslfj
 4. Click "Create new project" and wait 1-2 minutes for setup
 
 ### 1.2 Run the Database Setup

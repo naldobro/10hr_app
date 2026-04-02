@@ -117,24 +117,24 @@ function App() {
 <div className="mb-16 max-w-2xl mx-auto">
 
   <h2 className="text-2xl font-bold mb-6 text-center tracking-tight">
-    RULES
+    5 rules to follow
   </h2>
 
   <div className="border border-black/20 rounded-lg overflow-hidden text-xl font-bold">
 
     <div className="grid grid-cols-[80px_1fr] border-b border-black/20">
       <div className="p-4 border-r border-black/20 text-indigo-600 text-center">1</div>
-      <div className="p-4">Show up even when you don’t feel like it.</div>
+      <div className="p-4">whatever stage of life you are in, follow the 10hr/day rule</div>
     </div>
 
     <div className="grid grid-cols-[80px_1fr] border-b border-black/20">
       <div className="p-4 border-r border-black/20 text-blue-600 text-center">2</div>
-      <div className="p-4">Do the work before you judge the results.</div>
+      <div className="p-4">Pray 5 times, its non negotiable, im failing because im not praying,</div>
     </div>
 
     <div className="grid grid-cols-[80px_1fr] border-b border-black/20">
       <div className="p-4 border-r border-black/20 text-emerald-600 text-center">3</div>
-      <div className="p-4">Protect your calendar like your future depends on it.</div>
+      <div className="p-4">2 people, one prays 5 times and other doesn't, obviously the 1st will win</div>
     </div>
 
     <div className="grid grid-cols-[80px_1fr] border-b border-black/20">
@@ -144,7 +144,7 @@ function App() {
 
     <div className="grid grid-cols-[80px_1fr]">
       <div className="p-4 border-r border-black/20 text-red-600 text-center">5</div>
-      <div className="p-4">Repeat daily until discipline becomes identity.</div>
+      <div className="p-4">Repeat daily consistency is everything</div>
     </div>
 
   </div>
