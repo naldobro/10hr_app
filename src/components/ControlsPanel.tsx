@@ -1,12 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Play, Square, Plus } from 'lucide-react';
+import { WorkSession } from '../types';
+
+const TIMER_STORAGE_KEY = 'active_timer';
+
+function formatTimerDisplay(seconds: number) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function toLocalDateStr(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 interface ControlsPanelProps {
   onAddSession: (session: { start_time: number; end_time: number; label: string; color: string }) => void;
   isLoading?: boolean;
+  sessions: WorkSession[];
+  currentDay: string;
 }
 
-export default function ControlsPanel({ onAddSession, isLoading = false }: ControlsPanelProps) {
+export default function ControlsPanel({ onAddSession, isLoading = false, sessions, currentDay }: ControlsPanelProps) {
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [timerStart, setTimerStart] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -14,6 +30,7 @@ export default function ControlsPanel({ onAddSession, isLoading = false }: Contr
   const [showTimerLabelModal, setShowTimerLabelModal] = useState(false);
   const [timerSessionData, setTimerSessionData] = useState<{ start_time: number; end_time: number } | null>(null);
   const [timerLabel, setTimerLabel] = useState('Deep Work');
+  const [timerColor, setTimerColor] = useState('blue');
   const [validationError, setValidationError] = useState('');
 
   const [manualStart, setManualStart] = useState('09:00');
@@ -24,13 +41,44 @@ export default function ControlsPanel({ onAddSession, isLoading = false }: Contr
   const [customHours, setCustomHours] = useState(0);
   const [customMinutes, setCustomMinutes] = useState(0);
 
+  const colorOptions = [
+    { value: 'blue', label: 'Blue', class: 'bg-blue-700' },
+    { value: 'green', label: 'Green', class: 'bg-emerald-600' },
+    { value: 'purple', label: 'Purple', class: 'bg-violet-700' },
+    { value: 'orange', label: 'Orange', class: 'bg-amber-600' },
+    { value: 'pink', label: 'Pink', class: 'bg-pink-600' },
+    { value: 'teal', label: 'Teal', class: 'bg-teal-700' },
+  ];
+
+  // Restore timer from localStorage on mount
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    const saved = localStorage.getItem(TIMER_STORAGE_KEY);
+    if (saved) {
+      try {
+        const { start } = JSON.parse(saved);
+        if (start && typeof start === 'number') {
+          setTimerStart(start);
+          setIsTimerRunning(true);
+          setElapsedSeconds(Math.floor((Date.now() - start) / 1000));
+        }
+      } catch {
+        localStorage.removeItem(TIMER_STORAGE_KEY);
+      }
+    }
+  }, []);
+
+  // Timer tick + update tab title
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
 
     if (isTimerRunning && timerStart) {
       interval = setInterval(() => {
-        setElapsedSeconds(Math.floor((Date.now() - timerStart) / 1000));
+        const elapsed = Math.floor((Date.now() - timerStart) / 1000);
+        setElapsedSeconds(elapsed);
+        document.title = `${formatTimerDisplay(elapsed)} — 10hr`;
       }, 1000);
+    } else {
+      document.title = '10hr';
     }
 
     return () => {
@@ -38,32 +86,68 @@ export default function ControlsPanel({ onAddSession, isLoading = false }: Contr
     };
   }, [isTimerRunning, timerStart]);
 
-  const formatTimerDisplay = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
+  // Snap to correct time when tab becomes visible again
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (!document.hidden && isTimerRunning && timerStart) {
+        setElapsedSeconds(Math.floor((Date.now() - timerStart) / 1000));
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [isTimerRunning, timerStart]);
 
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
+  // Warn before closing tab with active timer
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isTimerRunning) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isTimerRunning]);
+
+  const findOverlap = useCallback((start: number, end: number) => {
+    return sessions.find(s => start < s.end_time && end > s.start_time);
+  }, [sessions]);
 
   const handleStartTimer = () => {
+    const now = Date.now();
     setIsTimerRunning(true);
-    setTimerStart(Date.now());
+    setTimerStart(now);
     setElapsedSeconds(0);
+    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify({ start: now }));
+  };
+
+  const clearTimerState = () => {
+    setIsTimerRunning(false);
+    setTimerStart(null);
+    setElapsedSeconds(0);
+    localStorage.removeItem(TIMER_STORAGE_KEY);
+    document.title = '10hr';
   };
 
   const handleStopTimer = () => {
-    if (timerStart) {
-      const now = new Date();
-      const endTime = now.getHours() + now.getMinutes() / 60;
-      const durationHours = elapsedSeconds / 3600;
-      const startTime = endTime - durationHours;
+    if (!timerStart) return;
 
-      console.log('Timer stopped:', { startTime, endTime, durationHours });
+    const startDate = new Date(timerStart);
+    const now = new Date();
 
-      setTimerSessionData({ start_time: startTime, end_time: endTime });
-      setShowTimerLabelModal(true);
+    let startTime = startDate.getHours() + startDate.getMinutes() / 60 + startDate.getSeconds() / 3600;
+    let endTime = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+
+    // If the timer started on a different day, cap start to midnight (0)
+    if (toLocalDateStr(startDate) !== toLocalDateStr(now)) {
+      startTime = 0;
     }
+
+    if (endTime <= startTime) {
+      endTime = startTime + 0.01;
+    }
+
+    setTimerSessionData({ start_time: startTime, end_time: endTime });
+    setShowTimerLabelModal(true);
   };
 
   const handleSaveTimerSession = () => {
@@ -73,31 +157,34 @@ export default function ControlsPanel({ onAddSession, isLoading = false }: Contr
     }
 
     if (timerSessionData) {
-      console.log('Adding timer session:', { ...timerSessionData, label: timerLabel });
+      const overlap = findOverlap(timerSessionData.start_time, timerSessionData.end_time);
+      if (overlap) {
+        setValidationError(`Overlaps with "${overlap.label}" (${formatHour(overlap.start_time)}–${formatHour(overlap.end_time)})`);
+        return;
+      }
+
       onAddSession({
         ...timerSessionData,
         label: timerLabel,
-        color: 'blue',
+        color: timerColor,
       });
 
       setShowTimerLabelModal(false);
       setTimerLabel('Deep Work');
+      setTimerColor('blue');
       setTimerSessionData(null);
       setValidationError('');
-      setIsTimerRunning(false);
-      setTimerStart(null);
-      setElapsedSeconds(0);
+      clearTimerState();
     }
   };
 
   const handleCancelTimerSession = () => {
     setShowTimerLabelModal(false);
     setTimerLabel('Deep Work');
+    setTimerColor('blue');
     setTimerSessionData(null);
     setValidationError('');
-    setIsTimerRunning(false);
-    setTimerStart(null);
-    setElapsedSeconds(0);
+    clearTimerState();
   };
 
   const handleAddManualSession = () => {
@@ -131,6 +218,12 @@ export default function ControlsPanel({ onAddSession, isLoading = false }: Contr
       return;
     }
 
+    const overlap = findOverlap(startTime, endTime);
+    if (overlap) {
+      setValidationError(`Overlaps with "${overlap.label}" (${formatHour(overlap.start_time)}–${formatHour(overlap.end_time)})`);
+      return;
+    }
+
     onAddSession({
       start_time: startTime,
       end_time: endTime,
@@ -149,14 +242,9 @@ export default function ControlsPanel({ onAddSession, isLoading = false }: Contr
     setValidationError('');
   };
 
-  const colorOptions = [
-    { value: 'blue', label: 'Blue', class: 'bg-blue-700' },
-    { value: 'green', label: 'Green', class: 'bg-emerald-600' },
-    { value: 'purple', label: 'Purple', class: 'bg-violet-700' },
-    { value: 'orange', label: 'Orange', class: 'bg-amber-600' },
-    { value: 'pink', label: 'Pink', class: 'bg-pink-600' },
-    { value: 'teal', label: 'Teal', class: 'bg-teal-700' },
-  ];
+  const formatHour = (hour: number) => {
+    return `${String(Math.floor(hour)).padStart(2, '0')}:${String(Math.floor((hour % 1) * 60)).padStart(2, '0')}`;
+  };
 
   return (
     <>
@@ -361,26 +449,47 @@ export default function ControlsPanel({ onAddSession, isLoading = false }: Contr
               </div>
             )}
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium ink-text-muted mb-2">
-                Session Label
-              </label>
-              <input
-                type="text"
-                value={timerLabel}
-                onChange={(e) => {
-                  setTimerLabel(e.target.value);
-                  setValidationError('');
-                }}
-                placeholder="e.g., Deep Work, Writing, Coding"
-                className="w-full px-4 py-3 paper-border rounded-lg focus:ring-2 focus:ring-amber-600 focus:border-transparent"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSaveTimerSession();
-                  }
-                }}
-              />
+            <div className="space-y-5 mb-6">
+              <div>
+                <label className="block text-sm font-medium ink-text-muted mb-2">
+                  Session Label
+                </label>
+                <input
+                  type="text"
+                  value={timerLabel}
+                  onChange={(e) => {
+                    setTimerLabel(e.target.value);
+                    setValidationError('');
+                  }}
+                  placeholder="e.g., Deep Work, Writing, Coding"
+                  className="w-full px-4 py-3 paper-border rounded-lg focus:ring-2 focus:ring-amber-600 focus:border-transparent"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSaveTimerSession();
+                    }
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium ink-text-muted mb-2">
+                  Color
+                </label>
+                <div className="flex gap-2">
+                  {colorOptions.map((color) => (
+                    <button
+                      key={color.value}
+                      onClick={() => setTimerColor(color.value)}
+                      className={`w-10 h-10 rounded-lg ${color.class} ${
+                        timerColor === color.value
+                          ? 'ring-4 ring-amber-800'
+                          : 'opacity-50 hover:opacity-100'
+                      } transition-all paper-shadow`}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-3">

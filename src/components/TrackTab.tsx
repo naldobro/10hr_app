@@ -131,7 +131,11 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
         timestamp: Date.now(),
       });
 
-      const newTotal = workedHours + (sessionData.end_time - sessionData.start_time);
+      const allSessionsForDay = await db.sessions.getByDate(currentDayString);
+      const newTotal = allSessionsForDay.reduce(
+        (sum, session) => sum + (session.end_time - session.start_time),
+        0
+      );
 
       await db.summaries.upsert({
         date: currentDayString,
@@ -266,7 +270,7 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
         onDeleteSession={handleDeleteSession}
       />
 
-      <ControlsPanel onAddSession={handleAddSession} isLoading={isAdding} />
+      <ControlsPanel onAddSession={handleAddSession} isLoading={isAdding} sessions={sessions} currentDay={currentDayString} />
 
       <MilestoneQuote quote={milestoneQuote} show={showQuote} />
     </div>

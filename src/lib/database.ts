@@ -46,6 +46,18 @@ export const db = {
       if (error) throw error;
     },
 
+    getByDateRange: async (startDate: string, endDate: string): Promise<WorkSession[]> => {
+      const { data, error } = await supabase
+        .from('work_sessions')
+        .select('*')
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('start_time', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    },
+
     getById: async (id: string): Promise<WorkSession | null> => {
       const { data, error } = await supabase
         .from('work_sessions')

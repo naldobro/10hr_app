@@ -52,7 +52,7 @@ export default function StatisticsTab({ currentMonth }: StatisticsTabProps) {
       const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${daysInMonth}`;
 
       const summaries = await db.summaries.getByDateRange(startDate, endDate);
-      const allSessions = await db.sessions.getAll();
+      const allSessions = await db.sessions.getByDateRange(startDate, endDate);
 
       const totalHours = summaries.reduce((sum, s) => sum + s.total_hours, 0);
       const daysWorked = summaries.filter((s) => s.total_hours > 0).length;
@@ -91,16 +91,9 @@ export default function StatisticsTab({ currentMonth }: StatisticsTabProps) {
         9
       );
 
-      const monthSessions = allSessions.filter((s) => {
-        const sessionDate = new Date(s.date);
-        return (
-          sessionDate >= new Date(startDate) && sessionDate <= new Date(endDate)
-        );
-      });
-
       setStats({
         totalHours,
-        totalSessions: monthSessions.length,
+        totalSessions: allSessions.length,
         avgHoursPerDay,
         daysWorked,
         bestDay,
@@ -111,7 +104,7 @@ export default function StatisticsTab({ currentMonth }: StatisticsTabProps) {
         mostProductiveHour,
       });
 
-      setRecentSessions(allSessions.slice(0, 10));
+      setRecentSessions([...allSessions].sort((a, b) => b.date.localeCompare(a.date) || b.start_time - a.start_time).slice(0, 10));
     } catch (error) {
       console.error('Error loading statistics:', error);
     } finally {
@@ -140,23 +133,30 @@ export default function StatisticsTab({ currentMonth }: StatisticsTabProps) {
   };
 
   const calculateLongestStreak = (summaries: DailySummary[]): number => {
-    let longestStreak = 0;
-    let currentStreak = 0;
+    const goodDays = summaries
+      .filter(s => s.total_hours >= 8)
+      .map(s => s.date)
+      .sort();
 
-    const sortedSummaries = [...summaries].sort((a, b) =>
-      a.date.localeCompare(b.date)
-    );
+    if (goodDays.length === 0) return 0;
 
-    for (const summary of sortedSummaries) {
-      if (summary.total_hours >= 8) {
-        currentStreak++;
-        longestStreak = Math.max(longestStreak, currentStreak);
-      } else {
-        currentStreak = 0;
+    let longest = 1;
+    let current = 1;
+
+    for (let i = 1; i < goodDays.length; i++) {
+      const prev = new Date(goodDays[i - 1] + 'T00:00:00');
+      const curr = new Date(goodDays[i] + 'T00:00:00');
+      const diffDays = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 1) {
+        current++;
+        longest = Math.max(longest, current);
+      } else if (diffDays > 1) {
+        current = 1;
       }
     }
 
-    return longestStreak;
+    return longest;
   };
 
   const calculateHourDistribution = (sessions: WorkSession[]): number[] => {

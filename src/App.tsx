@@ -16,14 +16,21 @@ function App() {
 
   const calculateStreak = async () => {
     const today = new Date();
+    const yearAgo = new Date(today);
+    yearAgo.setDate(yearAgo.getDate() - 365);
+
+    const toDateStr = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    const summaries = await db.summaries.getByDateRange(toDateStr(yearAgo), toDateStr(today));
+    const goodDays = new Set(
+      summaries.filter(s => s.total_hours >= 8).map(s => s.date)
+    );
+
     let streak = 0;
-    let checkDate = new Date(today);
-
+    const checkDate = new Date(today);
     for (let i = 0; i < 365; i++) {
-      const dateStr = checkDate.toISOString().split('T')[0];
-      const summary = await db.summaries.getByDate(dateStr);
-
-      if (summary && summary.total_hours >= 8) {
+      if (goodDays.has(toDateStr(checkDate))) {
         streak++;
         checkDate.setDate(checkDate.getDate() - 1);
       } else {
