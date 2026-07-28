@@ -19,9 +19,9 @@ function getPrayerCount(h: HabitEntry): number {
 }
 
 function Led({ status }: { status: 'on' | 'yellow' | 'off' }) {
-  if (status === 'on') return <span className="w-[7px] h-[7px] rounded-full bg-emerald-400 inline-block flex-shrink-0 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />;
-  if (status === 'yellow') return <span className="w-[7px] h-[7px] rounded-full bg-amber-400 inline-block flex-shrink-0 shadow-[0_0_6px_rgba(251,191,36,0.8)]" />;
-  return <span className="w-[7px] h-[7px] rounded-full bg-white/30 inline-block flex-shrink-0" />;
+  if (status === 'on') return <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block flex-shrink-0 ring-[1.5px] ring-white/80 shadow-[0_0_6px_rgba(16,185,129,0.9)]" />;
+  if (status === 'yellow') return <span className="w-2 h-2 rounded-full bg-orange-400 inline-block flex-shrink-0 ring-[1.5px] ring-white/80 shadow-[0_0_6px_rgba(251,146,60,0.9)]" />;
+  return <span className="w-2 h-2 rounded-full bg-black/20 inline-block flex-shrink-0 ring-[1.5px] ring-black/10" />;
 }
 
 export default function MonthOverview({
@@ -104,7 +104,7 @@ export default function MonthOverview({
           <div key={weekIndex}>
             <div className="grid grid-cols-7 gap-2">
               {week.map((dayData, dayIndex) => {
-                if (!dayData) return <div key={`empty-${dayIndex}`} className="h-[90px]" />;
+                if (!dayData) return <div key={`empty-${dayIndex}`} className="aspect-square" />;
 
                 const isToday = isCurrentMonth && dayData.day === todayDay;
                 const isSelected = dayData.day === selectedDay && panelOpen;
@@ -119,45 +119,48 @@ export default function MonthOverview({
                     onClick={() => !isFuture && handleDayClick(dayData.day)}
                     disabled={isFuture}
                     className={`
-                      relative rounded-xl h-[90px] transition-all duration-200 paper-shadow
+                      relative rounded-xl aspect-square transition-all duration-200 paper-shadow
                       ${isFuture ? 'cursor-not-allowed' : 'cursor-pointer hover:scale-[1.04] active:scale-[0.98]'}
                       ${getColorClass(dayData.color, isToday, isFuture)}
                       ${isSelected ? 'ring-2 ring-amber-600 scale-[1.04] shadow-lg' : ''}
                       ${dayData.day === selectedDay && !panelOpen ? 'ring-1 ring-amber-400/50' : ''}
-                      flex flex-col justify-between p-2.5
+                      flex flex-col justify-between p-2
                     `}
                   >
-                    <div className="flex justify-between items-start w-full">
-                      {!isFuture ? (
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-1">
-                            <Led status={prayerLed} />
-                            <span className="text-[11px] font-extrabold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)]">Pray</span>
-                            <span className="mx-0.5" />
-                            <Led status={habit?.gym ? 'on' : 'off'} />
-                            <span className="text-[11px] font-extrabold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)]">Gym</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Led status={habit?.outreach ? 'on' : 'off'} />
-                            <span className="text-[11px] font-extrabold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)]">Out</span>
-                            <span className="mx-0.5" />
-                            <Led status={habit?.learn ? 'on' : 'off'} />
-                            <span className="text-[11px] font-extrabold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)]">Learn</span>
-                          </div>
-                        </div>
-                      ) : <div />}
-                      <span className={`text-2xl font-black leading-none ${isFuture ? 'ink-text-muted' : 'text-white drop-shadow-[0_2px_4px_rgba(61,40,23,0.7)]'}`}>
+                    {/* Day number top-right */}
+                    <div className="flex justify-end w-full">
+                      <span className={`text-3xl font-black leading-none ${isFuture ? 'ink-text-muted' : 'text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]'}`}>
                         {dayData.day}
                       </span>
                     </div>
 
-                    {!isFuture && (
-                      <div className="text-right w-full">
-                        <span className="text-sm font-extrabold text-white drop-shadow-[0_2px_4px_rgba(61,40,23,0.7)]">
+                    {/* Habit LEDs bottom-left, hours bottom-right */}
+                    <div className="flex justify-between items-end w-full">
+                      {!isFuture ? (
+                        <div className="bg-black/25 backdrop-blur-sm rounded-md px-1.5 py-1 flex flex-col gap-[2px]">
+                          <div className="flex items-center gap-[3px]">
+                            <Led status={prayerLed} />
+                            <span className="text-[10px] font-bold text-white leading-none">Pray</span>
+                            <span className="w-1" />
+                            <Led status={habit?.gym ? 'on' : 'off'} />
+                            <span className="text-[10px] font-bold text-white leading-none">Gym</span>
+                          </div>
+                          <div className="flex items-center gap-[3px]">
+                            <Led status={habit?.outreach ? 'on' : 'off'} />
+                            <span className="text-[10px] font-bold text-white leading-none">Out</span>
+                            <span className="w-1" />
+                            <Led status={habit?.learn ? 'on' : 'off'} />
+                            <span className="text-[10px] font-bold text-white leading-none">Learn</span>
+                          </div>
+                        </div>
+                      ) : <div />}
+
+                      {!isFuture && (
+                        <span className="text-base font-extrabold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">
                           {dayData.hours.toFixed(1)}h
                         </span>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
                     {isToday && !isFuture && (
                       <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white shadow-md" />
@@ -169,15 +172,17 @@ export default function MonthOverview({
 
             {weekIndex === selectedWeekIndex && panelOpen && !isFutureSelected && selectedDayData && (
               <div className="relative mt-2 overflow-hidden" style={{
-                animation: 'slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                animation: 'habitSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
               }}>
                 <div
                   className="absolute top-0 z-10"
                   style={{
-                    left: `calc(${(selectedDayIndex * 100) / 7}% + ${100 / 14}% - 8px)`,
+                    left: `calc(${(selectedDayIndex * 100) / 7}% + ${100 / 14}% - 10px)`,
                   }}
                 >
-                  <div className="w-4 h-4 rotate-45 -translate-y-2 bg-gradient-to-br from-slate-800 to-slate-900 border-l border-t border-white/10" />
+                  <div className="w-5 h-5 rotate-45 -translate-y-2.5 border-l border-t border-amber-300/30" style={{
+                    background: 'linear-gradient(135deg, #92400e, #78350f)',
+                  }} />
                 </div>
 
                 <HabitPanel
@@ -187,9 +192,9 @@ export default function MonthOverview({
                 />
 
                 <style>{`
-                  @keyframes slideDown {
-                    from { max-height: 0; opacity: 0; transform: translateY(-8px); }
-                    to { max-height: 400px; opacity: 1; transform: translateY(0); }
+                  @keyframes habitSlideDown {
+                    from { max-height: 0; opacity: 0; transform: translateY(-12px); }
+                    to { max-height: 500px; opacity: 1; transform: translateY(0); }
                   }
                 `}</style>
               </div>
