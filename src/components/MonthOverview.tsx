@@ -19,9 +19,9 @@ function getPrayerCount(h: HabitEntry): number {
 }
 
 function Led({ status }: { status: 'on' | 'yellow' | 'off' }) {
-  if (status === 'on') return <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block flex-shrink-0 ring-[1.5px] ring-white/80 shadow-[0_0_6px_rgba(16,185,129,0.9)]" />;
-  if (status === 'yellow') return <span className="w-2.5 h-2.5 rounded-full bg-orange-400 inline-block flex-shrink-0 ring-[1.5px] ring-white/80 shadow-[0_0_6px_rgba(251,146,60,0.9)]" />;
-  return <span className="w-2.5 h-2.5 rounded-full bg-black/20 inline-block flex-shrink-0 ring-[1.5px] ring-black/10" />;
+  if (status === 'on') return <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block flex-shrink-0 ring-[1.5px] ring-white/80 shadow-[0_0_6px_rgba(16,185,129,0.9)]" />;
+  if (status === 'yellow') return <span className="w-3 h-3 rounded-full bg-orange-400 inline-block flex-shrink-0 ring-[1.5px] ring-white/80 shadow-[0_0_6px_rgba(251,146,60,0.9)]" />;
+  return <span className="w-3 h-3 rounded-full bg-black/20 inline-block flex-shrink-0 ring-[1.5px] ring-black/10" />;
 }
 
 export default function MonthOverview({
@@ -70,7 +70,7 @@ export default function MonthOverview({
     else { onDayClick(day); setPanelOpen(true); }
   };
 
-  const shadow = 'drop-shadow-[0_1px_3px_rgba(0,0,0,0.5)]';
+  const s = 'drop-shadow-[0_1px_3px_rgba(0,0,0,0.5)]';
 
   return (
     <div className="paper-card rounded-2xl paper-shadow p-5 paper-border">
@@ -85,7 +85,7 @@ export default function MonthOverview({
           <div key={weekIndex}>
             <div className="grid grid-cols-7 gap-2">
               {week.map((dayData, dayIndex) => {
-                if (!dayData) return <div key={`empty-${dayIndex}`} className="aspect-square" />;
+                if (!dayData) return <div key={`empty-${dayIndex}`} style={{ aspectRatio: '1 / 0.88' }} />;
 
                 const isToday = isCurrentMonth && dayData.day === todayDay;
                 const isSelected = dayData.day === selectedDay && panelOpen;
@@ -99,48 +99,53 @@ export default function MonthOverview({
                     key={dayData.day}
                     onClick={() => !isFuture && handleDayClick(dayData.day)}
                     disabled={isFuture}
+                    style={{ aspectRatio: '1 / 0.88' }}
                     className={`
-                      relative rounded-xl aspect-square transition-all duration-200 paper-shadow
+                      relative rounded-xl transition-all duration-200 paper-shadow
                       ${isFuture ? 'cursor-not-allowed' : 'cursor-pointer hover:scale-[1.04] active:scale-[0.98]'}
                       ${getColorClass(dayData.color, isToday, isFuture)}
                       ${isSelected ? 'ring-2 ring-amber-600 scale-[1.04] shadow-lg' : ''}
                       ${dayData.day === selectedDay && !panelOpen ? 'ring-1 ring-amber-400/50' : ''}
-                      flex flex-col justify-between p-3
+                      flex flex-col p-3
                     `}
                   >
-                    {/* Top: day number right-aligned */}
-                    <div className="text-right">
-                      <span className={`text-3xl font-black leading-none ${isFuture ? 'ink-text-muted' : `text-white ${shadow}`}`}>
+                    {/* Row 1: day number top-right */}
+                    <div className="text-right pr-0.5">
+                      <span className={`font-black leading-none ${isFuture ? 'ink-text-muted' : `text-white ${s}`}`} style={{ fontSize: '36px' }}>
                         {dayData.day}
                       </span>
                     </div>
 
-                    {/* Bottom: habits grid left, hours right */}
+                    {/* Rows 2-4: habits spread evenly across lower half */}
                     {!isFuture ? (
-                      <div className="flex justify-between items-end">
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                      <div className="flex-1 flex flex-col justify-evenly mt-1">
+                        <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5">
                             <Led status={pLed} />
-                            <span className={`text-xs font-extrabold text-white ${shadow}`}>Pray</span>
+                            <span className={`font-bold text-white ${s}`} style={{ fontSize: '15px' }}>Pray</span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <Led status={habit?.gym ? 'on' : 'off'} />
-                            <span className={`text-xs font-extrabold text-white ${shadow}`}>Gym</span>
+                            <span className={`font-bold text-white ${s}`} style={{ fontSize: '15px' }}>Gym</span>
                           </div>
+                        </div>
+                        <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5">
                             <Led status={habit?.outreach ? 'on' : 'off'} />
-                            <span className={`text-xs font-extrabold text-white ${shadow}`}>Out</span>
+                            <span className={`font-bold text-white ${s}`} style={{ fontSize: '15px' }}>Out</span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <Led status={habit?.learn ? 'on' : 'off'} />
-                            <span className={`text-xs font-extrabold text-white ${shadow}`}>Learn</span>
+                            <span className={`font-bold text-white ${s}`} style={{ fontSize: '15px' }}>Learn</span>
                           </div>
                         </div>
-                        <span className={`text-lg font-black text-white ${shadow} leading-none`}>
-                          {dayData.hours.toFixed(1)}h
-                        </span>
+                        <div className="text-right">
+                          <span className={`font-semibold text-white ${s}`} style={{ fontSize: '20px' }}>
+                            {dayData.hours.toFixed(1)}h
+                          </span>
+                        </div>
                       </div>
-                    ) : <div />}
+                    ) : <div className="flex-1" />}
 
                     {isToday && !isFuture && (
                       <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white shadow-md" />
@@ -158,7 +163,7 @@ export default function MonthOverview({
                   left: `calc(${(selectedDayIndex * 100) / 7}% + ${100 / 14}% - 10px)`,
                 }}>
                   <div className="w-5 h-5 rotate-45 -translate-y-2.5 border-l border-t border-indigo-400/20" style={{
-                    background: 'linear-gradient(135deg, #3730a3, #312e81)',
+                    background: 'linear-gradient(135deg, #4338ca, #3730a3)',
                   }} />
                 </div>
                 <HabitPanel date={selectedDayData.date} habit={currentHabit} onToggle={onHabitToggle} />
