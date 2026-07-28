@@ -3,7 +3,6 @@ import { db } from '../lib/database';
 import { undoManager } from '../lib/undoManager';
 import { WorkSession, DayData, HabitEntry } from '../types';
 import MonthOverview from './MonthOverview';
-import HabitPanel from './HabitPanel';
 import MotivationalQuote from './MotivationalQuote';
 import DaySummary from './DaySummary';
 import TimelineGraph from './TimelineGraph';
@@ -316,12 +315,8 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
         todayDay={todayDay}
         currentMonth={currentMonth}
         habitData={habitMap}
-      />
-
-      <HabitPanel
-        date={currentDayString}
-        habit={currentHabit}
-        onToggle={handleHabitToggle}
+        currentHabit={currentHabit}
+        onHabitToggle={handleHabitToggle}
       />
 
       <MotivationalQuote workedHours={workedHours} />

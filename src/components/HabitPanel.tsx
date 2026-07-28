@@ -1,4 +1,5 @@
 import { HabitEntry } from '../types';
+import { Check } from 'lucide-react';
 
 interface HabitPanelProps {
   date: string;
@@ -15,10 +16,38 @@ const PRAYERS = [
 ];
 
 const HABITS = [
-  { key: 'gym' as const, label: 'Gym' },
-  { key: 'outreach' as const, label: 'Outreach' },
-  { key: 'learn' as const, label: 'Learn' },
+  { key: 'gym' as const, label: 'Gym', emoji: '💪' },
+  { key: 'outreach' as const, label: 'Outreach', emoji: '📨' },
+  { key: 'learn' as const, label: 'Learn', emoji: '📖' },
 ];
+
+function Toggle({ checked, onToggle, label }: { checked: boolean; onToggle: () => void; label: string }) {
+  return (
+    <button
+      onClick={onToggle}
+      className={`
+        flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-200
+        ${checked
+          ? 'bg-emerald-100 border border-emerald-300'
+          : 'bg-stone-100 border border-stone-200 hover:bg-stone-150 hover:border-stone-300'
+        }
+      `}
+    >
+      <div className={`
+        w-5 h-5 rounded-md flex items-center justify-center transition-all duration-200
+        ${checked
+          ? 'bg-emerald-500 shadow-sm'
+          : 'bg-white border-2 border-stone-300'
+        }
+      `}>
+        {checked && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+      </div>
+      <span className={`text-sm font-semibold transition-colors ${checked ? 'text-emerald-800' : 'text-stone-500'}`}>
+        {label}
+      </span>
+    </button>
+  );
+}
 
 export default function HabitPanel({ date, habit, onToggle }: HabitPanelProps) {
   const prayerCount = habit
@@ -27,61 +56,47 @@ export default function HabitPanel({ date, habit, onToggle }: HabitPanelProps) {
 
   const formatDate = (d: string) => {
     const dt = new Date(d + 'T00:00:00');
-    return dt.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
   return (
-    <div className="paper-card rounded-2xl paper-shadow p-6 paper-border animate-in fade-in slide-in-from-top-2 duration-200">
-      <h3 className="text-lg font-bold ink-text mb-4">{formatDate(date)}</h3>
+    <div className="bg-amber-50 rounded-xl border border-stone-200 p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm font-bold ink-text">{formatDate(date)}</span>
+        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+          prayerCount >= 5 ? 'bg-emerald-100 text-emerald-700 shadow-[0_0_6px_rgba(52,211,153,0.3)]' :
+          prayerCount === 4 ? 'bg-amber-100 text-amber-700' :
+          'bg-stone-100 text-stone-400'
+        }`}>
+          🕌 {prayerCount}/5
+        </span>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 gap-3">
         <div>
-          <div className="flex items-center gap-2 mb-3">
-            <h4 className="font-bold ink-text">Prayer</h4>
-            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-              prayerCount >= 5 ? 'bg-emerald-100 text-emerald-700' :
-              prayerCount === 4 ? 'bg-amber-100 text-amber-700' :
-              'bg-stone-100 text-stone-500'
-            }`}>
-              {prayerCount}/5
-            </span>
-          </div>
-          <div className="space-y-2">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-2">Prayers</p>
+          <div className="flex flex-col gap-1.5">
             {PRAYERS.map(({ key, label }) => (
-              <label key={key} className="flex items-center gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={habit?.[key] || false}
-                  onChange={() => onToggle(key)}
-                  className="w-5 h-5 rounded border-stone-300 text-amber-600 focus:ring-amber-600 cursor-pointer"
-                />
-                <span className={`font-medium transition-colors ${
-                  habit?.[key] ? 'ink-text' : 'ink-text-muted group-hover:text-stone-600'
-                }`}>
-                  {label}
-                </span>
-              </label>
+              <Toggle
+                key={key}
+                checked={habit?.[key] || false}
+                onToggle={() => onToggle(key)}
+                label={label}
+              />
             ))}
           </div>
         </div>
 
         <div>
-          <h4 className="font-bold ink-text mb-3">Habits</h4>
-          <div className="space-y-2">
-            {HABITS.map(({ key, label }) => (
-              <label key={key} className="flex items-center gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={habit?.[key] || false}
-                  onChange={() => onToggle(key)}
-                  className="w-5 h-5 rounded border-stone-300 text-amber-600 focus:ring-amber-600 cursor-pointer"
-                />
-                <span className={`font-medium transition-colors ${
-                  habit?.[key] ? 'ink-text' : 'ink-text-muted group-hover:text-stone-600'
-                }`}>
-                  {label}
-                </span>
-              </label>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-2">Habits</p>
+          <div className="flex flex-col gap-1.5">
+            {HABITS.map(({ key, label, emoji }) => (
+              <Toggle
+                key={key}
+                checked={habit?.[key] || false}
+                onToggle={() => onToggle(key)}
+                label={`${emoji} ${label}`}
+              />
             ))}
           </div>
         </div>
