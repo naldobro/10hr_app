@@ -21,7 +21,7 @@ function getPrayerCount(h: HabitEntry): number {
 function Led({ status }: { status: 'on' | 'yellow' | 'off' }) {
   if (status === 'on') return <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block flex-shrink-0 ring-[1.5px] ring-white/80 shadow-[0_0_6px_rgba(16,185,129,0.9)]" />;
   if (status === 'yellow') return <span className="w-3 h-3 rounded-full bg-orange-400 inline-block flex-shrink-0 ring-[1.5px] ring-white/80 shadow-[0_0_6px_rgba(251,146,60,0.9)]" />;
-  return <span className="w-3 h-3 rounded-full bg-black/20 inline-block flex-shrink-0 ring-[1.5px] ring-black/10" />;
+  return <span className="w-3 h-3 rounded-full bg-black/25 inline-block flex-shrink-0 ring-[1.5px] ring-black/10" />;
 }
 
 export default function MonthOverview({
@@ -70,8 +70,6 @@ export default function MonthOverview({
     else { onDayClick(day); setPanelOpen(true); }
   };
 
-  const s = 'drop-shadow-[0_1px_3px_rgba(0,0,0,0.5)]';
-
   return (
     <div className="paper-card rounded-2xl paper-shadow p-5 paper-border">
       <div className="grid grid-cols-7 gap-2 mb-3">
@@ -106,46 +104,45 @@ export default function MonthOverview({
                       ${getColorClass(dayData.color, isToday, isFuture)}
                       ${isSelected ? 'ring-2 ring-amber-600 scale-[1.04] shadow-lg' : ''}
                       ${dayData.day === selectedDay && !panelOpen ? 'ring-1 ring-amber-400/50' : ''}
-                      flex flex-col p-3
+                      flex p-3
                     `}
                   >
-                    {/* Row 1: day number top-right */}
-                    <div className="text-right pr-0.5">
-                      <span className={`font-black leading-none ${isFuture ? 'ink-text-muted' : `text-white ${s}`}`} style={{ fontSize: '36px' }}>
-                        {dayData.day}
-                      </span>
-                    </div>
-
-                    {/* Rows 2-4: habits spread evenly across lower half */}
+                    {/* Left zone: 4 habit rows stacked, evenly spaced */}
                     {!isFuture ? (
-                      <div className="flex-1 flex flex-col justify-evenly mt-1">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <Led status={pLed} />
-                            <span className={`font-bold text-white ${s}`} style={{ fontSize: '15px' }}>Pray</span>
+                      <div className="flex flex-col justify-between flex-1 min-w-0">
+                        {[
+                          { label: 'Pray', led: pLed },
+                          { label: 'Gym', led: (habit?.gym ? 'on' : 'off') as 'on' | 'off' },
+                          { label: 'Out', led: (habit?.outreach ? 'on' : 'off') as 'on' | 'off' },
+                          { label: 'Learn', led: (habit?.learn ? 'on' : 'off') as 'on' | 'off' },
+                        ].map(({ label, led }) => (
+                          <div key={label} className="flex items-center gap-2">
+                            <Led status={led} />
+                            <span className="font-bold text-stone-800 leading-none" style={{ fontSize: '15px' }}>
+                              {label}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-1.5">
-                            <Led status={habit?.gym ? 'on' : 'off'} />
-                            <span className={`font-bold text-white ${s}`} style={{ fontSize: '15px' }}>Gym</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <Led status={habit?.outreach ? 'on' : 'off'} />
-                            <span className={`font-bold text-white ${s}`} style={{ fontSize: '15px' }}>Out</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <Led status={habit?.learn ? 'on' : 'off'} />
-                            <span className={`font-bold text-white ${s}`} style={{ fontSize: '15px' }}>Learn</span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <span className={`font-semibold text-white ${s}`} style={{ fontSize: '20px' }}>
-                            {dayData.hours.toFixed(1)}h
-                          </span>
-                        </div>
+                        ))}
                       </div>
                     ) : <div className="flex-1" />}
+
+                    {/* Right zone: day number top, hours bottom */}
+                    <div className="flex flex-col justify-between items-end flex-shrink-0 ml-1">
+                      <span
+                        className={`font-bold leading-none ${isFuture ? 'ink-text-muted' : 'text-stone-800 drop-shadow-[0_1px_2px_rgba(255,255,255,0.3)]'}`}
+                        style={{ fontSize: '45px' }}
+                      >
+                        {dayData.day}
+                      </span>
+                      {!isFuture && (
+                        <span
+                          className="font-bold text-stone-800 leading-none drop-shadow-[0_1px_2px_rgba(255,255,255,0.3)]"
+                          style={{ fontSize: '22px' }}
+                        >
+                          {dayData.hours.toFixed(1)}h
+                        </span>
+                      )}
+                    </div>
 
                     {isToday && !isFuture && (
                       <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white shadow-md" />
