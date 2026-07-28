@@ -27,15 +27,12 @@ function ToggleSwitch({ checked, onToggle }: { checked: boolean; onToggle: () =>
       relative w-12 h-7 rounded-full transition-all duration-300 flex-shrink-0 border
       ${checked
         ? 'bg-gradient-to-r from-emerald-400 to-emerald-500 border-emerald-600/30 shadow-[0_0_14px_rgba(16,185,129,0.4)]'
-        : 'bg-amber-900/20 border-amber-700/20 hover:bg-amber-900/30'
+        : 'bg-white/10 border-white/10 hover:bg-white/20'
       }
     `}>
       <div className={`
         absolute top-[3px] w-[22px] h-[22px] rounded-full transition-all duration-300 flex items-center justify-center shadow-sm
-        ${checked
-          ? 'left-[23px] bg-white'
-          : 'left-[3px] bg-amber-200/60'
-        }
+        ${checked ? 'left-[23px] bg-white' : 'left-[3px] bg-white/40'}
       `}>
         {checked && <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />}
       </div>
@@ -56,19 +53,19 @@ export default function HabitPanel({ date, habit, onToggle }: HabitPanelProps) {
   };
 
   return (
-    <div className="rounded-xl overflow-hidden shadow-lg" style={{
-      background: 'linear-gradient(135deg, #92400e 0%, #78350f 40%, #451a03 100%)',
+    <div className="rounded-xl overflow-hidden shadow-xl" style={{
+      background: 'linear-gradient(135deg, #4338ca 0%, #3730a3 30%, #312e81 60%, #1e1b4b 100%)',
     }}>
-      <div className="p-5">
+      <div className="p-6">
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-amber-100 font-bold text-lg">{formatDate(date)}</h3>
+          <h3 className="text-indigo-100 font-bold text-lg">{formatDate(date)}</h3>
           <div className={`
             flex items-center gap-2 px-3.5 py-1.5 rounded-full text-sm font-bold border
             ${prayerCount >= 5
               ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30 shadow-[0_0_14px_rgba(16,185,129,0.25)]'
               : prayerCount >= 4
               ? 'bg-amber-400/20 text-amber-200 border-amber-400/30'
-              : 'bg-amber-900/30 text-amber-300/50 border-amber-700/20'}
+              : 'bg-white/5 text-indigo-300/50 border-indigo-400/20'}
           `}>
             🕌 {prayerCount}/5
           </div>
@@ -76,21 +73,21 @@ export default function HabitPanel({ date, habit, onToggle }: HabitPanelProps) {
 
         <div className="grid grid-cols-2 gap-6">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.15em] text-amber-400/50 mb-3">Salah</p>
+            <p className="text-xs font-bold uppercase tracking-[0.15em] text-indigo-300/40 mb-3">Salah</p>
             <div className="space-y-1.5">
               {PRAYERS.map(({ key, label, time }) => (
                 <div key={key} className={`
-                  flex items-center justify-between px-3.5 py-3 rounded-xl transition-all duration-300 border
+                  flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 border
                   ${habit?.[key]
                     ? 'bg-emerald-500/15 border-emerald-500/25'
-                    : 'bg-amber-950/30 border-amber-700/15 hover:bg-amber-950/50'
+                    : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]'
                   }
                 `}>
                   <div>
-                    <span className={`text-sm font-bold ${habit?.[key] ? 'text-emerald-300' : 'text-amber-100/80'}`}>
+                    <span className={`text-[15px] font-bold ${habit?.[key] ? 'text-emerald-300' : 'text-indigo-100/80'}`}>
                       {label}
                     </span>
-                    <span className={`text-[10px] ml-2 ${habit?.[key] ? 'text-emerald-400/40' : 'text-amber-400/25'}`}>
+                    <span className={`text-[11px] ml-2 ${habit?.[key] ? 'text-emerald-400/40' : 'text-indigo-300/25'}`}>
                       {time}
                     </span>
                   </div>
@@ -101,19 +98,19 @@ export default function HabitPanel({ date, habit, onToggle }: HabitPanelProps) {
           </div>
 
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.15em] text-amber-400/50 mb-3">Daily Habits</p>
+            <p className="text-xs font-bold uppercase tracking-[0.15em] text-indigo-300/40 mb-3">Daily Habits</p>
             <div className="space-y-1.5">
               {HABITS.map(({ key, label, icon }) => (
                 <div key={key} className={`
-                  flex items-center justify-between px-3.5 py-3 rounded-xl transition-all duration-300 border
+                  flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 border
                   ${habit?.[key]
                     ? 'bg-emerald-500/15 border-emerald-500/25'
-                    : 'bg-amber-950/30 border-amber-700/15 hover:bg-amber-950/50'
+                    : 'bg-white/[0.04] border-white/[0.06] hover:bg-white/[0.08]'
                   }
                 `}>
                   <div className="flex items-center gap-2.5">
                     <span className="text-lg">{icon}</span>
-                    <span className={`text-sm font-bold ${habit?.[key] ? 'text-emerald-300' : 'text-amber-100/80'}`}>
+                    <span className={`text-[15px] font-bold ${habit?.[key] ? 'text-emerald-300' : 'text-indigo-100/80'}`}>
                       {label}
                     </span>
                   </div>
@@ -122,20 +119,20 @@ export default function HabitPanel({ date, habit, onToggle }: HabitPanelProps) {
               ))}
             </div>
 
-            <div className="mt-5 p-4 rounded-xl bg-amber-950/40 border border-amber-700/15">
+            <div className="mt-5 p-4 rounded-xl bg-white/[0.04] border border-white/[0.06]">
               <div className="flex items-center justify-between mb-2.5">
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-400/40">Daily Score</span>
-                <span className={`text-lg font-black ${
-                  totalScore >= 7 ? 'text-emerald-400' : totalScore >= 4 ? 'text-amber-300' : 'text-amber-400/40'
+                <span className="text-xs font-bold uppercase tracking-wider text-indigo-300/40">Daily Score</span>
+                <span className={`text-xl font-black ${
+                  totalScore >= 7 ? 'text-emerald-400' : totalScore >= 4 ? 'text-amber-300' : 'text-indigo-300/40'
                 }`}>{totalScore}/8</span>
               </div>
               <div className="flex gap-1.5">
                 {[...Array(8)].map((_, i) => (
                   <div key={i} className={`
-                    h-2 flex-1 rounded-full transition-all duration-500
+                    h-2.5 flex-1 rounded-full transition-all duration-500
                     ${i < totalScore
-                      ? 'bg-gradient-to-r from-emerald-400 to-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.35)]'
-                      : 'bg-amber-900/40'
+                      ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 shadow-[0_0_8px_rgba(16,185,129,0.35)]'
+                      : 'bg-white/10'
                     }
                   `} />
                 ))}
