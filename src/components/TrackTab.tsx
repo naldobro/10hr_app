@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { db } from '../lib/database';
 import { undoManager } from '../lib/undoManager';
-import { WorkSession, DayData } from '../types';
+import { WorkSession, DayData, HabitEntry } from '../types';
 import MonthOverview from './MonthOverview';
+import HabitPanel from './HabitPanel';
 import MotivationalQuote from './MotivationalQuote';
 import DaySummary from './DaySummary';
 import TimelineGraph from './TimelineGraph';
@@ -25,23 +26,79 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [habitMap, setHabitMap] = useState<Map<string, HabitEntry>>(new Map());
+  const [currentHabit, setCurrentHabit] = useState<HabitEntry | null>(null);
 
   const currentDayString = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
 
   useEffect(() => {
     loadMonthData();
     loadSessions();
+    loadHabitData();
     updateUndoRedoState();
   }, [currentMonth]);
 
   useEffect(() => {
     loadSessions();
+    loadCurrentHabit();
     updateUndoRedoState();
   }, [selectedDay]);
 
   const updateUndoRedoState = () => {
     setCanUndo(undoManager.canUndo());
     setCanRedo(undoManager.canRedo());
+  };
+
+  const loadHabitData = async () => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+    const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${daysInMonth}`;
+
+    try {
+      const entries = await db.habits.getByDateRange(startDate, endDate);
+      const map = new Map(entries.map(e => [e.date, e]));
+      setHabitMap(map);
+      setCurrentHabit(map.get(currentDayString) || null);
+    } catch {
+      // Table might not exist yet
+    }
+  };
+
+  const loadCurrentHabit = async () => {
+    try {
+      const entry = await db.habits.getByDate(currentDayString);
+      setCurrentHabit(entry);
+    } catch {
+      // Table might not exist yet
+    }
+  };
+
+  const handleHabitToggle = async (field: keyof HabitEntry) => {
+    try {
+      const current = currentHabit;
+      const newValue = !(current?.[field] || false);
+      const updated = await db.habits.upsert({
+        date: currentDayString,
+        [field]: newValue,
+        ...(current ? {} : {
+          prayer_fajr: false,
+          prayer_dhuhr: false,
+          prayer_asr: false,
+          prayer_maghrib: false,
+          prayer_isha: false,
+          gym: false,
+          outreach: false,
+          learn: false,
+        }),
+        [field]: newValue,
+      });
+      setCurrentHabit(updated);
+      setHabitMap(prev => new Map(prev).set(currentDayString, updated));
+    } catch (err) {
+      console.error('Error toggling habit:', err);
+    }
   };
 
   const loadMonthData = async () => {
@@ -258,6 +315,13 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
         onDayClick={setSelectedDay}
         todayDay={todayDay}
         currentMonth={currentMonth}
+        habitData={habitMap}
+      />
+
+      <HabitPanel
+        date={currentDayString}
+        habit={currentHabit}
+        onToggle={handleHabitToggle}
       />
 
       <MotivationalQuote workedHours={workedHours} />

@@ -18,23 +18,21 @@ export interface DailySummary {
   updated_at: string;
 }
 
-export interface Goal {
+
+export interface HabitEntry {
   id: string;
   user_id: string;
-  type: 'major' | 'minor';
-  description: string;
-  completed: boolean;
-  progress_current: number;
-  progress_total: number;
   date: string;
-  month: string;
+  prayer_fajr: boolean;
+  prayer_dhuhr: boolean;
+  prayer_asr: boolean;
+  prayer_maghrib: boolean;
+  prayer_isha: boolean;
+  gym: boolean;
+  outreach: boolean;
+  learn: boolean;
   created_at: string;
-}
-
-export interface MilestoneQuote {
-  id: string;
-  quote: string;
-  sort_order: number;
+  updated_at: string;
 }
 
 export interface DayData {

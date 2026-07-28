@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { WorkSession, DailySummary, Goal } from '../types';
+import { WorkSession, DailySummary, HabitEntry } from '../types';
 
 const SINGLE_USER_ID = 'single-user';
 
@@ -121,69 +121,44 @@ export const db = {
     },
   },
 
-  goals: {
-    getAll: async (): Promise<Goal[]> => {
+  habits: {
+    getByDate: async (date: string): Promise<HabitEntry | null> => {
       const { data, error } = await supabase
-        .from('goals')
+        .from('habit_entries')
         .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
-    },
-
-    getByMonth: async (month: string, type?: 'major' | 'minor'): Promise<Goal[]> => {
-      let query = supabase
-        .from('goals')
-        .select('*')
-        .eq('month', month);
-
-      if (type) {
-        query = query.eq('type', type);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
-    },
-
-    add: async (goal: Omit<Goal, 'id' | 'user_id' | 'created_at'>): Promise<Goal> => {
-      const { data, error } = await supabase
-        .from('goals')
-        .insert([{ ...goal, user_id: SINGLE_USER_ID }])
-        .select()
-        .single();
+        .eq('date', date)
+        .maybeSingle();
 
       if (error) throw error;
       return data;
     },
 
-    update: async (id: string, updates: Partial<Goal>): Promise<void> => {
-      const { error } = await supabase
-        .from('goals')
-        .update(updates)
-        .eq('id', id);
+    getByDateRange: async (startDate: string, endDate: string): Promise<HabitEntry[]> => {
+      const { data, error } = await supabase
+        .from('habit_entries')
+        .select('*')
+        .gte('date', startDate)
+        .lte('date', endDate);
 
       if (error) throw error;
+      return data || [];
     },
 
-    delete: async (id: string): Promise<void> => {
-      const { error } = await supabase
-        .from('goals')
-        .delete()
-        .eq('id', id);
+    upsert: async (entry: Partial<HabitEntry> & { date: string }): Promise<HabitEntry> => {
+      const { data, error } = await supabase
+        .from('habit_entries')
+        .upsert({
+          user_id: SINGLE_USER_ID,
+          ...entry,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id,date',
+        })
+        .select()
+        .single();
 
       if (error) throw error;
-    },
-
-    deleteByMonth: async (month: string): Promise<void> => {
-      const { error } = await supabase
-        .from('goals')
-        .delete()
-        .eq('month', month);
-
-      if (error) throw error;
+      return data;
     },
   },
 

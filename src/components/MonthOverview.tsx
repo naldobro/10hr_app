@@ -1,4 +1,4 @@
-import { DayData } from '../types';
+import { DayData, HabitEntry } from '../types';
 
 interface MonthOverviewProps {
   monthData: DayData[];
@@ -6,6 +6,22 @@ interface MonthOverviewProps {
   onDayClick: (day: number) => void;
   todayDay: number;
   currentMonth: Date;
+  habitData: Map<string, HabitEntry>;
+}
+
+function getPrayerCount(h: HabitEntry): number {
+  return [h.prayer_fajr, h.prayer_dhuhr, h.prayer_asr, h.prayer_maghrib, h.prayer_isha]
+    .filter(Boolean).length;
+}
+
+function HabitLed({ active, color }: { active: boolean | 'yellow'; color: string }) {
+  if (active === 'yellow') {
+    return <span className="w-2 h-2 rounded-full bg-amber-400 inline-block flex-shrink-0" />;
+  }
+  if (active) {
+    return <span className={`w-2 h-2 rounded-full ${color} inline-block flex-shrink-0`} />;
+  }
+  return <span className="w-2 h-2 rounded-full bg-stone-400/40 inline-block flex-shrink-0" />;
 }
 
 export default function MonthOverview({
@@ -14,6 +30,7 @@ export default function MonthOverview({
   onDayClick,
   todayDay,
   currentMonth,
+  habitData,
 }: MonthOverviewProps) {
   const today = new Date();
   const isCurrentMonth =
@@ -49,7 +66,6 @@ export default function MonthOverview({
 
   for (let day = 1; day <= daysInMonth; day++) {
     const dayData = dayMap.get(day);
-    const isFuture = isCurrentMonth && day > today.getDate();
 
     currentWeek.push(
       dayData || {
@@ -91,14 +107,15 @@ export default function MonthOverview({
             <div key={weekIndex} className="grid grid-cols-7 gap-2">
               {week.map((dayData, dayIndex) => {
                 if (!dayData) {
-                  return (
-                    <div key={`empty-${dayIndex}`} className="h-24 w-24"></div>
-                  );
+                  return <div key={`empty-${dayIndex}`} className="aspect-square" />;
                 }
 
                 const isToday = isCurrentMonth && dayData.day === todayDay;
                 const isSelected = dayData.day === selectedDay;
                 const isFuture = isCurrentMonth && dayData.day > today.getDate();
+                const habit = habitData.get(dayData.date);
+                const prayerCount = habit ? getPrayerCount(habit) : 0;
+                const prayerStatus: boolean | 'yellow' = prayerCount >= 5 ? true : prayerCount === 4 ? 'yellow' : false;
 
                 return (
                   <button
@@ -106,26 +123,52 @@ export default function MonthOverview({
                     onClick={() => !isFuture && onDayClick(dayData.day)}
                     disabled={isFuture}
                     className={`
-                      relative h-24 w-24 rounded-lg
+                      relative rounded-lg p-2
                       ${isFuture ? 'cursor-not-allowed' : 'cursor-pointer'}
                       ${getColorClass(dayData.color, isToday, isFuture)}
-                      ${isToday && !isFuture ? 'scale-105' : ''}
-                      ${!isFuture ? 'hover:scale-105' : ''}
+                      ${isToday && !isFuture ? 'scale-[1.02]' : ''}
+                      ${!isFuture ? 'hover:scale-[1.02]' : ''}
                       ${isSelected && !isFuture ? 'ring-2 ring-amber-700' : ''}
-                      flex flex-col items-center justify-center
+                      flex flex-col justify-between aspect-square
                     `}
                   >
-                    <span className={`text-4xl font-black ${isFuture ? 'ink-text-muted' : 'text-white'} ${isFuture ? 'drop-shadow-sm' : 'drop-shadow-[0_2px_4px_rgba(61,40,23,0.6)]'} leading-none mb-1`}>
-                      {dayData.day}
-                    </span>
-                    {!isFuture && (
-                      <span className="text-sm font-bold text-white drop-shadow-[0_2px_4px_rgba(61,40,23,0.6)] leading-none">
-                        {dayData.hours.toFixed(1)}h
+                    <div className="flex justify-between items-start w-full">
+                      {!isFuture ? (
+                        <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-left">
+                          <div className="flex items-center gap-1">
+                            <HabitLed active={prayerStatus} color="bg-emerald-400" />
+                            <span className="text-[9px] font-bold text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] leading-none">Pray</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <HabitLed active={habit?.gym || false} color="bg-emerald-400" />
+                            <span className="text-[9px] font-bold text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] leading-none">Gym</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <HabitLed active={habit?.outreach || false} color="bg-emerald-400" />
+                            <span className="text-[9px] font-bold text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] leading-none">Out</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <HabitLed active={habit?.learn || false} color="bg-emerald-400" />
+                            <span className="text-[9px] font-bold text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] leading-none">Learn</span>
+                          </div>
+                        </div>
+                      ) : <div />}
+
+                      <span className={`text-2xl font-black leading-none ${isFuture ? 'ink-text-muted drop-shadow-sm' : 'text-white drop-shadow-[0_2px_4px_rgba(61,40,23,0.6)]'}`}>
+                        {dayData.day}
                       </span>
+                    </div>
+
+                    {!isFuture && (
+                      <div className="text-right w-full">
+                        <span className="text-sm font-bold text-white drop-shadow-[0_2px_4px_rgba(61,40,23,0.6)] leading-none">
+                          {dayData.hours.toFixed(1)}h
+                        </span>
+                      </div>
                     )}
 
                     {isToday && !isFuture && (
-                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-amber-600 rounded-full border border-white"></div>
+                      <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-600 rounded-full border-2 border-white" />
                     )}
                   </button>
                 );
