@@ -1,8 +1,8 @@
 import { ChevronLeft, ChevronRight, Flame } from 'lucide-react';
 
 interface NavigationProps {
-  activeTab: 'track' | 'focus' | 'statistics';
-  onTabChange: (tab: 'track' | 'focus' | 'statistics') => void;
+  activeTab: 'track' | 'statistics';
+  onTabChange: (tab: 'track' | 'statistics') => void;
   currentMonth: string;
   onMonthChange: (direction: 'prev' | 'next') => void;
   streakDays: number;
@@ -38,16 +38,6 @@ export default function Navigation({
               }`}
             >
               Track
-            </button>
-            <button
-              onClick={() => onTabChange('focus')}
-              className={`px-6 py-2 rounded-md font-semibold transition-all ${
-                activeTab === 'focus'
-                  ? 'paper-card ink-text paper-shadow'
-                  : 'ink-text-muted hover:bg-amber-50'
-              }`}
-            >
-              Focus
             </button>
             <button
               onClick={() => onTabChange('statistics')}
