@@ -82,32 +82,32 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
   return (
     <div className="h-full paper-card paper-border rounded-2xl flex flex-col">
       {/* Header */}
-      <div className="p-6 pb-4">
-        <div className="flex items-center justify-between mb-4">
-          <button onClick={prevHabit} className="p-2 rounded-lg hover:bg-amber-100 transition-colors paper-border">
+      <div className="px-6 pt-4 pb-3">
+        <div className="flex items-center justify-between mb-3">
+          <button onClick={prevHabit} className="p-1.5 rounded-lg hover:bg-amber-100 transition-colors paper-border">
             <ChevronLeft className="w-5 h-5 ink-text-muted" />
           </button>
           <div className="text-center">
-            <div className="text-3xl mb-1">{habit.icon}</div>
-            <h3 className="text-2xl font-bold ink-text">{habit.label}</h3>
-            <p className="text-sm font-semibold ink-text-muted mt-1">
-              {doneCount} of {pastDays} days completed
+            <div className="text-2xl mb-0.5">{habit.icon}</div>
+            <h3 className="text-xl font-bold ink-text">{habit.label}</h3>
+            <p className="text-xs font-semibold ink-text-muted mt-0.5">
+              {doneCount} of {pastDays} days
             </p>
           </div>
-          <button onClick={nextHabit} className="p-2 rounded-lg hover:bg-amber-100 transition-colors paper-border">
+          <button onClick={nextHabit} className="p-1.5 rounded-lg hover:bg-amber-100 transition-colors paper-border">
             <ChevronRight className="w-5 h-5 ink-text-muted" />
           </button>
         </div>
 
         {/* Streak bar */}
-        <div className="flex gap-[3px] mb-1">
+        <div className="flex gap-[2px] mb-2">
           {Array.from({ length: daysInMonth }, (_, i) => {
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
             const entry = habitData.get(dateStr);
             const status = entry ? habit.getStatus(entry) : 'off';
             const isFuture = isCurrentMonth && (i + 1) > today.getDate();
             return (
-              <div key={i} className={`h-2 flex-1 rounded-full ${
+              <div key={i} className={`h-1.5 flex-1 rounded-full ${
                 isFuture ? 'bg-stone-200' :
                 status === 'green' ? 'bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.4)]' :
                 status === 'yellow' ? 'bg-amber-400 shadow-[0_0_4px_rgba(251,191,36,0.4)]' :
@@ -117,13 +117,13 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
           })}
         </div>
 
-        {/* Dot navigation */}
-        <div className="flex justify-center gap-2.5 mt-3">
+        {/* Tab navigation */}
+        <div className="flex justify-center gap-2 mt-2">
           {HABITS.map((h, i) => (
             <button
               key={h.key}
               onClick={() => setHabitIndex(i)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
                 i === habitIndex
                   ? 'bg-amber-600 text-white shadow-md'
                   : 'bg-stone-200 ink-text-muted hover:bg-stone-300 paper-border'
@@ -137,16 +137,16 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
       </div>
 
       {/* Day grid */}
-      <div className="flex-1 px-6 pb-6">
-        <div className="grid grid-cols-7 gap-2 mb-2">
+      <div className="flex-1 px-6 pb-4">
+        <div className="grid grid-cols-7 gap-1.5 mb-1.5">
           {dayNames.map((d, i) => (
-            <div key={i} className="text-center text-xs font-bold ink-text-muted uppercase tracking-wider">{d}</div>
+            <div key={i} className="text-center text-[10px] font-bold ink-text-muted uppercase tracking-wider">{d}</div>
           ))}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {weeks.map((week, wi) => (
-            <div key={wi} className="grid grid-cols-7 gap-2">
+            <div key={wi} className="grid grid-cols-7 gap-1.5">
               {week.map((day, di) => {
                 if (day === null) return <div key={`e-${di}`} className="aspect-square" />;
 
@@ -161,7 +161,7 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
                   <div
                     key={day}
                     className={`
-                      aspect-square rounded-xl flex flex-col items-center justify-center paper-shadow transition-all
+                      aspect-square rounded-lg flex flex-col items-center justify-center transition-all
                       ${isFuture ? 'bg-stone-200/50' :
                         status === 'green' ? 'bg-emerald-100 border-2 border-emerald-400' :
                         status === 'yellow' ? 'bg-amber-100 border-2 border-amber-400' :
@@ -170,7 +170,7 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
                       ${isToday ? 'ring-2 ring-amber-600' : ''}
                     `}
                   >
-                    <span className={`text-lg font-bold leading-none ${
+                    <span className={`text-sm font-bold leading-none ${
                       isFuture ? 'ink-text-muted' :
                       status === 'green' ? 'text-emerald-800' :
                       status === 'yellow' ? 'text-amber-800' :
@@ -179,10 +179,10 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
                       {day}
                     </span>
                     {!isFuture && status === 'green' && (
-                      <Check className="w-5 h-5 text-emerald-600 mt-0.5 stroke-[3]" />
+                      <Check className="w-3.5 h-3.5 text-emerald-600 mt-0.5 stroke-[3]" />
                     )}
                     {!isFuture && status === 'yellow' && (
-                      <span className="text-xs font-bold text-amber-600 mt-0.5">{detail}</span>
+                      <span className="text-[10px] font-bold text-amber-600 mt-0.5">{detail}</span>
                     )}
                   </div>
                 );
