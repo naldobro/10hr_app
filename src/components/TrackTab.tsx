@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { db } from '../lib/database';
 import { undoManager } from '../lib/undoManager';
 import { WorkSession, DayData, HabitEntry } from '../types';
@@ -10,7 +10,7 @@ import DaySummary from './DaySummary';
 import TimelineGraph from './TimelineGraph';
 import ControlsPanel from './ControlsPanel';
 import MilestoneQuote from './MilestoneQuote';
-import { Undo2, Redo2, ChevronRight, ChevronLeft, Settings } from 'lucide-react';
+import { Undo2, Redo2, ChevronRight, ChevronLeft, Settings, X } from 'lucide-react';
 
 interface TrackTabProps {
   currentMonth: Date;
@@ -25,6 +25,7 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
   const [showQuote, setShowQuote] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [habitMap, setHabitMap] = useState<Map<string, HabitEntry>>(new Map());
@@ -34,6 +35,13 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
 
   const currentDayString = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
+
+  const showFeedback = useCallback((type: 'success' | 'error', message: string) => {
+    setFeedback({ type, message });
+    setFeedbackVisible(true);
+    setTimeout(() => setFeedbackVisible(false), 2500);
+    setTimeout(() => setFeedback(null), 3000);
+  }, []);
 
   useEffect(() => {
     loadMonthData();
@@ -48,6 +56,47 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
     loadCurrentHabit();
     updateUndoRedoState();
   }, [selectedDay]);
+
+  const handleUndo = useCallback(async () => {
+    if (!undoManager.canUndo()) return;
+    if (await undoManager.undo()) {
+      await loadSessions();
+      await loadMonthData();
+      updateUndoRedoState();
+      showFeedback('success', 'Undone');
+    }
+  }, [currentDayString]);
+
+  const handleRedo = useCallback(async () => {
+    if (!undoManager.canRedo()) return;
+    if (await undoManager.redo()) {
+      await loadSessions();
+      await loadMonthData();
+      updateUndoRedoState();
+      showFeedback('success', 'Redone');
+    }
+  }, [currentDayString]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      const isMod = e.metaKey || e.ctrlKey;
+      if (isMod && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if (isMod && e.key === 'z' && e.shiftKey) {
+        e.preventDefault();
+        handleRedo();
+      } else if (isMod && e.key === 'y') {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo]);
 
   const updateUndoRedoState = () => {
     setCanUndo(undoManager.canUndo());
@@ -199,7 +248,6 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
     color: string;
   }) => {
     setIsAdding(true);
-    setFeedback(null);
 
     try {
       const newSession = await db.sessions.add({
@@ -224,17 +272,15 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
         total_hours: newTotal,
       });
 
-      setFeedback({ type: 'success', message: 'Session added successfully!' });
+      showFeedback('success', 'Session added');
 
       await loadSessions();
       await loadMonthData();
       updateUndoRedoState();
-
-      setTimeout(() => setFeedback(null), 3000);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Error adding session:', err);
-      setFeedback({ type: 'error', message });
+      showFeedback('error', message);
     } finally {
       setIsAdding(false);
     }
@@ -264,75 +310,61 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
         total_hours: newTotal,
       });
 
-      setFeedback({ type: 'success', message: 'Session deleted successfully!' });
+      showFeedback('success', 'Session deleted');
 
       await loadSessions();
       await loadMonthData();
       updateUndoRedoState();
-
-      setTimeout(() => setFeedback(null), 3000);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error('Error deleting session:', err);
-      setFeedback({ type: 'error', message });
-    }
-  };
-
-  const handleUndo = async () => {
-    if (await undoManager.undo()) {
-      await loadSessions();
-      await loadMonthData();
-      updateUndoRedoState();
-      setFeedback({ type: 'success', message: 'Action undone!' });
-      setTimeout(() => setFeedback(null), 3000);
-    }
-  };
-
-  const handleRedo = async () => {
-    if (await undoManager.redo()) {
-      await loadSessions();
-      await loadMonthData();
-      updateUndoRedoState();
-      setFeedback({ type: 'success', message: 'Action redone!' });
-      setTimeout(() => setFeedback(null), 3000);
+      showFeedback('error', message);
     }
   };
 
   const todayDay = new Date().getDate();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Toast notification */}
       {feedback && (
-        <div className={`p-4 rounded-lg text-sm font-medium animate-in fade-in ${
-          feedback.type === 'success'
-            ? 'bg-green-50 text-green-700 border border-green-200'
-            : 'bg-red-50 text-red-700 border border-red-200'
-        }`}>
-          <div className="font-semibold mb-1">
-            {feedback.type === 'success' ? 'Success!' : 'Error'}
+        <div className={`fixed bottom-6 right-6 z-[60] ${feedbackVisible ? 'animate-toast-in' : 'opacity-0 pointer-events-none'} transition-opacity duration-300`}>
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium ${
+            feedback.type === 'success'
+              ? 'bg-emerald-600 text-white'
+              : 'bg-red-600 text-white'
+          }`}>
+            {feedback.message}
+            <button onClick={() => setFeedbackVisible(false)} className="opacity-70 hover:opacity-100">
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          {feedback.message}
         </div>
       )}
 
-      <div className="flex gap-3 justify-center">
-        <button
-          onClick={handleUndo}
-          disabled={!canUndo}
-          className="flex items-center gap-2 px-6 py-3 bg-stone-200 hover:bg-stone-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold ink-text transition-colors paper-border paper-shadow"
-        >
-          <Undo2 className="w-5 h-5" />
-          Undo
-        </button>
-        <button
-          onClick={handleRedo}
-          disabled={!canRedo}
-          className="flex items-center gap-2 px-6 py-3 bg-stone-200 hover:bg-stone-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold ink-text transition-colors paper-border paper-shadow"
-        >
-          <Redo2 className="w-5 h-5" />
-          Redo
-        </button>
-      </div>
+      {/* Undo/Redo — compact inline */}
+      {(canUndo || canRedo) && (
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={handleUndo}
+            disabled={!canUndo}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-200 hover:bg-stone-300 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-sm font-medium ink-text transition-colors paper-border"
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Undo</span>
+          </button>
+          <button
+            onClick={handleRedo}
+            disabled={!canRedo}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-200 hover:bg-stone-300 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-sm font-medium ink-text transition-colors paper-border"
+            title="Redo (Ctrl+Shift+Z)"
+          >
+            <Redo2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Redo</span>
+          </button>
+        </div>
+      )}
 
       <div className="relative">
         <MonthOverview
@@ -348,11 +380,11 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
         />
 
         {/* Buttons pinned to right edge */}
-        <div className="absolute top-1/2 -translate-y-1/2 -right-5 z-20 flex flex-col gap-2">
+        <div className="absolute top-2 -right-1 sm:top-1/2 sm:-translate-y-1/2 sm:-right-5 z-20 flex flex-col gap-2">
           <button
             onClick={() => setHabitViewOpen(!habitViewOpen)}
             className={`
-              w-10 h-10 rounded-full flex items-center justify-center
+              w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center
               transition-all duration-300 shadow-lg
               ${habitViewOpen
                 ? 'bg-amber-700 hover:bg-amber-800 text-white'
@@ -361,15 +393,15 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
             `}
           >
             {habitViewOpen
-              ? <ChevronRight className="w-5 h-5" />
-              : <ChevronLeft className="w-5 h-5" />
+              ? <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+              : <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             }
           </button>
           <button
             onClick={() => setScheduleModalOpen(true)}
-            className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg bg-stone-600 hover:bg-stone-700 text-white"
+            className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg bg-stone-600 hover:bg-stone-700 text-white"
           >
-            <Settings className="w-5 h-5" />
+            <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 

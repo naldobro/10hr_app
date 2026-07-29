@@ -77,9 +77,9 @@ export default function MotivationalQuote({ workedHours }: MotivationalQuoteProp
   const quote = useMemo(() => pickFromBracket(bracket), [bracket]);
 
   return (
-    <div className="bg-amber-50/50 rounded-2xl paper-shadow p-8 paper-border">
+    <div className="bg-amber-50/50 rounded-2xl paper-shadow p-4 sm:p-6 lg:p-8 paper-border">
       <div className="max-w-3xl mx-auto text-center">
-        <p className="text-lg ink-text leading-relaxed">
+        <p className="text-sm sm:text-base lg:text-lg ink-text leading-relaxed">
           {quote}
         </p>
       </div>

@@ -70,11 +70,6 @@ function App() {
 
   return (
     <div className="min-h-screen paper-texture">
-       <img
-  src="/profile.png"
-  alt="profile"
-  className="fixed top-4 right-4 w-10 h-10 rounded-full object-cover z-50"
-/>
       <Navigation
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -84,10 +79,10 @@ function App() {
         canGoNext={canGoNext()}
       />
 
-      <main className="relative pt-[90px] pb-12 px-8 max-w-[1400px] mx-auto">
-  {activeTab === 'track' && <TrackTab currentMonth={currentMonth} />}
-  {activeTab === 'statistics' && <StatisticsTab currentMonth={currentMonth} />}
-</main>
+      <main className="relative pt-[100px] md:pt-[90px] pb-12 px-3 sm:px-6 lg:px-8 max-w-[1400px] mx-auto">
+        {activeTab === 'track' && <TrackTab currentMonth={currentMonth} />}
+        {activeTab === 'statistics' && <StatisticsTab currentMonth={currentMonth} />}
+      </main>
     </div>
   );
 }

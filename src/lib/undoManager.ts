@@ -39,23 +39,24 @@ export const undoManager = {
     const action = undoHistory.pop()!;
     localStorage.setItem(UNDO_STORAGE_KEY, JSON.stringify(undoHistory));
 
-    const redoHistory = undoManager.getRedoHistory();
-    redoHistory.push(action);
-    localStorage.setItem(REDO_STORAGE_KEY, JSON.stringify(redoHistory));
-
     if (action.type === 'add_session') {
       await db.sessions.delete(action.sessionData.id);
       await undoManager.recalculateSummary(action.sessionData.date);
     } else if (action.type === 'delete_session') {
-      await db.sessions.add({
+      const restored = await db.sessions.add({
         date: action.sessionData.date,
         start_time: action.sessionData.start_time,
         end_time: action.sessionData.end_time,
         label: action.sessionData.label,
         color: action.sessionData.color,
       });
+      action.sessionData = restored;
       await undoManager.recalculateSummary(action.sessionData.date);
     }
+
+    const redoHistory = undoManager.getRedoHistory();
+    redoHistory.push(action);
+    localStorage.setItem(REDO_STORAGE_KEY, JSON.stringify(redoHistory));
 
     return true;
   },
@@ -67,23 +68,24 @@ export const undoManager = {
     const action = redoHistory.pop()!;
     localStorage.setItem(REDO_STORAGE_KEY, JSON.stringify(redoHistory));
 
-    const undoHistory = undoManager.getUndoHistory();
-    undoHistory.push(action);
-    localStorage.setItem(UNDO_STORAGE_KEY, JSON.stringify(undoHistory));
-
     if (action.type === 'add_session') {
-      await db.sessions.add({
+      const restored = await db.sessions.add({
         date: action.sessionData.date,
         start_time: action.sessionData.start_time,
         end_time: action.sessionData.end_time,
         label: action.sessionData.label,
         color: action.sessionData.color,
       });
+      action.sessionData = restored;
       await undoManager.recalculateSummary(action.sessionData.date);
     } else if (action.type === 'delete_session') {
       await db.sessions.delete(action.sessionData.id);
       await undoManager.recalculateSummary(action.sessionData.date);
     }
+
+    const undoHistory = undoManager.getUndoHistory();
+    undoHistory.push(action);
+    localStorage.setItem(UNDO_STORAGE_KEY, JSON.stringify(undoHistory));
 
     return true;
   },

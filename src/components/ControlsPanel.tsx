@@ -22,7 +22,7 @@ interface ControlsPanelProps {
   currentDay: string;
 }
 
-export default function ControlsPanel({ onAddSession, isLoading = false, sessions, currentDay }: ControlsPanelProps) {
+export default function ControlsPanel({ onAddSession, isLoading = false, sessions }: ControlsPanelProps) {
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [timerStart, setTimerStart] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -50,7 +50,6 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
     { value: 'teal', label: 'Teal', class: 'bg-teal-700' },
   ];
 
-  // Restore timer from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem(TIMER_STORAGE_KEY);
     if (saved) {
@@ -67,7 +66,6 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
     }
   }, []);
 
-  // Timer tick + update tab title
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
 
@@ -86,7 +84,6 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
     };
   }, [isTimerRunning, timerStart]);
 
-  // Snap to correct time when tab becomes visible again
   useEffect(() => {
     const handleVisibility = () => {
       if (!document.hidden && isTimerRunning && timerStart) {
@@ -97,7 +94,6 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [isTimerRunning, timerStart]);
 
-  // Warn before closing tab with active timer
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isTimerRunning) {
@@ -137,7 +133,6 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
     let startTime = startDate.getHours() + startDate.getMinutes() / 60 + startDate.getSeconds() / 3600;
     let endTime = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
 
-    // If the timer started on a different day, cap start to midnight (0)
     if (toLocalDateStr(startDate) !== toLocalDateStr(now)) {
       startTime = 0;
     }
@@ -248,43 +243,43 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
 
   return (
     <>
-      <div className="paper-card rounded-2xl paper-shadow p-6 paper-border">
-        <div className="flex gap-4">
+      <div className="paper-card rounded-2xl paper-shadow p-3 sm:p-4 lg:p-6 paper-border">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           {!isTimerRunning ? (
             <button
               onClick={handleStartTimer}
               disabled={isLoading}
-              className="flex-1 flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-lg transition-colors paper-shadow"
+              className="flex-1 flex items-center justify-center gap-2 sm:gap-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 sm:py-4 px-4 sm:px-6 rounded-lg transition-colors paper-shadow text-sm sm:text-base"
             >
-              <Play className="w-5 h-5" />
+              <Play className="w-4 h-4 sm:w-5 sm:h-5" />
               Start Deep Work Timer
             </button>
           ) : (
             <button
               onClick={handleStopTimer}
               disabled={isLoading}
-              className="flex-1 flex items-center justify-center gap-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-lg transition-colors paper-shadow"
+              className="flex-1 flex items-center justify-center gap-2 sm:gap-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 sm:py-4 px-4 sm:px-6 rounded-lg transition-colors paper-shadow text-sm sm:text-base"
             >
-              <Square className="w-5 h-5" />
-              Stop Timer: {formatTimerDisplay(elapsedSeconds)}
+              <Square className="w-4 h-4 sm:w-5 sm:h-5" />
+              Stop: {formatTimerDisplay(elapsedSeconds)}
             </button>
           )}
 
           <button
             onClick={() => setShowModal(true)}
             disabled={isLoading}
-            className="flex items-center justify-center gap-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-lg transition-colors paper-shadow"
+            className="flex items-center justify-center gap-2 sm:gap-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 sm:py-4 px-4 sm:px-6 rounded-lg transition-colors paper-shadow text-sm sm:text-base"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
             Add Manual Session
           </button>
         </div>
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="paper-card rounded-2xl p-8 max-w-lg w-full mx-4 shadow-2xl paper-border">
-            <h3 className="text-2xl font-bold mb-6 ink-text">
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="paper-card rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 lg:p-8 max-w-lg w-full shadow-2xl paper-border max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 ink-text">
               Add Manual Session
             </h3>
 
@@ -294,7 +289,7 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
               </div>
             )}
 
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div>
                 <label className="block text-sm font-medium ink-text-muted mb-2">
                   Start Time
@@ -303,7 +298,7 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
                   type="time"
                   value={manualStart}
                   onChange={(e) => setManualStart(e.target.value)}
-                  className="w-full px-4 py-3 paper-border rounded-lg text-lg focus:ring-2 focus:ring-amber-600 focus:border-transparent ink-text"
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 paper-border rounded-lg text-base sm:text-lg focus:ring-2 focus:ring-amber-600 focus:border-transparent ink-text"
                 />
               </div>
 
@@ -311,7 +306,7 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
                 <label className="block text-sm font-medium ink-text-muted mb-3">
                   Duration
                 </label>
-                <div className="grid grid-cols-4 gap-2 mb-3">
+                <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mb-3">
                   {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4].map((duration) => (
                     <button
                       key={duration}
@@ -319,7 +314,7 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
                         setManualDuration(duration);
                         setUseCustomDuration(false);
                       }}
-                      className={`py-3 rounded-lg font-semibold transition-all ${
+                      className={`py-2 sm:py-3 rounded-lg font-semibold text-sm sm:text-base transition-all ${
                         manualDuration === duration && !useCustomDuration
                           ? 'bg-amber-600 text-white paper-shadow'
                           : 'bg-amber-50 ink-text hover:bg-amber-100 paper-border'
@@ -388,7 +383,7 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
                   value={manualLabel}
                   onChange={(e) => setManualLabel(e.target.value)}
                   placeholder="e.g., Outreach, Copywriting"
-                  className="w-full px-4 py-3 paper-border rounded-lg focus:ring-2 focus:ring-amber-600 focus:border-transparent"
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 paper-border rounded-lg focus:ring-2 focus:ring-amber-600 focus:border-transparent"
                   autoFocus
                 />
               </div>
@@ -402,7 +397,7 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
                     <button
                       key={color.value}
                       onClick={() => setManualColor(color.value)}
-                      className={`w-12 h-12 rounded-lg ${color.class} ${
+                      className={`w-9 h-9 sm:w-12 sm:h-12 rounded-lg ${color.class} ${
                         manualColor === color.value
                           ? 'ring-4 ring-amber-800'
                           : 'opacity-50 hover:opacity-100'
@@ -413,21 +408,21 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
               </div>
             </div>
 
-            <div className="flex gap-3 mt-8">
+            <div className="flex gap-3 mt-6 sm:mt-8">
               <button
                 onClick={() => {
                   setShowModal(false);
                   setValidationError('');
                 }}
                 disabled={isLoading}
-                className="flex-1 px-4 py-3 bg-stone-200 hover:bg-stone-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold ink-text transition-colors paper-border"
+                className="flex-1 px-4 py-2.5 sm:py-3 bg-stone-200 hover:bg-stone-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold ink-text transition-colors paper-border text-sm sm:text-base"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddManualSession}
                 disabled={isLoading}
-                className="flex-1 px-4 py-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold text-white transition-colors paper-shadow"
+                className="flex-1 px-4 py-2.5 sm:py-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold text-white transition-colors paper-shadow text-sm sm:text-base"
               >
                 {isLoading ? 'Adding...' : 'Add Session'}
               </button>
@@ -437,9 +432,9 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
       )}
 
       {showTimerLabelModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="paper-card rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl paper-border">
-            <h3 className="text-2xl font-bold mb-6 ink-text">
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="paper-card rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 lg:p-8 max-w-md w-full shadow-2xl paper-border">
+            <h3 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 ink-text">
               Name Your Session
             </h3>
 
@@ -449,7 +444,7 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
               </div>
             )}
 
-            <div className="space-y-5 mb-6">
+            <div className="space-y-4 sm:space-y-5 mb-5 sm:mb-6">
               <div>
                 <label className="block text-sm font-medium ink-text-muted mb-2">
                   Session Label
@@ -462,7 +457,7 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
                     setValidationError('');
                   }}
                   placeholder="e.g., Deep Work, Writing, Coding"
-                  className="w-full px-4 py-3 paper-border rounded-lg focus:ring-2 focus:ring-amber-600 focus:border-transparent"
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 paper-border rounded-lg focus:ring-2 focus:ring-amber-600 focus:border-transparent"
                   autoFocus
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
@@ -481,7 +476,7 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
                     <button
                       key={color.value}
                       onClick={() => setTimerColor(color.value)}
-                      className={`w-10 h-10 rounded-lg ${color.class} ${
+                      className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg ${color.class} ${
                         timerColor === color.value
                           ? 'ring-4 ring-amber-800'
                           : 'opacity-50 hover:opacity-100'
@@ -495,13 +490,13 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
             <div className="flex gap-3">
               <button
                 onClick={handleCancelTimerSession}
-                className="flex-1 px-4 py-3 bg-stone-200 hover:bg-stone-300 rounded-lg font-semibold ink-text transition-colors paper-border"
+                className="flex-1 px-4 py-2.5 sm:py-3 bg-stone-200 hover:bg-stone-300 rounded-lg font-semibold ink-text transition-colors paper-border text-sm sm:text-base"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveTimerSession}
-                className="flex-1 px-4 py-3 bg-amber-600 hover:bg-amber-700 rounded-lg font-semibold text-white transition-colors paper-shadow"
+                className="flex-1 px-4 py-2.5 sm:py-3 bg-amber-600 hover:bg-amber-700 rounded-lg font-semibold text-white transition-colors paper-shadow text-sm sm:text-base"
               >
                 Save Session
               </button>

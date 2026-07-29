@@ -20,9 +20,9 @@ function getPrayerCount(h: HabitEntry): number {
 }
 
 function Led({ status }: { status: 'on' | 'yellow' | 'off' }) {
-  if (status === 'on') return <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block flex-shrink-0 ring-[1.5px] ring-white/80 shadow-[0_0_6px_rgba(16,185,129,0.9)]" />;
-  if (status === 'yellow') return <span className="w-3 h-3 rounded-full bg-orange-400 inline-block flex-shrink-0 ring-[1.5px] ring-white/80 shadow-[0_0_6px_rgba(251,146,60,0.9)]" />;
-  return <span className="w-3 h-3 rounded-full bg-black/25 inline-block flex-shrink-0 ring-[1.5px] ring-black/10" />;
+  if (status === 'on') return <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 lg:w-3 lg:h-3 rounded-full bg-emerald-500 inline-block flex-shrink-0 ring-[1px] sm:ring-[1.5px] ring-white/80 shadow-[0_0_4px_rgba(16,185,129,0.9)] sm:shadow-[0_0_6px_rgba(16,185,129,0.9)]" />;
+  if (status === 'yellow') return <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 lg:w-3 lg:h-3 rounded-full bg-orange-400 inline-block flex-shrink-0 ring-[1px] sm:ring-[1.5px] ring-white/80 shadow-[0_0_4px_rgba(251,146,60,0.9)] sm:shadow-[0_0_6px_rgba(251,146,60,0.9)]" />;
+  return <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 lg:w-3 lg:h-3 rounded-full bg-black/25 inline-block flex-shrink-0 ring-[1px] sm:ring-[1.5px] ring-black/10" />;
 }
 
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
@@ -62,7 +62,8 @@ export default function MonthOverview({
     weeks.push(currentWeek);
   }
 
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const dayNamesFull = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const selectedWeekIndex = weeks.findIndex(week => week.some(d => d && d.day === selectedDay));
   const selectedDayIndex = selectedWeekIndex >= 0 ? weeks[selectedWeekIndex].findIndex(d => d && d.day === selectedDay) : -1;
   const selectedDayData = selectedWeekIndex >= 0 ? weeks[selectedWeekIndex][selectedDayIndex] : null;
@@ -74,19 +75,23 @@ export default function MonthOverview({
   };
 
   return (
-    <div className="paper-card rounded-2xl paper-shadow p-5 paper-border">
-      <div className="grid grid-cols-7 gap-2 mb-3">
-        {dayNames.map((day) => (
-          <div key={day} className="text-center text-sm font-bold ink-text-muted uppercase tracking-wider">{day}</div>
+    <div className="paper-card rounded-2xl paper-shadow p-2.5 sm:p-4 lg:p-5 paper-border">
+      {/* Day headers */}
+      <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2 sm:mb-3">
+        {dayNames.map((day, i) => (
+          <div key={i} className="text-center text-[10px] sm:text-xs lg:text-sm font-bold ink-text-muted uppercase tracking-wider">
+            <span className="sm:hidden">{day}</span>
+            <span className="hidden sm:inline">{dayNamesFull[i]}</span>
+          </div>
         ))}
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1 sm:space-y-2">
         {weeks.map((week, weekIndex) => (
           <div key={weekIndex}>
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
               {week.map((dayData, dayIndex) => {
-                if (!dayData) return <div key={`empty-${dayIndex}`} style={{ aspectRatio: '1 / 0.88' }} />;
+                if (!dayData) return <div key={`empty-${dayIndex}`} className="aspect-square sm:aspect-[1/0.88]" />;
 
                 const isToday = isCurrentMonth && dayData.day === todayDay;
                 const isSelected = dayData.day === selectedDay && panelOpen;
@@ -102,55 +107,63 @@ export default function MonthOverview({
                     key={dayData.day}
                     onClick={() => !isFuture && handleDayClick(dayData.day)}
                     disabled={isFuture}
-                    style={{ aspectRatio: '1 / 0.88' }}
                     className={`
-                      relative rounded-xl transition-all duration-200 paper-shadow
+                      relative rounded-lg sm:rounded-xl transition-all duration-200 paper-shadow
+                      aspect-square sm:aspect-[1/0.88]
                       ${isFuture ? 'cursor-not-allowed' : 'cursor-pointer hover:scale-[1.04] active:scale-[0.98]'}
                       ${getColorClass(dayData.color, isToday, isFuture)}
                       ${isSelected ? 'ring-2 ring-amber-600 scale-[1.04] shadow-lg' : ''}
                       ${dayData.day === selectedDay && !panelOpen ? 'ring-1 ring-amber-400/50' : ''}
-                      flex p-3
+                      flex flex-col items-center justify-center sm:flex-row sm:items-stretch sm:justify-start p-1 sm:p-2 lg:p-3
                     `}
                   >
-                    {/* Left zone: 4 habit rows stacked, evenly spaced */}
+                    {/* Mobile: centered day + hours */}
+                    <div className="flex flex-col items-center justify-center sm:hidden w-full h-full">
+                      <span className={`font-bold leading-none ${isFuture ? 'ink-text-muted' : 'text-stone-800'} text-base`}>
+                        {dayData.day}
+                      </span>
+                      {!isFuture && dayData.hours > 0 && (
+                        <span className="font-bold text-stone-800 leading-none text-[9px] mt-0.5">
+                          {dayData.hours.toFixed(1)}h
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Tablet+: habit LEDs + day/hours layout */}
                     {!isFuture ? (
-                      <div className="flex flex-col justify-between flex-1 min-w-0">
+                      <div className="hidden sm:flex flex-col justify-between flex-1 min-w-0">
                         {[
                           { label: 'Pray', led: pLed },
                           { label: 'Gym', led: (!isScheduled('gym') ? 'off' : habit?.gym ? 'on' : 'off') as 'on' | 'off' },
                           { label: 'Out', led: (!isScheduled('outreach') ? 'off' : habit?.outreach ? 'on' : 'off') as 'on' | 'off' },
                           { label: 'Learn', led: (!isScheduled('learn') ? 'off' : habit?.learn ? 'on' : 'off') as 'on' | 'off' },
                         ].map(({ label, led }) => (
-                          <div key={label} className="flex items-center gap-2">
+                          <div key={label} className="flex items-center gap-1 lg:gap-2">
                             <Led status={led} />
-                            <span className="font-bold text-stone-800 leading-none" style={{ fontSize: '15px' }}>
+                            <span className="hidden lg:inline font-bold text-stone-800 leading-none text-[11px] xl:text-[15px]">
                               {label}
                             </span>
                           </div>
                         ))}
                       </div>
-                    ) : <div className="flex-1" />}
+                    ) : <div className="hidden sm:block flex-1" />}
 
-                    {/* Right zone: day number top, hours bottom */}
-                    <div className="flex flex-col justify-between items-end flex-shrink-0 ml-1">
+                    {/* Tablet+: right zone */}
+                    <div className="hidden sm:flex flex-col justify-between items-end flex-shrink-0 ml-0.5 lg:ml-1">
                       <span
-                        className={`font-bold leading-none ${isFuture ? 'ink-text-muted' : 'text-stone-800 drop-shadow-[0_1px_2px_rgba(255,255,255,0.3)]'}`}
-                        style={{ fontSize: '45px' }}
+                        className={`font-bold leading-none ${isFuture ? 'ink-text-muted' : 'text-stone-800 drop-shadow-[0_1px_2px_rgba(255,255,255,0.3)]'} text-xl md:text-2xl lg:text-4xl xl:text-[45px]`}
                       >
                         {dayData.day}
                       </span>
                       {!isFuture && (
-                        <span
-                          className="font-bold text-stone-800 leading-none drop-shadow-[0_1px_2px_rgba(255,255,255,0.3)]"
-                          style={{ fontSize: '22px' }}
-                        >
+                        <span className="font-bold text-stone-800 leading-none drop-shadow-[0_1px_2px_rgba(255,255,255,0.3)] text-xs md:text-sm lg:text-lg xl:text-[22px]">
                           {dayData.hours.toFixed(1)}h
                         </span>
                       )}
                     </div>
 
                     {isToday && !isFuture && (
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white shadow-md" />
+                      <div className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 w-2 h-2 sm:w-3 sm:h-3 bg-amber-500 rounded-full border-2 border-white shadow-md" />
                     )}
                   </button>
                 );
@@ -161,7 +174,7 @@ export default function MonthOverview({
               <div className="relative mt-2 overflow-hidden" style={{
                 animation: 'habitSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
               }}>
-                <div className="absolute top-0 z-10" style={{
+                <div className="absolute top-0 z-10 hidden sm:block" style={{
                   left: `calc(${(selectedDayIndex * 100) / 7}% + ${100 / 14}% - 10px)`,
                 }}>
                   <div className="w-5 h-5 rotate-45 -translate-y-2.5 border-l border-t border-indigo-400/20" style={{
