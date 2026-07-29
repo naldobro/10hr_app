@@ -67,67 +67,86 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
     weeks.push(currentWeek);
   }
 
-  const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const pastDays = isCurrentMonth ? today.getDate() : daysInMonth;
 
-  const doneCount = Array.from({ length: daysInMonth }, (_, i) => {
+  const doneCount = Array.from({ length: pastDays }, (_, i) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
     const entry = habitData.get(dateStr);
     return entry ? habit.getStatus(entry) !== 'off' : false;
   }).filter(Boolean).length;
 
-  const pastDays = isCurrentMonth ? today.getDate() : daysInMonth;
-
   const prevHabit = () => setHabitIndex((habitIndex - 1 + HABITS.length) % HABITS.length);
   const nextHabit = () => setHabitIndex((habitIndex + 1) % HABITS.length);
 
   return (
-    <div className="rounded-xl overflow-hidden shadow-lg" style={{
-      background: 'linear-gradient(160deg, #4338ca 0%, #3730a3 40%, #312e81 100%)',
-      width: '300px',
-    }}>
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-3">
-          <button onClick={prevHabit} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
-            <ChevronLeft className="w-5 h-5 text-indigo-200" />
+    <div className="h-full paper-card paper-border rounded-2xl flex flex-col">
+      {/* Header */}
+      <div className="p-6 pb-4">
+        <div className="flex items-center justify-between mb-4">
+          <button onClick={prevHabit} className="p-2 rounded-lg hover:bg-amber-100 transition-colors paper-border">
+            <ChevronLeft className="w-5 h-5 ink-text-muted" />
           </button>
           <div className="text-center">
-            <div className="text-2xl mb-0.5">{habit.icon}</div>
-            <h3 className="text-white font-bold text-lg leading-tight">{habit.label}</h3>
-            <p className="text-indigo-300/50 text-xs font-semibold mt-0.5">
-              {doneCount}/{pastDays} days
+            <div className="text-3xl mb-1">{habit.icon}</div>
+            <h3 className="text-2xl font-bold ink-text">{habit.label}</h3>
+            <p className="text-sm font-semibold ink-text-muted mt-1">
+              {doneCount} of {pastDays} days completed
             </p>
           </div>
-          <button onClick={nextHabit} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
-            <ChevronRight className="w-5 h-5 text-indigo-200" />
+          <button onClick={nextHabit} className="p-2 rounded-lg hover:bg-amber-100 transition-colors paper-border">
+            <ChevronRight className="w-5 h-5 ink-text-muted" />
           </button>
         </div>
 
-        <div className="flex gap-[2px] mb-3">
+        {/* Streak bar */}
+        <div className="flex gap-[3px] mb-1">
           {Array.from({ length: daysInMonth }, (_, i) => {
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
             const entry = habitData.get(dateStr);
             const status = entry ? habit.getStatus(entry) : 'off';
             const isFuture = isCurrentMonth && (i + 1) > today.getDate();
             return (
-              <div key={i} className={`h-1.5 flex-1 rounded-full ${
-                isFuture ? 'bg-white/5' :
-                status === 'green' ? 'bg-emerald-400 shadow-[0_0_4px_rgba(16,185,129,0.4)]' :
+              <div key={i} className={`h-2 flex-1 rounded-full ${
+                isFuture ? 'bg-stone-200' :
+                status === 'green' ? 'bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.4)]' :
                 status === 'yellow' ? 'bg-amber-400 shadow-[0_0_4px_rgba(251,191,36,0.4)]' :
-                'bg-white/10'
+                'bg-stone-300/50'
               }`} />
             );
           })}
         </div>
 
-        <div className="grid grid-cols-7 gap-1 mb-1">
+        {/* Dot navigation */}
+        <div className="flex justify-center gap-2.5 mt-3">
+          {HABITS.map((h, i) => (
+            <button
+              key={h.key}
+              onClick={() => setHabitIndex(i)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                i === habitIndex
+                  ? 'bg-amber-600 text-white shadow-md'
+                  : 'bg-stone-200 ink-text-muted hover:bg-stone-300 paper-border'
+              }`}
+            >
+              <span>{h.icon}</span>
+              <span>{h.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Day grid */}
+      <div className="flex-1 px-6 pb-6">
+        <div className="grid grid-cols-7 gap-2 mb-2">
           {dayNames.map((d, i) => (
-            <div key={i} className="text-center text-[10px] font-bold text-indigo-300/40 uppercase">{d}</div>
+            <div key={i} className="text-center text-xs font-bold ink-text-muted uppercase tracking-wider">{d}</div>
           ))}
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-2">
           {weeks.map((week, wi) => (
-            <div key={wi} className="grid grid-cols-7 gap-1">
+            <div key={wi} className="grid grid-cols-7 gap-2">
               {week.map((day, di) => {
                 if (day === null) return <div key={`e-${di}`} className="aspect-square" />;
 
@@ -142,43 +161,33 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
                   <div
                     key={day}
                     className={`
-                      aspect-square rounded-lg flex flex-col items-center justify-center
-                      ${isFuture ? 'bg-white/[0.03]' :
-                        status === 'green' ? 'bg-emerald-500/20 border border-emerald-500/30' :
-                        status === 'yellow' ? 'bg-amber-400/20 border border-amber-400/30' :
-                        'bg-white/[0.05] border border-white/[0.05]'
+                      aspect-square rounded-xl flex flex-col items-center justify-center paper-shadow transition-all
+                      ${isFuture ? 'bg-stone-200/50' :
+                        status === 'green' ? 'bg-emerald-100 border-2 border-emerald-400' :
+                        status === 'yellow' ? 'bg-amber-100 border-2 border-amber-400' :
+                        'bg-stone-200/70 paper-border'
                       }
-                      ${isToday ? 'ring-1 ring-indigo-300/50' : ''}
+                      ${isToday ? 'ring-2 ring-amber-600' : ''}
                     `}
                   >
-                    <span className={`text-[11px] font-bold leading-none ${
-                      isFuture ? 'text-indigo-300/20' :
-                      status !== 'off' ? 'text-white/90' : 'text-indigo-200/40'
+                    <span className={`text-lg font-bold leading-none ${
+                      isFuture ? 'ink-text-muted' :
+                      status === 'green' ? 'text-emerald-800' :
+                      status === 'yellow' ? 'text-amber-800' :
+                      'ink-text-muted'
                     }`}>
                       {day}
                     </span>
                     {!isFuture && status === 'green' && (
-                      <Check className="w-3 h-3 text-emerald-400 mt-0.5 stroke-[3]" />
+                      <Check className="w-5 h-5 text-emerald-600 mt-0.5 stroke-[3]" />
                     )}
                     {!isFuture && status === 'yellow' && (
-                      <span className="text-[8px] font-bold text-amber-300 mt-0.5">{detail}</span>
+                      <span className="text-xs font-bold text-amber-600 mt-0.5">{detail}</span>
                     )}
                   </div>
                 );
               })}
             </div>
-          ))}
-        </div>
-
-        <div className="flex justify-center gap-2 mt-3">
-          {HABITS.map((h, i) => (
-            <button
-              key={h.key}
-              onClick={() => setHabitIndex(i)}
-              className={`w-2 h-2 rounded-full transition-all ${
-                i === habitIndex ? 'bg-white scale-125' : 'bg-white/20 hover:bg-white/40'
-              }`}
-            />
           ))}
         </div>
       </div>

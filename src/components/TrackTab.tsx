@@ -310,45 +310,52 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
         </button>
       </div>
 
-      <div className="flex gap-3 items-start">
-        <div className="flex-1 min-w-0">
-          <MonthOverview
-            monthData={monthData}
-            selectedDay={selectedDay}
-            onDayClick={setSelectedDay}
-            todayDay={todayDay}
-            currentMonth={currentMonth}
-            habitData={habitMap}
-            currentHabit={currentHabit}
-            onHabitToggle={handleHabitToggle}
-          />
-        </div>
+      <div className="relative">
+        <MonthOverview
+          monthData={monthData}
+          selectedDay={selectedDay}
+          onDayClick={setSelectedDay}
+          todayDay={todayDay}
+          currentMonth={currentMonth}
+          habitData={habitMap}
+          currentHabit={currentHabit}
+          onHabitToggle={handleHabitToggle}
+        />
 
-        <div className="flex items-center gap-0 flex-shrink-0 self-stretch">
-          <button
-            onClick={() => setHabitViewOpen(!habitViewOpen)}
-            className={`
-              h-full px-1.5 rounded-lg transition-all duration-300 flex items-center
-              ${habitViewOpen
-                ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg'
-                : 'bg-stone-200 hover:bg-stone-300 ink-text-muted paper-border paper-shadow'
-              }
-            `}
-          >
-            {habitViewOpen
-              ? <ChevronRight className="w-5 h-5" />
-              : <ChevronLeft className="w-5 h-5" />
+        {/* Arrow button pinned to right edge */}
+        <button
+          onClick={() => setHabitViewOpen(!habitViewOpen)}
+          className={`
+            absolute top-1/2 -translate-y-1/2 -right-5 z-20
+            w-10 h-10 rounded-full flex items-center justify-center
+            transition-all duration-300 shadow-lg
+            ${habitViewOpen
+              ? 'bg-amber-700 hover:bg-amber-800 text-white'
+              : 'bg-amber-600 hover:bg-amber-700 text-white'
             }
-          </button>
+          `}
+        >
+          {habitViewOpen
+            ? <ChevronRight className="w-5 h-5" />
+            : <ChevronLeft className="w-5 h-5" />
+          }
+        </button>
 
-          <div className={`transition-all duration-400 ease-in-out overflow-hidden ${
-            habitViewOpen ? 'w-[300px] opacity-100 ml-1.5' : 'w-0 opacity-0 ml-0'
-          }`}>
-            {habitViewOpen && (
-              <HabitMonthView currentMonth={currentMonth} habitData={habitMap} />
-            )}
+        {/* Overlay on top of calendar */}
+        {habitViewOpen && (
+          <div
+            className="absolute inset-0 z-10 rounded-2xl overflow-hidden"
+            style={{ animation: 'habitOverlayIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
+          >
+            <HabitMonthView currentMonth={currentMonth} habitData={habitMap} />
+            <style>{`
+              @keyframes habitOverlayIn {
+                from { opacity: 0; transform: translateX(30px); }
+                to { opacity: 1; transform: translateX(0); }
+              }
+            `}</style>
           </div>
-        </div>
+        )}
       </div>
 
       <MotivationalQuote workedHours={workedHours} />
