@@ -39,12 +39,15 @@ const HABITS = [
   },
 ];
 
+const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+
 interface HabitMonthViewProps {
   currentMonth: Date;
   habitData: Map<string, HabitEntry>;
+  habitSchedules: Record<string, number[]>;
 }
 
-export default function HabitMonthView({ currentMonth, habitData }: HabitMonthViewProps) {
+export default function HabitMonthView({ currentMonth, habitData, habitSchedules }: HabitMonthViewProps) {
   const [habitIndex, setHabitIndex] = useState(0);
   const habit = HABITS[habitIndex];
 
@@ -70,8 +73,20 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const pastDays = isCurrentMonth ? today.getDate() : daysInMonth;
 
+  const isScheduledForDate = (dateStr: string) => {
+    const dow = new Date(dateStr + 'T00:00:00').getDay();
+    return (habitSchedules[habit.key] || ALL_DAYS).includes(dow);
+  };
+
+  const scheduledDays = Array.from({ length: pastDays }, (_, i) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
+    return isScheduledForDate(dateStr);
+  });
+  const scheduledCount = scheduledDays.filter(Boolean).length;
+
   const doneCount = Array.from({ length: pastDays }, (_, i) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
+    if (!isScheduledForDate(dateStr)) return false;
     const entry = habitData.get(dateStr);
     return entry ? habit.getStatus(entry) !== 'off' : false;
   }).filter(Boolean).length;
@@ -91,7 +106,7 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
             <div className="text-2xl mb-0.5">{habit.icon}</div>
             <h3 className="text-2xl font-bold ink-text">{habit.label}</h3>
             <p className="text-xs font-semibold ink-text-muted mt-0.5">
-              {doneCount} of {pastDays} days
+              {doneCount} of {scheduledCount} days
             </p>
           </div>
           <button onClick={nextHabit} className="p-1.5 rounded-lg hover:bg-amber-100 transition-colors paper-border">
@@ -104,11 +119,13 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
           {Array.from({ length: daysInMonth }, (_, i) => {
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
             const entry = habitData.get(dateStr);
-            const status = entry ? habit.getStatus(entry) : 'off';
+            const scheduled = isScheduledForDate(dateStr);
+            const status = scheduled && entry ? habit.getStatus(entry) : 'off';
             const isFuture = isCurrentMonth && (i + 1) > today.getDate();
             return (
               <div key={i} className={`h-1.5 flex-1 rounded-full ${
                 isFuture ? 'bg-stone-200' :
+                !scheduled ? 'bg-stone-200/40' :
                 status === 'green' ? 'bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.4)]' :
                 status === 'yellow' ? 'bg-amber-400 shadow-[0_0_4px_rgba(251,191,36,0.4)]' :
                 'bg-stone-300/50'
@@ -152,7 +169,8 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
 
                 const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 const entry = habitData.get(dateStr);
-                const status = entry ? habit.getStatus(entry) : 'off';
+                const scheduled = isScheduledForDate(dateStr);
+                const status = scheduled && entry ? habit.getStatus(entry) : 'off';
                 const detail = entry ? habit.getDetail(entry) : '';
                 const isFuture = isCurrentMonth && day > today.getDate();
                 const isToday = isCurrentMonth && day === today.getDate();
@@ -163,6 +181,7 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
                     className={`
                       rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all
                       ${isFuture ? 'bg-stone-200/50' :
+                        !scheduled ? 'bg-stone-100/50 paper-border opacity-50' :
                         status === 'green' ? 'bg-emerald-100 border-2 border-emerald-400' :
                         status === 'yellow' ? 'bg-amber-100 border-2 border-amber-400' :
                         'bg-stone-200/70 paper-border'
@@ -171,17 +190,17 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
                     `}
                   >
                     <span className={`text-xl font-bold leading-none ${
-                      isFuture ? 'ink-text-muted' :
+                      isFuture || !scheduled ? 'ink-text-muted' :
                       status === 'green' ? 'text-emerald-800' :
                       status === 'yellow' ? 'text-amber-800' :
                       'ink-text-muted'
                     }`}>
                       {day}
                     </span>
-                    {!isFuture && status === 'green' && (
+                    {!isFuture && scheduled && status === 'green' && (
                       <Check className="w-5 h-5 text-emerald-600 stroke-[3]" />
                     )}
-                    {!isFuture && status === 'yellow' && (
+                    {!isFuture && scheduled && status === 'yellow' && (
                       <span className="text-sm font-bold text-amber-600">{detail}</span>
                     )}
                   </div>

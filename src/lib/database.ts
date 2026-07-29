@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { WorkSession, DailySummary, HabitEntry } from '../types';
+import { WorkSession, DailySummary, HabitEntry, HabitSchedule } from '../types';
 
 const SINGLE_USER_ID = 'single-user';
 
@@ -153,6 +153,36 @@ export const db = {
           updated_at: new Date().toISOString(),
         }, {
           onConflict: 'user_id,date',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+  },
+
+  habitSchedules: {
+    getAll: async (): Promise<HabitSchedule[]> => {
+      const { data, error } = await supabase
+        .from('habit_schedules')
+        .select('*')
+        .eq('user_id', SINGLE_USER_ID);
+
+      if (error) throw error;
+      return data || [];
+    },
+
+    upsert: async (habitKey: string, activeDays: number[]): Promise<HabitSchedule> => {
+      const { data, error } = await supabase
+        .from('habit_schedules')
+        .upsert({
+          user_id: SINGLE_USER_ID,
+          habit_key: habitKey,
+          active_days: activeDays,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id,habit_key',
         })
         .select()
         .single();

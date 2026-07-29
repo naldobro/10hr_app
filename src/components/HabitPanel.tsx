@@ -5,7 +5,10 @@ interface HabitPanelProps {
   date: string;
   habit: HabitEntry | null;
   onToggle: (field: keyof HabitEntry) => void;
+  habitSchedules: Record<string, number[]>;
 }
+
+const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
 const PRAYERS = [
   { key: 'prayer_fajr' as const, label: 'Fajr', time: 'Dawn' },
@@ -40,12 +43,18 @@ function ToggleSwitch({ checked, onToggle }: { checked: boolean; onToggle: () =>
   );
 }
 
-export default function HabitPanel({ date, habit, onToggle }: HabitPanelProps) {
+export default function HabitPanel({ date, habit, onToggle, habitSchedules }: HabitPanelProps) {
+  const dow = new Date(date + 'T00:00:00').getDay();
+  const isScheduled = (key: string) => (habitSchedules[key] || ALL_DAYS).includes(dow);
+
   const prayerCount = habit
     ? [habit.prayer_fajr, habit.prayer_dhuhr, habit.prayer_asr, habit.prayer_maghrib, habit.prayer_isha].filter(Boolean).length
     : 0;
-  const habitCount = (habit?.gym ? 1 : 0) + (habit?.outreach ? 1 : 0) + (habit?.learn ? 1 : 0);
-  const totalScore = prayerCount + habitCount;
+  const habitCount = (habit?.gym && isScheduled('gym') ? 1 : 0) + (habit?.outreach && isScheduled('outreach') ? 1 : 0) + (habit?.learn && isScheduled('learn') ? 1 : 0);
+  const scheduledPrayerMax = isScheduled('prayer') ? 5 : 0;
+  const scheduledHabitCount = (['gym', 'outreach', 'learn'] as const).filter(k => isScheduled(k)).length;
+  const totalMax = scheduledPrayerMax + scheduledHabitCount;
+  const totalScore = (isScheduled('prayer') ? prayerCount : 0) + habitCount;
 
   const formatDate = (d: string) => {
     const dt = new Date(d + 'T00:00:00');
@@ -123,11 +132,11 @@ export default function HabitPanel({ date, habit, onToggle }: HabitPanelProps) {
               <div className="flex items-center justify-between mb-2.5">
                 <span className="text-xs font-bold uppercase tracking-wider text-indigo-300/40">Daily Score</span>
                 <span className={`text-xl font-black ${
-                  totalScore >= 7 ? 'text-emerald-400' : totalScore >= 4 ? 'text-amber-300' : 'text-indigo-300/40'
-                }`}>{totalScore}/8</span>
+                  totalMax > 0 && totalScore >= totalMax - 1 ? 'text-emerald-400' : totalScore >= totalMax / 2 ? 'text-amber-300' : 'text-indigo-300/40'
+                }`}>{totalScore}/{totalMax}</span>
               </div>
               <div className="flex gap-1.5">
-                {[...Array(8)].map((_, i) => (
+                {[...Array(totalMax)].map((_, i) => (
                   <div key={i} className={`
                     h-2.5 flex-1 rounded-full transition-all duration-500
                     ${i < totalScore

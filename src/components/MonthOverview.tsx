@@ -11,6 +11,7 @@ interface MonthOverviewProps {
   habitData: Map<string, HabitEntry>;
   currentHabit: HabitEntry | null;
   onHabitToggle: (field: keyof HabitEntry) => void;
+  habitSchedules: Record<string, number[]>;
 }
 
 function getPrayerCount(h: HabitEntry): number {
@@ -24,9 +25,11 @@ function Led({ status }: { status: 'on' | 'yellow' | 'off' }) {
   return <span className="w-3 h-3 rounded-full bg-black/25 inline-block flex-shrink-0 ring-[1.5px] ring-black/10" />;
 }
 
+const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+
 export default function MonthOverview({
   monthData, selectedDay, onDayClick, todayDay, currentMonth,
-  habitData, currentHabit, onHabitToggle,
+  habitData, currentHabit, onHabitToggle, habitSchedules,
 }: MonthOverviewProps) {
   const [panelOpen, setPanelOpen] = useState(false);
   const today = new Date();
@@ -89,8 +92,10 @@ export default function MonthOverview({
                 const isSelected = dayData.day === selectedDay && panelOpen;
                 const isFuture = isCurrentMonth && dayData.day > today.getDate();
                 const habit = habitData.get(dayData.date);
+                const dow = new Date(dayData.date + 'T00:00:00').getDay();
+                const isScheduled = (key: string) => (habitSchedules[key] || ALL_DAYS).includes(dow);
                 const pc = habit ? getPrayerCount(habit) : 0;
-                const pLed: 'on' | 'yellow' | 'off' = pc >= 5 ? 'on' : pc === 4 ? 'yellow' : 'off';
+                const pLed: 'on' | 'yellow' | 'off' = !isScheduled('prayer') ? 'off' : pc >= 5 ? 'on' : pc === 4 ? 'yellow' : 'off';
 
                 return (
                   <button
@@ -112,9 +117,9 @@ export default function MonthOverview({
                       <div className="flex flex-col justify-between flex-1 min-w-0">
                         {[
                           { label: 'Pray', led: pLed },
-                          { label: 'Gym', led: (habit?.gym ? 'on' : 'off') as 'on' | 'off' },
-                          { label: 'Out', led: (habit?.outreach ? 'on' : 'off') as 'on' | 'off' },
-                          { label: 'Learn', led: (habit?.learn ? 'on' : 'off') as 'on' | 'off' },
+                          { label: 'Gym', led: (!isScheduled('gym') ? 'off' : habit?.gym ? 'on' : 'off') as 'on' | 'off' },
+                          { label: 'Out', led: (!isScheduled('outreach') ? 'off' : habit?.outreach ? 'on' : 'off') as 'on' | 'off' },
+                          { label: 'Learn', led: (!isScheduled('learn') ? 'off' : habit?.learn ? 'on' : 'off') as 'on' | 'off' },
                         ].map(({ label, led }) => (
                           <div key={label} className="flex items-center gap-2">
                             <Led status={led} />
@@ -163,7 +168,7 @@ export default function MonthOverview({
                     background: 'linear-gradient(135deg, #4338ca, #3730a3)',
                   }} />
                 </div>
-                <HabitPanel date={selectedDayData.date} habit={currentHabit} onToggle={onHabitToggle} />
+                <HabitPanel date={selectedDayData.date} habit={currentHabit} onToggle={onHabitToggle} habitSchedules={habitSchedules} />
                 <style>{`
                   @keyframes habitSlideDown {
                     from { max-height: 0; opacity: 0; transform: translateY(-12px); }

@@ -35,6 +35,15 @@ export interface HabitEntry {
   updated_at: string;
 }
 
+export interface HabitSchedule {
+  id: string;
+  user_id: string;
+  habit_key: string;
+  active_days: number[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DayData {
   day: number;
   hours: number;

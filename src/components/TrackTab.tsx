@@ -4,12 +4,13 @@ import { undoManager } from '../lib/undoManager';
 import { WorkSession, DayData, HabitEntry } from '../types';
 import MonthOverview from './MonthOverview';
 import HabitMonthView from './HabitMonthView';
+import HabitScheduleModal from './HabitScheduleModal';
 import MotivationalQuote from './MotivationalQuote';
 import DaySummary from './DaySummary';
 import TimelineGraph from './TimelineGraph';
 import ControlsPanel from './ControlsPanel';
 import MilestoneQuote from './MilestoneQuote';
-import { Undo2, Redo2, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Undo2, Redo2, ChevronRight, ChevronLeft, Settings } from 'lucide-react';
 
 interface TrackTabProps {
   currentMonth: Date;
@@ -29,6 +30,8 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
   const [habitMap, setHabitMap] = useState<Map<string, HabitEntry>>(new Map());
   const [currentHabit, setCurrentHabit] = useState<HabitEntry | null>(null);
   const [habitViewOpen, setHabitViewOpen] = useState(false);
+  const [habitSchedules, setHabitSchedules] = useState<Record<string, number[]>>({});
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
 
   const currentDayString = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
 
@@ -36,6 +39,7 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
     loadMonthData();
     loadSessions();
     loadHabitData();
+    loadHabitSchedules();
     updateUndoRedoState();
   }, [currentMonth]);
 
@@ -48,6 +52,26 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
   const updateUndoRedoState = () => {
     setCanUndo(undoManager.canUndo());
     setCanRedo(undoManager.canRedo());
+  };
+
+  const loadHabitSchedules = async () => {
+    try {
+      const entries = await db.habitSchedules.getAll();
+      const map: Record<string, number[]> = {};
+      entries.forEach(e => { map[e.habit_key] = e.active_days; });
+      setHabitSchedules(map);
+    } catch {
+      // Table might not exist yet
+    }
+  };
+
+  const handleScheduleUpdate = async (habitKey: string, activeDays: number[]) => {
+    try {
+      await db.habitSchedules.upsert(habitKey, activeDays);
+      setHabitSchedules(prev => ({ ...prev, [habitKey]: activeDays }));
+    } catch (err) {
+      console.error('Error updating schedule:', err);
+    }
   };
 
   const loadHabitData = async () => {
@@ -320,26 +344,34 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
           habitData={habitMap}
           currentHabit={currentHabit}
           onHabitToggle={handleHabitToggle}
+          habitSchedules={habitSchedules}
         />
 
-        {/* Arrow button pinned to right edge */}
-        <button
-          onClick={() => setHabitViewOpen(!habitViewOpen)}
-          className={`
-            absolute top-1/2 -translate-y-1/2 -right-5 z-20
-            w-10 h-10 rounded-full flex items-center justify-center
-            transition-all duration-300 shadow-lg
-            ${habitViewOpen
-              ? 'bg-amber-700 hover:bg-amber-800 text-white'
-              : 'bg-amber-600 hover:bg-amber-700 text-white'
+        {/* Buttons pinned to right edge */}
+        <div className="absolute top-1/2 -translate-y-1/2 -right-5 z-20 flex flex-col gap-2">
+          <button
+            onClick={() => setHabitViewOpen(!habitViewOpen)}
+            className={`
+              w-10 h-10 rounded-full flex items-center justify-center
+              transition-all duration-300 shadow-lg
+              ${habitViewOpen
+                ? 'bg-amber-700 hover:bg-amber-800 text-white'
+                : 'bg-amber-600 hover:bg-amber-700 text-white'
+              }
+            `}
+          >
+            {habitViewOpen
+              ? <ChevronRight className="w-5 h-5" />
+              : <ChevronLeft className="w-5 h-5" />
             }
-          `}
-        >
-          {habitViewOpen
-            ? <ChevronRight className="w-5 h-5" />
-            : <ChevronLeft className="w-5 h-5" />
-          }
-        </button>
+          </button>
+          <button
+            onClick={() => setScheduleModalOpen(true)}
+            className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg bg-stone-600 hover:bg-stone-700 text-white"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+        </div>
 
         {/* Overlay on top of calendar */}
         {habitViewOpen && (
@@ -347,7 +379,7 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
             className="absolute inset-0 z-10 rounded-2xl overflow-hidden"
             style={{ animation: 'habitOverlayIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
           >
-            <HabitMonthView currentMonth={currentMonth} habitData={habitMap} />
+            <HabitMonthView currentMonth={currentMonth} habitData={habitMap} habitSchedules={habitSchedules} />
             <style>{`
               @keyframes habitOverlayIn {
                 from { opacity: 0; transform: translateX(30px); }
@@ -371,6 +403,14 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
       <ControlsPanel onAddSession={handleAddSession} isLoading={isAdding} sessions={sessions} currentDay={currentDayString} />
 
       <MilestoneQuote quote={milestoneQuote} show={showQuote} />
+
+      {scheduleModalOpen && (
+        <HabitScheduleModal
+          schedules={habitSchedules}
+          onUpdate={handleScheduleUpdate}
+          onClose={() => setScheduleModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
