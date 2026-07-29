@@ -3,12 +3,13 @@ import { db } from '../lib/database';
 import { undoManager } from '../lib/undoManager';
 import { WorkSession, DayData, HabitEntry } from '../types';
 import MonthOverview from './MonthOverview';
+import HabitMonthView from './HabitMonthView';
 import MotivationalQuote from './MotivationalQuote';
 import DaySummary from './DaySummary';
 import TimelineGraph from './TimelineGraph';
 import ControlsPanel from './ControlsPanel';
 import MilestoneQuote from './MilestoneQuote';
-import { Undo2, Redo2 } from 'lucide-react';
+import { Undo2, Redo2, ChevronRight, ChevronLeft } from 'lucide-react';
 
 interface TrackTabProps {
   currentMonth: Date;
@@ -27,6 +28,7 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
   const [canRedo, setCanRedo] = useState(false);
   const [habitMap, setHabitMap] = useState<Map<string, HabitEntry>>(new Map());
   const [currentHabit, setCurrentHabit] = useState<HabitEntry | null>(null);
+  const [habitViewOpen, setHabitViewOpen] = useState(false);
 
   const currentDayString = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
 
@@ -308,16 +310,46 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
         </button>
       </div>
 
-      <MonthOverview
-        monthData={monthData}
-        selectedDay={selectedDay}
-        onDayClick={setSelectedDay}
-        todayDay={todayDay}
-        currentMonth={currentMonth}
-        habitData={habitMap}
-        currentHabit={currentHabit}
-        onHabitToggle={handleHabitToggle}
-      />
+      <div className="flex gap-3 items-start">
+        <div className="flex-1 min-w-0">
+          <MonthOverview
+            monthData={monthData}
+            selectedDay={selectedDay}
+            onDayClick={setSelectedDay}
+            todayDay={todayDay}
+            currentMonth={currentMonth}
+            habitData={habitMap}
+            currentHabit={currentHabit}
+            onHabitToggle={handleHabitToggle}
+          />
+        </div>
+
+        <div className="flex items-center gap-0 flex-shrink-0 self-stretch">
+          <button
+            onClick={() => setHabitViewOpen(!habitViewOpen)}
+            className={`
+              h-full px-1.5 rounded-lg transition-all duration-300 flex items-center
+              ${habitViewOpen
+                ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg'
+                : 'bg-stone-200 hover:bg-stone-300 ink-text-muted paper-border paper-shadow'
+              }
+            `}
+          >
+            {habitViewOpen
+              ? <ChevronRight className="w-5 h-5" />
+              : <ChevronLeft className="w-5 h-5" />
+            }
+          </button>
+
+          <div className={`transition-all duration-400 ease-in-out overflow-hidden ${
+            habitViewOpen ? 'w-[300px] opacity-100 ml-1.5' : 'w-0 opacity-0 ml-0'
+          }`}>
+            {habitViewOpen && (
+              <HabitMonthView currentMonth={currentMonth} habitData={habitMap} />
+            )}
+          </div>
+        </div>
+      </div>
 
       <MotivationalQuote workedHours={workedHours} />
 
