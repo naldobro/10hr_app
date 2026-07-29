@@ -89,7 +89,7 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
           </button>
           <div className="text-center">
             <div className="text-2xl mb-0.5">{habit.icon}</div>
-            <h3 className="text-xl font-bold ink-text">{habit.label}</h3>
+            <h3 className="text-2xl font-bold ink-text">{habit.label}</h3>
             <p className="text-xs font-semibold ink-text-muted mt-0.5">
               {doneCount} of {pastDays} days
             </p>
@@ -144,11 +144,11 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
           ))}
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           {weeks.map((week, wi) => (
-            <div key={wi} className="grid grid-cols-7 gap-1.5">
+            <div key={wi} className="grid grid-cols-7 gap-1">
               {week.map((day, di) => {
-                if (day === null) return <div key={`e-${di}`} className="aspect-square" />;
+                if (day === null) return <div key={`e-${di}`} className="h-12" />;
 
                 const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 const entry = habitData.get(dateStr);
@@ -161,7 +161,7 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
                   <div
                     key={day}
                     className={`
-                      aspect-square rounded-lg flex flex-col items-center justify-center transition-all
+                      h-12 rounded-lg flex items-center justify-center gap-1 transition-all
                       ${isFuture ? 'bg-stone-200/50' :
                         status === 'green' ? 'bg-emerald-100 border-2 border-emerald-400' :
                         status === 'yellow' ? 'bg-amber-100 border-2 border-amber-400' :
@@ -170,7 +170,7 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
                       ${isToday ? 'ring-2 ring-amber-600' : ''}
                     `}
                   >
-                    <span className={`text-sm font-bold leading-none ${
+                    <span className={`text-base font-bold leading-none ${
                       isFuture ? 'ink-text-muted' :
                       status === 'green' ? 'text-emerald-800' :
                       status === 'yellow' ? 'text-amber-800' :
@@ -179,10 +179,10 @@ export default function HabitMonthView({ currentMonth, habitData }: HabitMonthVi
                       {day}
                     </span>
                     {!isFuture && status === 'green' && (
-                      <Check className="w-3.5 h-3.5 text-emerald-600 mt-0.5 stroke-[3]" />
+                      <Check className="w-4 h-4 text-emerald-600 stroke-[3]" />
                     )}
                     {!isFuture && status === 'yellow' && (
-                      <span className="text-[10px] font-bold text-amber-600 mt-0.5">{detail}</span>
+                      <span className="text-xs font-bold text-amber-600">{detail}</span>
                     )}
                   </div>
                 );
