@@ -50,3 +50,22 @@ export interface DayData {
   color: string;
   date: string;
 }
+
+export interface GoalStep {
+  text: string;
+  done: boolean;
+}
+
+export interface VisionGoal {
+  id: string;
+  user_id: string;
+  title: string;
+  target: string;
+  note: string;
+  color: string;
+  deadline: string | null;
+  steps: GoalStep[];
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}

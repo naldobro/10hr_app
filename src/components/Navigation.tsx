@@ -1,8 +1,10 @@
-import { ChevronLeft, ChevronRight, Flame } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Flame, Sparkles } from 'lucide-react';
+
+type Tab = 'track' | 'statistics' | 'vision';
 
 interface NavigationProps {
-  activeTab: 'track' | 'statistics';
-  onTabChange: (tab: 'track' | 'statistics') => void;
+  activeTab: Tab;
+  onTabChange: (tab: Tab) => void;
   currentMonth: string;
   onMonthChange: (direction: 'prev' | 'next') => void;
   streakDays: number;
@@ -71,6 +73,17 @@ export default function Navigation({
             >
               Statistics
             </button>
+            <button
+              onClick={() => onTabChange('vision')}
+              className={`flex-1 py-1.5 rounded-md text-sm font-semibold transition-all flex items-center justify-center gap-1 ${
+                activeTab === 'vision'
+                  ? 'paper-card ink-text paper-shadow'
+                  : 'ink-text-muted hover:bg-amber-50'
+              }`}
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${activeTab === 'vision' ? 'text-violet-500' : ''}`} />
+              Vision
+            </button>
           </div>
         </div>
 
@@ -104,6 +117,17 @@ export default function Navigation({
                 }`}
               >
                 Statistics
+              </button>
+              <button
+                onClick={() => onTabChange('vision')}
+                className={`px-4 lg:px-6 py-2 rounded-md font-semibold transition-all flex items-center gap-1.5 ${
+                  activeTab === 'vision'
+                    ? 'paper-card ink-text paper-shadow'
+                    : 'ink-text-muted hover:bg-amber-50'
+                }`}
+              >
+                <Sparkles className={`w-4 h-4 ${activeTab === 'vision' ? 'text-violet-500' : ''}`} />
+                Vision
               </button>
             </div>
           </div>

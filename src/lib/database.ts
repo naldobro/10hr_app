@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { WorkSession, DailySummary, HabitEntry, HabitSchedule } from '../types';
+import { WorkSession, DailySummary, HabitEntry, HabitSchedule, VisionGoal } from '../types';
 
 const SINGLE_USER_ID = 'single-user';
 
@@ -189,6 +189,56 @@ export const db = {
 
       if (error) throw error;
       return data;
+    },
+  },
+
+  visionGoals: {
+    getAll: async (): Promise<VisionGoal[]> => {
+      const { data, error } = await supabase
+        .from('vision_goals')
+        .select('*')
+        .eq('user_id', SINGLE_USER_ID)
+        .order('sort_order', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    },
+
+    add: async (
+      goal: Partial<Omit<VisionGoal, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
+    ): Promise<VisionGoal> => {
+      const { data, error } = await supabase
+        .from('vision_goals')
+        .insert([{ ...goal, user_id: SINGLE_USER_ID }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+
+    update: async (
+      id: string,
+      patch: Partial<Omit<VisionGoal, 'id' | 'user_id' | 'created_at'>>
+    ): Promise<VisionGoal> => {
+      const { data, error } = await supabase
+        .from('vision_goals')
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+
+    delete: async (id: string): Promise<void> => {
+      const { error } = await supabase
+        .from('vision_goals')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
     },
   },
 

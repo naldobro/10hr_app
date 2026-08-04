@@ -3,9 +3,10 @@ import { db } from './lib/database';
 import Navigation from './components/Navigation';
 import TrackTab from './components/TrackTab';
 import StatisticsTab from './components/StatisticsTab';
+import VisionTab from './components/VisionTab';
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'track' | 'statistics'>('track');
+  const [activeTab, setActiveTab] = useState<'track' | 'statistics' | 'vision'>('track');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [streakDays, setStreakDays] = useState(0);
 
@@ -79,10 +80,14 @@ function App() {
         canGoNext={canGoNext()}
       />
 
-      <main className="relative pt-[100px] md:pt-[90px] pb-12 px-3 sm:px-6 lg:px-8 max-w-[1400px] mx-auto">
-        {activeTab === 'track' && <TrackTab currentMonth={currentMonth} />}
-        {activeTab === 'statistics' && <StatisticsTab currentMonth={currentMonth} />}
-      </main>
+      {activeTab === 'vision' ? (
+        <VisionTab />
+      ) : (
+        <main className="relative pt-[100px] md:pt-[90px] pb-12 px-3 sm:px-6 lg:px-8 max-w-[1400px] mx-auto">
+          {activeTab === 'track' && <TrackTab currentMonth={currentMonth} />}
+          {activeTab === 'statistics' && <StatisticsTab currentMonth={currentMonth} />}
+        </main>
+      )}
     </div>
   );
 }
