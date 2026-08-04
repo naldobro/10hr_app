@@ -78,10 +78,16 @@ export default function VisionTab() {
   const particlesRef = useRef<Particle[]>([]);
   const burstsRef = useRef<Burst[]>([]);
   const didInitScroll = useRef(false);
+  const pausedRef = useRef(false);
 
   useEffect(() => {
     goalsRef.current = goals;
   });
+
+  // Pause the animation loop while the drawer is open (it's hidden behind the scrim anyway).
+  useEffect(() => {
+    pausedRef.current = selectedId !== null;
+  }, [selectedId]);
 
   const ppd = ZOOMS[zoomIndex].ppd;
 
@@ -134,58 +140,71 @@ export default function VisionTab() {
   }, [goals, layoutH]);
 
   // ---------- particles ----------
+  // The canvas is only viewport-sized and follows scroll (rather than being as tall
+  // as the whole timeline), which keeps per-frame cost tiny even when zoomed out.
   useEffect(() => {
     const canvas = pCanvasRef.current;
-    const wrap = canvasRef.current;
-    if (!canvas || !wrap) return;
+    const scrollEl = scrollRef.current;
+    if (!canvas || !scrollEl) return;
     const ctx = canvas.getContext('2d')!;
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
     let raf = 0;
 
     const resize = () => {
-      const w = wrap.clientWidth;
-      const h = wrap.clientHeight;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
+      const w = scrollEl.clientWidth;
+      const h = scrollEl.clientHeight;
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
       canvas.style.width = w + 'px';
       canvas.style.height = h + 'px';
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       dimsRef.current = { w, h };
       if (particlesRef.current.length === 0) {
-        for (let i = 0; i < 46; i++) particlesRef.current.push(spawn(w, h, true));
+        for (let i = 0; i < 32; i++) particlesRef.current.push(spawn(w, h, true));
       }
     };
+    const reposition = () => {
+      canvas.style.top = scrollEl.scrollTop + 'px';
+    };
     resize();
-    const ro = new ResizeObserver(resize);
-    ro.observe(wrap);
+    reposition();
+    const ro = new ResizeObserver(() => {
+      resize();
+      reposition();
+    });
+    ro.observe(scrollEl);
+    scrollEl.addEventListener('scroll', reposition, { passive: true });
 
     const frame = () => {
-      const { w, h } = dimsRef.current;
-      ctx.clearRect(0, 0, w, h);
-      const cx = w / 2;
-      particlesRef.current.forEach((p) => {
-        p.y += p.vy;
-        p.drift += 0.02;
-        const x = cx + Math.sin(p.drift) * p.amp;
-        if (p.y < -10) Object.assign(p, spawn(w, h, false));
-        ctx.beginPath();
-        ctx.fillStyle = `rgba(${p.hue},${p.a})`;
-        ctx.arc(x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fill();
-      });
-      if (burstsRef.current.length) {
-        burstsRef.current.forEach((b) => {
-          b.x += b.vx;
-          b.y += b.vy;
-          b.vy += 0.12;
-          b.life -= 0.02;
+      const hasBursts = burstsRef.current.length > 0;
+      if (!pausedRef.current || hasBursts) {
+        const { w, h } = dimsRef.current;
+        ctx.clearRect(0, 0, w, h);
+        const cx = w / 2;
+        particlesRef.current.forEach((p) => {
+          p.y += p.vy;
+          p.drift += 0.02;
+          const x = cx + Math.sin(p.drift) * p.amp;
+          if (p.y < -10) Object.assign(p, spawn(w, h, false));
           ctx.beginPath();
-          ctx.fillStyle = `rgba(${b.rgb},${Math.max(0, b.life)})`;
-          ctx.arc(b.x, b.y, 2.6, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(${p.hue},${p.a})`;
+          ctx.arc(x, p.y, p.r, 0, Math.PI * 2);
           ctx.fill();
         });
-        burstsRef.current = burstsRef.current.filter((b) => b.life > 0);
+        if (hasBursts) {
+          burstsRef.current.forEach((b) => {
+            b.x += b.vx;
+            b.y += b.vy;
+            b.vy += 0.12;
+            b.life -= 0.02;
+            ctx.beginPath();
+            ctx.fillStyle = `rgba(${b.rgb},${Math.max(0, b.life)})`;
+            ctx.arc(b.x, b.y, 2.6, 0, Math.PI * 2);
+            ctx.fill();
+          });
+          burstsRef.current = burstsRef.current.filter((b) => b.life > 0);
+        }
       }
       if (!reduce) raf = requestAnimationFrame(frame);
     };
@@ -194,16 +213,15 @@ export default function VisionTab() {
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
+      scrollEl.removeEventListener('scroll', reposition);
     };
   }, []);
 
   const triggerBurst = (color: string) => {
-    const el = scrollRef.current;
-    if (!el) return;
     const cx = dimsRef.current.w / 2;
-    const cy = el.scrollTop + el.clientHeight * 0.3;
+    const cy = dimsRef.current.h * 0.3;
     const rgb = hexRgb(color);
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 36; i++) {
       const a = Math.random() * Math.PI * 2;
       const sp = 2 + Math.random() * 5;
       burstsRef.current.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 2, life: 1, rgb });
@@ -417,28 +435,31 @@ export default function VisionTab() {
             className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[280px] pointer-events-none"
             style={{ background: 'radial-gradient(closest-side, rgba(124,58,237,0.06), transparent)' }}
           />
-          <canvas ref={pCanvasRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 1 }} />
+          <canvas ref={pCanvasRef} className="absolute left-0 top-0 pointer-events-none" style={{ zIndex: 1 }} />
 
-          {/* month / quarter gridlines */}
+          {/* month / quarter gridlines (line sits behind cards, label sits above the spine) */}
           {ticks.map((t) => (
-            <div key={t.key} className="absolute left-0 right-0 pointer-events-none" style={{ top: t.y, zIndex: 2 }}>
-              <div
-                className="absolute left-[7%] right-[7%]"
-                style={
-                  t.quarter
-                    ? { top: 0, height: 1, background: 'rgba(0,0,0,0.12)' }
-                    : { top: 0, height: 0, borderTop: '1px dashed rgba(0,0,0,0.07)' }
-                }
-              />
-              <div
-                className={`absolute left-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap font-mono tracking-wider rounded-full border ${
-                  t.quarter
-                    ? 'text-[11px] font-bold ink-text px-2.5 py-0.5 bg-white border-black/10 shadow-sm'
-                    : 'text-[10px] ink-text-muted px-2 py-0.5 bg-[#f7f6f3] border-black/5'
-                }`}
-              >
-                {t.label}
-              </div>
+            <div
+              key={t.key + '-line'}
+              className="absolute left-[7%] right-[7%] pointer-events-none"
+              style={
+                t.quarter
+                  ? { top: t.y, height: 1, background: 'rgba(0,0,0,0.12)', zIndex: 2 }
+                  : { top: t.y, height: 0, borderTop: '1px dashed rgba(0,0,0,0.07)', zIndex: 2 }
+              }
+            />
+          ))}
+          {ticks.map((t) => (
+            <div
+              key={t.key + '-lbl'}
+              className={`absolute left-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap font-mono tracking-wider rounded-full border pointer-events-none ${
+                t.quarter
+                  ? 'text-[11px] font-bold ink-text px-2.5 py-0.5 bg-white border-black/10 shadow-sm'
+                  : 'text-[10px] ink-text-muted px-2 py-0.5 bg-white border-black/5 shadow-sm'
+              }`}
+              style={{ top: t.y, zIndex: 7 }}
+            >
+              {t.label}
             </div>
           ))}
 
@@ -624,7 +645,7 @@ export default function VisionTab() {
       {/* drawer + scrim */}
       {selectedGoal && (
         <>
-          <div className="fixed inset-0 z-[65] bg-black/25 backdrop-blur-[2px]" onClick={() => setSelectedId(null)} />
+          <div className="fixed inset-0 z-[65] bg-black/25" onClick={() => setSelectedId(null)} />
           <GoalDrawer
             goal={selectedGoal}
             onChange={(patch, persist) => updateGoal(selectedGoal.id, patch, persist)}
