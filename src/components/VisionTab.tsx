@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Flag, CalendarClock, X, Check, Minus } from 'lucide-react';
+import { Plus, Flag, CalendarClock, X, Check, Minus, Undo2, Redo2 } from 'lucide-react';
 import { db } from '../lib/database';
+import { undoManager } from '../lib/undoManager';
 import { VisionGoal } from '../types';
 import {
   DAY,
@@ -69,6 +70,8 @@ export default function VisionTab() {
   const [toast, setToast] = useState<string | null>(null);
   const [dbDown, setDbDown] = useState(false);
   const [pendingMove, setPendingMove] = useState<{ id: string; from: string | null; to: string } | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
   const [ppd, setPpd] = useState<number>(() => {
     const saved = Number(localStorage.getItem('vision_ppd'));
     return saved >= PPD_MIN && saved <= PPD_MAX ? saved : PPD_DEFAULT;
@@ -107,6 +110,20 @@ export default function VisionTab() {
   const yForDays = (d: number) => layoutH - BOT_PAD - d * ppd;
   const yForDeadline = (dl: string) => yForDays(daysUntil(dl));
 
+  const refreshUndo = useCallback(() => {
+    setCanUndo(undoManager.canUndo());
+    setCanRedo(undoManager.canRedo());
+  }, []);
+
+  const reloadGoals = useCallback(async () => {
+    try {
+      const rows = await db.visionGoals.getAll();
+      setGoals(normalize(rows));
+    } catch {
+      /* leave current state */
+    }
+  }, []);
+
   // ---------- load ----------
   useEffect(() => {
     (async () => {
@@ -118,8 +135,45 @@ export default function VisionTab() {
         setDbDown(true);
         setGoals(demoGoals());
       }
+      refreshUndo();
     })();
-  }, []);
+  }, [refreshUndo]);
+
+  const handleUndo = useCallback(async () => {
+    if (!undoManager.canUndo()) return;
+    await undoManager.undo();
+    await reloadGoals();
+    refreshUndo();
+    setToast('Undone');
+    window.setTimeout(() => setToast(null), 1600);
+  }, [reloadGoals, refreshUndo]);
+
+  const handleRedo = useCallback(async () => {
+    if (!undoManager.canRedo()) return;
+    await undoManager.redo();
+    await reloadGoals();
+    refreshUndo();
+    setToast('Redone');
+    window.setTimeout(() => setToast(null), 1600);
+  }, [reloadGoals, refreshUndo]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t.isContentEditable)) return;
+      const mod = e.metaKey || e.ctrlKey;
+      const key = e.key.toLowerCase();
+      if (mod && key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if ((mod && key === 'z' && e.shiftKey) || (mod && key === 'y')) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [handleUndo, handleRedo]);
 
   // ---------- viewport measure ----------
   useEffect(() => {
@@ -255,7 +309,14 @@ export default function VisionTab() {
     setGoals((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch } : g)));
     if (persist) {
       const cur = goalsRef.current.find((g) => g.id === id);
-      if (cur) persistGoal({ ...cur, ...patch });
+      if (cur) {
+        const after = { ...cur, ...patch };
+        persistGoal(after);
+        if (!dbDown && visionChanged(cur, after)) {
+          undoManager.addToUndoHistory({ type: 'vision_update', before: cur, after, timestamp: Date.now() });
+          refreshUndo();
+        }
+      }
     }
   };
 
@@ -286,8 +347,11 @@ export default function VisionTab() {
     }
     try {
       const row = await db.visionGoals.add(draft);
-      setGoals((p) => [...p, { ...row, kind: row.kind ?? kind, done: row.done ?? false, goal_id: row.goal_id ?? null }]);
+      const norm = { ...row, kind: row.kind ?? kind, done: row.done ?? false, goal_id: row.goal_id ?? null };
+      setGoals((p) => [...p, norm]);
       setSelectedId(row.id);
+      undoManager.addToUndoHistory({ type: 'vision_add', row: norm, timestamp: Date.now() });
+      refreshUndo();
     } catch {
       flash('Could not create — run the latest vision_goals migration');
       setDbDown(true);
@@ -295,9 +359,16 @@ export default function VisionTab() {
   };
 
   const deleteGoal = (id: string) => {
+    const row = goalsRef.current.find((g) => g.id === id);
     setGoals((p) => p.filter((g) => g.id !== id).map((g) => (g.goal_id === id ? { ...g, goal_id: null } : g)));
     setSelectedId(null);
-    if (!dbDown) db.visionGoals.delete(id).catch(() => flash('Delete failed'));
+    if (!dbDown) {
+      db.visionGoals.delete(id).catch(() => flash('Delete failed'));
+      if (row) {
+        undoManager.addToUndoHistory({ type: 'vision_delete', row, timestamp: Date.now() });
+        refreshUndo();
+      }
+    }
   };
 
   // ---------- drag ----------
@@ -416,6 +487,24 @@ export default function VisionTab() {
     <div className="fixed left-0 right-0 bottom-0 top-[100px] md:top-[90px] flex overflow-hidden bg-[#f7f6f3]">
       {/* ---------------- Tray ---------------- */}
       <aside className="w-[220px] sm:w-[264px] flex-shrink-0 flex flex-col gap-3 p-4 overflow-y-auto bg-amber-50/40 border-r border-black/5">
+        <div className="flex gap-2">
+          <button
+            onClick={handleUndo}
+            disabled={!canUndo}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-black/10 ink-text text-sm font-semibold hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            title="Undo (Ctrl/Cmd+Z)"
+          >
+            <Undo2 className="w-4 h-4" /> Undo
+          </button>
+          <button
+            onClick={handleRedo}
+            disabled={!canRedo}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border border-black/10 ink-text text-sm font-semibold hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            title="Redo (Ctrl/Cmd+Shift+Z)"
+          >
+            <Redo2 className="w-4 h-4" /> Redo
+          </button>
+        </div>
         <button
           onClick={() => addItem('goal')}
           className="bg-stone-800 hover:bg-stone-900 text-white font-bold text-sm rounded-xl py-3 px-3.5 flex items-center justify-center gap-2 transition-colors"
@@ -784,6 +873,11 @@ export default function VisionTab() {
 // ---------- helpers ----------
 function normalize(rows: VisionGoal[]): VisionGoal[] {
   return rows.map((r) => ({ ...r, kind: r.kind ?? 'goal', done: r.done ?? false, goal_id: r.goal_id ?? null }));
+}
+
+function visionChanged(a: VisionGoal, b: VisionGoal): boolean {
+  const f = (g: VisionGoal) => [g.kind, g.goal_id, g.title, g.target, g.note, g.color, g.deadline, g.done, g.sort_order];
+  return JSON.stringify(f(a)) !== JSON.stringify(f(b));
 }
 
 function spawn(h: number, rand: boolean): Particle {

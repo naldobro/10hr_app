@@ -1,11 +1,23 @@
-import { WorkSession } from '../types';
+import { WorkSession, VisionGoal } from '../types';
 import { db } from './database';
 
-interface UndoAction {
-  type: 'add_session' | 'delete_session';
-  sessionData: WorkSession;
-  timestamp: number;
-}
+type UndoAction =
+  | { type: 'add_session' | 'delete_session'; sessionData: WorkSession; timestamp: number }
+  | { type: 'vision_add'; row: VisionGoal; timestamp: number }
+  | { type: 'vision_delete'; row: VisionGoal; timestamp: number }
+  | { type: 'vision_update'; before: VisionGoal; after: VisionGoal; timestamp: number };
+
+const visionFields = (g: VisionGoal) => ({
+  kind: g.kind,
+  goal_id: g.goal_id,
+  title: g.title,
+  target: g.target,
+  note: g.note,
+  color: g.color,
+  deadline: g.deadline,
+  done: g.done,
+  sort_order: g.sort_order,
+});
 
 const UNDO_STORAGE_KEY = 'undo_history';
 const REDO_STORAGE_KEY = 'redo_history';
@@ -52,6 +64,12 @@ export const undoManager = {
       });
       action.sessionData = restored;
       await undoManager.recalculateSummary(action.sessionData.date);
+    } else if (action.type === 'vision_add') {
+      await db.visionGoals.delete(action.row.id);
+    } else if (action.type === 'vision_delete') {
+      await db.visionGoals.restore(action.row);
+    } else if (action.type === 'vision_update') {
+      await db.visionGoals.update(action.before.id, visionFields(action.before));
     }
 
     const redoHistory = undoManager.getRedoHistory();
@@ -81,6 +99,12 @@ export const undoManager = {
     } else if (action.type === 'delete_session') {
       await db.sessions.delete(action.sessionData.id);
       await undoManager.recalculateSummary(action.sessionData.date);
+    } else if (action.type === 'vision_add') {
+      await db.visionGoals.restore(action.row);
+    } else if (action.type === 'vision_delete') {
+      await db.visionGoals.delete(action.row.id);
+    } else if (action.type === 'vision_update') {
+      await db.visionGoals.update(action.after.id, visionFields(action.after));
     }
 
     const undoHistory = undoManager.getUndoHistory();

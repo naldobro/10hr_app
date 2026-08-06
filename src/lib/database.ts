@@ -240,6 +240,32 @@ export const db = {
 
       if (error) throw error;
     },
+
+    // Re-insert a previously-deleted row keeping its original id (used by undo).
+    restore: async (goal: VisionGoal): Promise<VisionGoal> => {
+      const { data, error } = await supabase
+        .from('vision_goals')
+        .insert([
+          {
+            id: goal.id,
+            user_id: SINGLE_USER_ID,
+            kind: goal.kind,
+            goal_id: goal.goal_id,
+            title: goal.title,
+            target: goal.target,
+            note: goal.note,
+            color: goal.color,
+            deadline: goal.deadline,
+            done: goal.done,
+            sort_order: goal.sort_order,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
   },
 
   quotes: {
