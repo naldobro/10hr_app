@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Flag, CalendarClock, X, Check, Minus, Undo2, Redo2, History, RotateCcw, Save } from 'lucide-react';
+import { Plus, Flag, CalendarClock, X, Check, Minus, Undo2, Redo2, History, RotateCcw, Save, Heart } from 'lucide-react';
 import { db } from '../lib/database';
 import { undoManager } from '../lib/undoManager';
-import { VisionGoal, VisionSnapshot } from '../types';
+import { VisionGoal, VisionSnapshot, VisionTopic } from '../types';
 import {
   DAY,
   GOAL_COLORS,
@@ -17,6 +17,7 @@ import {
   Urgency,
 } from '../lib/visionUtils';
 import GoalDrawer from './GoalDrawer';
+import ReflectionsPanel from './ReflectionsPanel';
 
 // Single timeline; spacing (pixels-per-day) is user-adjustable to spread out cramped items.
 const PPD_MIN = 4;
@@ -76,6 +77,8 @@ export default function VisionTab() {
   const [versions, setVersions] = useState<VisionSnapshot[]>([]);
   const [restoreDate, setRestoreDate] = useState<string | null>(null);
   const [versionsBusy, setVersionsBusy] = useState(false);
+  const [topics, setTopics] = useState<VisionTopic[]>([]);
+  const [showReflections, setShowReflections] = useState(false);
   const [ppd, setPpd] = useState<number>(() => {
     const saved = Number(localStorage.getItem('vision_ppd'));
     return saved >= PPD_MIN && saved <= PPD_MAX ? saved : PPD_DEFAULT;
@@ -101,6 +104,7 @@ export default function VisionTab() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const pCanvasRef = useRef<HTMLCanvasElement>(null);
   const goalsRef = useRef<VisionGoal[]>([]);
+  const topicsRef = useRef<VisionTopic[]>([]);
   const dimsRef = useRef({ w: 0, h: 0 });
   const particlesRef = useRef<Particle[]>([]);
   const burstsRef = useRef<Burst[]>([]);
@@ -111,6 +115,9 @@ export default function VisionTab() {
 
   useEffect(() => {
     goalsRef.current = goals;
+  });
+  useEffect(() => {
+    topicsRef.current = topics;
   });
   useEffect(() => {
     pausedRef.current = selectedId !== null;
@@ -152,6 +159,15 @@ export default function VisionTab() {
     }
   }, []);
 
+  const reloadTopics = useCallback(async () => {
+    try {
+      const rows = await db.visionTopics.getAll();
+      setTopics(rows.map((t) => ({ ...t, emotions: Array.isArray(t.emotions) ? t.emotions : [] })));
+    } catch {
+      /* table may be absent until migration */
+    }
+  }, []);
+
   // ---------- load ----------
   useEffect(() => {
     (async () => {
@@ -166,9 +182,10 @@ export default function VisionTab() {
         setDbDown(true);
         setGoals(demoGoals());
       }
+      reloadTopics();
       refreshUndo();
     })();
-  }, [refreshUndo]);
+  }, [refreshUndo, reloadTopics]);
 
   const openVersions = async () => {
     setShowVersions(true);
@@ -212,20 +229,20 @@ export default function VisionTab() {
   const handleUndo = useCallback(async () => {
     if (!undoManager.canUndo()) return;
     await undoManager.undo();
-    await reloadGoals();
+    await Promise.all([reloadGoals(), reloadTopics()]);
     refreshUndo();
     setToast('Undone');
     window.setTimeout(() => setToast(null), 1600);
-  }, [reloadGoals, refreshUndo]);
+  }, [reloadGoals, reloadTopics, refreshUndo]);
 
   const handleRedo = useCallback(async () => {
     if (!undoManager.canRedo()) return;
     await undoManager.redo();
-    await reloadGoals();
+    await Promise.all([reloadGoals(), reloadTopics()]);
     refreshUndo();
     setToast('Redone');
     window.setTimeout(() => setToast(null), 1600);
-  }, [reloadGoals, refreshUndo]);
+  }, [reloadGoals, reloadTopics, refreshUndo]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -441,6 +458,53 @@ export default function VisionTab() {
     }
   };
 
+  // ---------- topics (Reflections) ----------
+  const persistTopic = (t: VisionTopic) => {
+    if (dbDown) return;
+    db.visionTopics
+      .update(t.id, { title: t.title, color: t.color, emotions: t.emotions, sort_order: t.sort_order })
+      .catch(() => flash('Could not save — run the vision_topics migration'));
+  };
+
+  const updateTopic = (id: string, patch: Partial<VisionTopic>, persist: boolean) => {
+    setTopics((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+    if (persist) {
+      const cur = topicsRef.current.find((t) => t.id === id);
+      if (cur) {
+        const after = { ...cur, ...patch };
+        persistTopic(after);
+        if (!dbDown && topicChanged(cur, after)) {
+          undoManager.addToUndoHistory({ type: 'topic_update', before: cur, after, timestamp: Date.now() });
+          refreshUndo();
+        }
+      }
+    }
+  };
+
+  const addTopic = async () => {
+    const sort_order = topics.reduce((m, t) => Math.max(m, t.sort_order), 0) + 1;
+    const draft = { title: 'New topic', color: GOAL_COLORS[Math.floor(Math.random() * GOAL_COLORS.length)], emotions: [], sort_order };
+    try {
+      const row = await db.visionTopics.add(draft);
+      const norm = { ...row, emotions: Array.isArray(row.emotions) ? row.emotions : [] };
+      setTopics((p) => [...p, norm]);
+      undoManager.addToUndoHistory({ type: 'topic_add', topic: norm, timestamp: Date.now() });
+      refreshUndo();
+    } catch {
+      flash('Could not create — run the vision_topics migration');
+    }
+  };
+
+  const deleteTopic = (id: string) => {
+    const row = topicsRef.current.find((t) => t.id === id);
+    setTopics((p) => p.filter((t) => t.id !== id));
+    db.visionTopics.delete(id).catch(() => flash('Delete failed'));
+    if (row) {
+      undoManager.addToUndoHistory({ type: 'topic_delete', topic: row, timestamp: Date.now() });
+      refreshUndo();
+    }
+  };
+
   // ---------- drag ----------
   const deadlineFromClientY = (clientY: number): string => {
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -592,6 +656,13 @@ export default function VisionTab() {
           className="bg-white border border-black/10 ink-text font-semibold text-sm rounded-xl py-2.5 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
         >
           <Flag className="w-3.5 h-3.5" /> New milestone
+        </button>
+        <button
+          onClick={() => setShowReflections(true)}
+          className="bg-white border border-black/10 ink-text-muted hover:ink-text font-semibold text-sm rounded-xl py-2 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
+          title="Important points to keep in mind"
+        >
+          <Heart className="w-3.5 h-3.5 text-rose-500" /> Reflections
         </button>
         <button
           onClick={openVersions}
@@ -931,6 +1002,17 @@ export default function VisionTab() {
         </>
       )}
 
+      {/* reflections panel */}
+      {showReflections && (
+        <ReflectionsPanel
+          topics={topics}
+          onAddTopic={addTopic}
+          onUpdateTopic={updateTopic}
+          onDeleteTopic={deleteTopic}
+          onClose={() => setShowReflections(false)}
+        />
+      )}
+
       {/* versions modal */}
       {showVersions && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" onClick={() => setShowVersions(false)}>
@@ -1057,6 +1139,11 @@ function normalize(rows: VisionGoal[]): VisionGoal[] {
 
 function visionChanged(a: VisionGoal, b: VisionGoal): boolean {
   const f = (g: VisionGoal) => [g.kind, g.goal_id, g.title, g.target, g.note, g.color, g.deadline, g.done, g.sort_order];
+  return JSON.stringify(f(a)) !== JSON.stringify(f(b));
+}
+
+function topicChanged(a: VisionTopic, b: VisionTopic): boolean {
+  const f = (t: VisionTopic) => [t.title, t.color, t.emotions, t.sort_order];
   return JSON.stringify(f(a)) !== JSON.stringify(f(b));
 }
 

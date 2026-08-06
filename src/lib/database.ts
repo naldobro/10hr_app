@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { WorkSession, DailySummary, HabitEntry, HabitSchedule, VisionGoal, VisionSnapshot } from '../types';
+import { WorkSession, DailySummary, HabitEntry, HabitSchedule, VisionGoal, VisionSnapshot, VisionTopic } from '../types';
 
 const snapshotRow = (g: VisionGoal) => ({
   id: g.id,
@@ -352,6 +352,72 @@ export const db = {
         });
 
       if (error) throw error;
+    },
+  },
+
+  visionTopics: {
+    getAll: async (): Promise<VisionTopic[]> => {
+      const { data, error } = await supabase
+        .from('vision_topics')
+        .select('*')
+        .eq('user_id', SINGLE_USER_ID)
+        .order('sort_order', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    },
+
+    add: async (
+      topic: Partial<Omit<VisionTopic, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
+    ): Promise<VisionTopic> => {
+      const { data, error } = await supabase
+        .from('vision_topics')
+        .insert([{ ...topic, user_id: SINGLE_USER_ID }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+
+    update: async (
+      id: string,
+      patch: Partial<Omit<VisionTopic, 'id' | 'user_id' | 'created_at'>>
+    ): Promise<VisionTopic> => {
+      const { data, error } = await supabase
+        .from('vision_topics')
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+
+    delete: async (id: string): Promise<void> => {
+      const { error } = await supabase.from('vision_topics').delete().eq('id', id);
+      if (error) throw error;
+    },
+
+    restore: async (topic: VisionTopic): Promise<VisionTopic> => {
+      const { data, error } = await supabase
+        .from('vision_topics')
+        .insert([
+          {
+            id: topic.id,
+            user_id: SINGLE_USER_ID,
+            title: topic.title,
+            color: topic.color,
+            emotions: topic.emotions,
+            sort_order: topic.sort_order,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
     },
   },
 

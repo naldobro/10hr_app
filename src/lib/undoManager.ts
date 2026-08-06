@@ -1,11 +1,14 @@
-import { WorkSession, VisionGoal } from '../types';
+import { WorkSession, VisionGoal, VisionTopic } from '../types';
 import { db } from './database';
 
 type UndoAction =
   | { type: 'add_session' | 'delete_session'; sessionData: WorkSession; timestamp: number }
   | { type: 'vision_add'; row: VisionGoal; timestamp: number }
   | { type: 'vision_delete'; row: VisionGoal; timestamp: number }
-  | { type: 'vision_update'; before: VisionGoal; after: VisionGoal; timestamp: number };
+  | { type: 'vision_update'; before: VisionGoal; after: VisionGoal; timestamp: number }
+  | { type: 'topic_add'; topic: VisionTopic; timestamp: number }
+  | { type: 'topic_delete'; topic: VisionTopic; timestamp: number }
+  | { type: 'topic_update'; before: VisionTopic; after: VisionTopic; timestamp: number };
 
 const visionFields = (g: VisionGoal) => ({
   kind: g.kind,
@@ -17,6 +20,13 @@ const visionFields = (g: VisionGoal) => ({
   deadline: g.deadline,
   done: g.done,
   sort_order: g.sort_order,
+});
+
+const topicFields = (t: VisionTopic) => ({
+  title: t.title,
+  color: t.color,
+  emotions: t.emotions,
+  sort_order: t.sort_order,
 });
 
 const UNDO_STORAGE_KEY = 'undo_history';
@@ -70,6 +80,12 @@ export const undoManager = {
       await db.visionGoals.restore(action.row);
     } else if (action.type === 'vision_update') {
       await db.visionGoals.update(action.before.id, visionFields(action.before));
+    } else if (action.type === 'topic_add') {
+      await db.visionTopics.delete(action.topic.id);
+    } else if (action.type === 'topic_delete') {
+      await db.visionTopics.restore(action.topic);
+    } else if (action.type === 'topic_update') {
+      await db.visionTopics.update(action.before.id, topicFields(action.before));
     }
 
     const redoHistory = undoManager.getRedoHistory();
@@ -105,6 +121,12 @@ export const undoManager = {
       await db.visionGoals.delete(action.row.id);
     } else if (action.type === 'vision_update') {
       await db.visionGoals.update(action.after.id, visionFields(action.after));
+    } else if (action.type === 'topic_add') {
+      await db.visionTopics.restore(action.topic);
+    } else if (action.type === 'topic_delete') {
+      await db.visionTopics.delete(action.topic.id);
+    } else if (action.type === 'topic_update') {
+      await db.visionTopics.update(action.after.id, topicFields(action.after));
     }
 
     const undoHistory = undoManager.getUndoHistory();

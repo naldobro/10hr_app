@@ -81,3 +81,20 @@ export interface VisionSnapshot {
   data: VisionGoal[];
   created_at: string;
 }
+
+export interface Emotion {
+  id: string;
+  text: string;
+  color: string;
+}
+
+export interface VisionTopic {
+  id: string;
+  user_id: string;
+  title: string;
+  color: string;
+  emotions: Emotion[];
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
