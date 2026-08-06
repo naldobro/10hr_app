@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { X, Trash2, Check, CalendarClock, Link2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { X, Trash2, Check, CalendarClock, Link2, Maximize2, Minimize2 } from 'lucide-react';
 import { VisionGoal } from '../types';
 import { GOAL_COLORS, MILESTONE_NEUTRAL, fmtDate, relText, iso, addDays, todayMidnight } from '../lib/visionUtils';
 
@@ -21,6 +21,7 @@ export default function GoalDrawer({ goal, attachOptions, onChange, onDelete, on
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  const [noteExpanded, setNoteExpanded] = useState(false);
   const isMilestone = goal.kind === 'milestone';
   const linked = attachOptions.find((o) => o.id === goal.goal_id);
   const accent = isMilestone ? (linked ? linked.color : MILESTONE_NEUTRAL) : goal.color;
@@ -116,7 +117,8 @@ export default function GoalDrawer({ goal, attachOptions, onChange, onDelete, on
               <select
                 value={goal.goal_id || ''}
                 onChange={(e) => onChange({ goal_id: e.target.value || null }, true)}
-                className="drawer-input pl-9 appearance-none cursor-pointer"
+                className="drawer-input appearance-none cursor-pointer"
+                style={{ paddingLeft: 38 }}
               >
                 <option value="">Standalone (no goal)</option>
                 {attachOptions.map((o) => (
@@ -133,16 +135,26 @@ export default function GoalDrawer({ goal, attachOptions, onChange, onDelete, on
         )}
 
         {!isMilestone && (
-          <Field label="Why this matters">
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[11px] tracking-wider uppercase ink-text-muted font-bold">Why this matters</label>
+              <button
+                onClick={() => setNoteExpanded((v) => !v)}
+                className="flex items-center gap-1 text-[11px] font-semibold ink-text-muted hover:ink-text transition"
+              >
+                {noteExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                {noteExpanded ? 'Collapse' : 'Expand'}
+              </button>
+            </div>
             <textarea
               value={goal.note}
               onChange={(e) => onChange({ note: e.target.value }, false)}
               onBlur={() => onChange({}, true)}
-              rows={3}
               placeholder="The reason you'll push through…"
-              className="drawer-input resize-y"
+              className="drawer-input resize-none transition-[height] duration-200"
+              style={{ height: noteExpanded ? '52vh' : 128 }}
             />
-          </Field>
+          </div>
         )}
       </div>
 

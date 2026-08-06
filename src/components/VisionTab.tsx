@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Flag, CalendarClock, X, Check } from 'lucide-react';
+import { Plus, Flag, CalendarClock, X, Check, Minus } from 'lucide-react';
 import { db } from '../lib/database';
 import { VisionGoal } from '../types';
 import {
@@ -10,14 +10,17 @@ import {
   iso,
   addDays,
   daysUntil,
+  fmtDate,
   fmtDayMonth,
   urgency,
   Urgency,
 } from '../lib/visionUtils';
 import GoalDrawer from './GoalDrawer';
 
-// One fixed, well-tuned scale — no zoom switching.
-const PPD = 7; // pixels per day
+// Single timeline; spacing (pixels-per-day) is user-adjustable to spread out cramped items.
+const PPD_MIN = 4;
+const PPD_MAX = 30;
+const PPD_DEFAULT = 7;
 const TOP_PAD = 90;
 const BOT_PAD = 150;
 const GAP = 46; // spine → goal card
@@ -65,6 +68,15 @@ export default function VisionTab() {
   const [drag, setDrag] = useState<Drag | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [dbDown, setDbDown] = useState(false);
+  const [pendingMove, setPendingMove] = useState<{ id: string; from: string | null; to: string } | null>(null);
+  const [ppd, setPpd] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('vision_ppd'));
+    return saved >= PPD_MIN && saved <= PPD_MAX ? saved : PPD_DEFAULT;
+  });
+  useEffect(() => {
+    localStorage.setItem('vision_ppd', String(ppd));
+  }, [ppd]);
+  const adjustPpd = (delta: number) => setPpd((p) => Math.min(PPD_MAX, Math.max(PPD_MIN, p + delta)));
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -91,8 +103,8 @@ export default function VisionTab() {
     return m + 25;
   }, [goals]);
 
-  const layoutH = Math.max(viewportH, TOP_PAD + maxDays() * PPD + BOT_PAD);
-  const yForDays = (d: number) => layoutH - BOT_PAD - d * PPD;
+  const layoutH = Math.max(viewportH, TOP_PAD + maxDays() * ppd + BOT_PAD);
+  const yForDays = (d: number) => layoutH - BOT_PAD - d * ppd;
   const yForDeadline = (dl: string) => yForDays(daysUntil(dl));
 
   // ---------- load ----------
@@ -292,7 +304,7 @@ export default function VisionTab() {
   const deadlineFromClientY = (clientY: number): string => {
     const rect = canvasRef.current!.getBoundingClientRect();
     const y = clientY - rect.top;
-    const days = Math.max(0, Math.round((layoutH - BOT_PAD - y) / PPD));
+    const days = Math.max(0, Math.round((layoutH - BOT_PAD - y) / ppd));
     return iso(addDays(todayMidnight(), days));
   };
 
@@ -323,7 +335,12 @@ export default function VisionTab() {
       if (!moved) {
         setSelectedId(item.id);
       } else if (mode === 'placed') {
-        updateGoal(item.id, { deadline: deadlineFromClientY(ev.clientY) }, true);
+        const to = deadlineFromClientY(ev.clientY);
+        if (to !== item.deadline) {
+          // Show the item at the new spot optimistically, but wait for confirmation before saving.
+          updateGoal(item.id, { deadline: to }, false);
+          setPendingMove({ id: item.id, from: item.deadline, to });
+        }
       } else {
         const rect = scrollRef.current!.getBoundingClientRect();
         const inside =
@@ -335,6 +352,27 @@ export default function VisionTab() {
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
   };
+
+  const confirmMove = () => {
+    if (!pendingMove) return;
+    updateGoal(pendingMove.id, { deadline: pendingMove.to }, true);
+    setPendingMove(null);
+  };
+  const cancelMove = () => {
+    if (!pendingMove) return;
+    updateGoal(pendingMove.id, { deadline: pendingMove.from }, false);
+    setPendingMove(null);
+  };
+  useEffect(() => {
+    if (!pendingMove) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') confirmMove();
+      else if (e.key === 'Escape') cancelMove();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingMove]);
 
   // ---------- derived ----------
   const placedGoals = useMemo(
@@ -369,7 +407,7 @@ export default function VisionTab() {
     }
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [goals, viewportH]);
+  }, [goals, viewportH, ppd]);
 
   const selectedGoal = goals.find((g) => g.id === selectedId) || null;
   const today = todayMidnight();
@@ -400,6 +438,33 @@ export default function VisionTab() {
             Working offline — run the latest <code className="font-mono">vision_goals</code> migration to save.
           </div>
         )}
+
+        <h2 className="text-[11px] tracking-wider uppercase ink-text-muted font-bold mt-2">Timeline spacing</h2>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => adjustPpd(-2)}
+            disabled={ppd <= PPD_MIN}
+            className="w-9 h-9 rounded-lg bg-white border border-black/10 ink-text flex items-center justify-center hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            title="Tighter"
+          >
+            <Minus className="w-4 h-4" />
+          </button>
+          <div className="flex-1 h-1.5 rounded-full bg-black/[0.06] overflow-hidden">
+            <div
+              className="h-full rounded-full bg-stone-400"
+              style={{ width: `${Math.round(((ppd - PPD_MIN) / (PPD_MAX - PPD_MIN)) * 100)}%` }}
+            />
+          </div>
+          <button
+            onClick={() => adjustPpd(2)}
+            disabled={ppd >= PPD_MAX}
+            className="w-9 h-9 rounded-lg bg-white border border-black/10 ink-text flex items-center justify-center hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            title="Spread out"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+        <p className="text-[11px] ink-text-muted -mt-1">Spread items out when a month gets crowded.</p>
 
         <h2 className="text-[11px] tracking-wider uppercase ink-text-muted font-bold mt-2">Unscheduled</h2>
         <div className="flex flex-col gap-2 min-h-[40px]">
@@ -674,6 +739,33 @@ export default function VisionTab() {
             onComplete={triggerBurst}
           />
         </>
+      )}
+
+      {/* move confirmation */}
+      {pendingMove && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[95] paper-card rounded-2xl border border-black/10 shadow-2xl px-4 py-3 flex items-center gap-4 animate-toast-in">
+          <div className="text-sm ink-text">
+            Move <span className="font-bold">{goals.find((g) => g.id === pendingMove.id)?.title}</span> to{' '}
+            <span className="font-bold font-mono">{fmtDate(pendingMove.to)}</span>?
+            {pendingMove.from && (
+              <span className="ink-text-muted"> (was {fmtDate(pendingMove.from)})</span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={cancelMove}
+              className="px-3 py-2 rounded-lg border border-black/10 ink-text text-sm font-semibold hover:bg-stone-50 transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmMove}
+              className="px-3 py-2 rounded-lg bg-stone-800 hover:bg-stone-900 text-white text-sm font-semibold transition"
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
       )}
 
       {/* toast */}
