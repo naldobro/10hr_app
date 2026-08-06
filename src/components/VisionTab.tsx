@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Flag, CalendarClock, X, Check, Minus, Undo2, Redo2, History, RotateCcw, Save, Heart, ShieldCheck } from 'lucide-react';
+import { Plus, Flag, CalendarClock, X, Check, Minus, Undo2, Redo2, History, RotateCcw, Save, Heart, ShieldCheck, Menu } from 'lucide-react';
 import { db } from '../lib/database';
 import { undoManager } from '../lib/undoManager';
 import { VisionGoal, VisionSnapshot, VisionTopic } from '../types';
@@ -81,6 +81,8 @@ export default function VisionTab() {
   const [topics, setTopics] = useState<VisionTopic[]>([]);
   const [showReflections, setShowReflections] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
+  const [trayOpen, setTrayOpen] = useState(false);
+  const [viewportW, setViewportW] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1024));
   const [reflHeading, setReflHeading] = useState({
     title: 'Reflections',
     subtitle: 'Life areas and how you want to hold them.',
@@ -288,6 +290,19 @@ export default function VisionTab() {
     return () => ro.disconnect();
   }, []);
 
+  useEffect(() => {
+    const onResize = () => setViewportW(window.innerWidth);
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Responsive sizing: phones get a collapsible tray + tight cards; iPad-portrait a
+  // mid size so cards don't overflow the narrower timeline; desktop the full size.
+  const cardW = viewportW < 640 ? 152 : viewportW < 1024 ? 200 : CARD_W;
+  const gap = viewportW < 640 ? 22 : viewportW < 1024 ? 34 : GAP;
+  const gapM = viewportW < 640 ? 12 : viewportW < 1024 ? 16 : GAP_M;
+
   // start at "today" (bottom), looking upward
   useEffect(() => {
     if (didInitScroll.current) return;
@@ -424,6 +439,7 @@ export default function VisionTab() {
   };
 
   const addItem = async (kind: 'goal' | 'milestone') => {
+    setTrayOpen(false);
     const sort_order = goals.reduce((m, g) => Math.max(m, g.sort_order), 0) + 1;
     const draft = {
       kind,
@@ -644,15 +660,39 @@ export default function VisionTab() {
   const today = todayMidnight();
 
   return (
-    <div className="fixed left-0 right-0 bottom-0 top-[100px] md:top-[90px] flex overflow-hidden bg-[#f7f6f3]">
+    <div className="fixed left-0 right-0 bottom-0 top-[calc(100px+env(safe-area-inset-top))] md:top-[calc(90px+env(safe-area-inset-top))] flex overflow-hidden bg-[#f7f6f3]">
       <style>{`
         .vision-range { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px; background: #e7e5e4; outline: none; }
         .vision-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #57534e; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); cursor: pointer; }
         .vision-range::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #57534e; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); cursor: pointer; }
         .vision-range::-moz-range-track { height: 6px; border-radius: 999px; background: #e7e5e4; }
       `}</style>
+      {/* phone: open-tray button */}
+      {!trayOpen && (
+        <button
+          onClick={() => setTrayOpen(true)}
+          className="sm:hidden absolute top-3 left-3 z-30 w-10 h-10 rounded-xl bg-white border border-black/10 shadow-md flex items-center justify-center ink-text"
+          title="Menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+      )}
+      {/* phone: backdrop */}
+      {trayOpen && <div className="sm:hidden absolute inset-0 z-30 bg-black/25" onClick={() => setTrayOpen(false)} />}
+
       {/* ---------------- Tray ---------------- */}
-      <aside className="w-[220px] sm:w-[264px] flex-shrink-0 flex flex-col gap-3 p-4 overflow-y-auto bg-amber-50/40 border-r border-black/5">
+      <aside
+        className={`w-[264px] max-w-[82vw] flex-shrink-0 flex flex-col gap-3 p-4 overflow-y-auto border-r border-black/5 bg-amber-50 sm:bg-amber-50/40 absolute sm:relative inset-y-0 left-0 z-40 transition-transform duration-300 sm:transition-none ${
+          trayOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full sm:translate-x-0 sm:shadow-none'
+        }`}
+      >
+        <button
+          onClick={() => setTrayOpen(false)}
+          className="sm:hidden self-end -mt-1 -mr-1 p-1.5 rounded-lg ink-text-muted hover:bg-white/60"
+          title="Close"
+        >
+          <X className="w-5 h-5" />
+        </button>
         <div className="flex gap-2">
           <button
             onClick={handleUndo}
@@ -684,21 +724,30 @@ export default function VisionTab() {
           <Flag className="w-3.5 h-3.5" /> New milestone
         </button>
         <button
-          onClick={() => setShowReflections(true)}
+          onClick={() => {
+            setTrayOpen(false);
+            setShowReflections(true);
+          }}
           className="bg-white border border-black/10 ink-text-muted hover:ink-text font-semibold text-sm rounded-xl py-2 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
           title="Important points to keep in mind"
         >
           <Heart className="w-3.5 h-3.5 text-rose-500" /> Reflections
         </button>
         <button
-          onClick={openVersions}
+          onClick={() => {
+            setTrayOpen(false);
+            openVersions();
+          }}
           className="bg-white border border-black/10 ink-text-muted hover:ink-text font-semibold text-sm rounded-xl py-2 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
           title="Daily version history"
         >
           <History className="w-3.5 h-3.5" /> Versions
         </button>
         <button
-          onClick={() => setShowBackup(true)}
+          onClick={() => {
+            setTrayOpen(false);
+            setShowBackup(true);
+          }}
           className="bg-white border border-black/10 ink-text-muted hover:ink-text font-semibold text-sm rounded-xl py-2 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
           title="Back up or restore all your data"
         >
@@ -844,7 +893,7 @@ export default function VisionTab() {
                   className="absolute h-px"
                   style={{
                     top: y,
-                    width: GAP_M,
+                    width: gapM,
                     zIndex: 3,
                     background: c,
                     opacity: 0.5,
@@ -863,7 +912,7 @@ export default function VisionTab() {
                     zIndex: isDragging ? 30 : 5,
                     touchAction: 'none',
                     opacity: g.done ? 0.55 : 1,
-                    ...(side === 'left' ? { right: `calc(50% + ${GAP_M + 2}px)` } : { left: `calc(50% + ${GAP_M + 2}px)` }),
+                    ...(side === 'left' ? { right: `calc(50% + ${gapM + 2}px)` } : { left: `calc(50% + ${gapM + 2}px)` }),
                   }}
                 >
                   <Flag className="w-3 h-3 flex-none" style={{ color: c }} />
@@ -894,7 +943,7 @@ export default function VisionTab() {
                   className="absolute h-[2px]"
                   style={{
                     top: y,
-                    width: GAP,
+                    width: gap,
                     zIndex: 3,
                     transform: 'translateY(-50%)',
                     opacity: isNext ? 0.9 : 0.5,
@@ -920,10 +969,10 @@ export default function VisionTab() {
                   }`}
                   style={{
                     top: y,
-                    width: CARD_W,
+                    width: cardW,
                     zIndex: isDragging ? 30 : 5,
                     transform: 'translateY(-50%)',
-                    ...(side === 'left' ? { right: `calc(50% + ${GAP + 2}px)` } : { left: `calc(50% + ${GAP + 2}px)` }),
+                    ...(side === 'left' ? { right: `calc(50% + ${gap + 2}px)` } : { left: `calc(50% + ${gap + 2}px)` }),
                     border: `1px solid ${isNext ? g.color + '66' : 'rgba(0,0,0,0.06)'}`,
                     touchAction: 'none',
                     transition: isDragging ? 'none' : 'box-shadow 0.15s ease',
@@ -1132,7 +1181,7 @@ export default function VisionTab() {
 
       {/* move confirmation */}
       {pendingMove && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[95] paper-card rounded-2xl border border-black/10 shadow-2xl px-4 py-3 flex items-center gap-4 animate-toast-in">
+        <div className="fixed left-1/2 -translate-x-1/2 z-[95] paper-card rounded-2xl border border-black/10 shadow-2xl px-4 py-3 flex flex-wrap items-center justify-center gap-3 animate-toast-in max-w-[92vw] bottom-[calc(1.5rem+env(safe-area-inset-bottom))]">
           <div className="text-sm ink-text">
             Move <span className="font-bold">{goals.find((g) => g.id === pendingMove.id)?.title}</span> to{' '}
             <span className="font-bold font-mono">{fmtDate(pendingMove.to)}</span>?
@@ -1159,7 +1208,7 @@ export default function VisionTab() {
 
       {/* toast */}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-[95] bg-stone-800 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-toast-in">
+        <div className="fixed right-6 z-[95] bg-stone-800 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-toast-in bottom-[calc(1.5rem+env(safe-area-inset-bottom))]">
           {toast}
           <button onClick={() => setToast(null)} className="opacity-70 hover:opacity-100">
             <X className="w-4 h-4" />

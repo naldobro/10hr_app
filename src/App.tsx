@@ -83,7 +83,7 @@ function App() {
       {activeTab === 'vision' ? (
         <VisionTab />
       ) : (
-        <main className="relative pt-[100px] md:pt-[90px] pb-12 px-3 sm:px-6 lg:px-8 max-w-[1400px] mx-auto">
+        <main className="relative pt-[calc(100px+env(safe-area-inset-top))] md:pt-[calc(90px+env(safe-area-inset-top))] pb-12 px-3 sm:px-6 lg:px-8 max-w-[1400px] mx-auto">
           {activeTab === 'track' && <TrackTab currentMonth={currentMonth} />}
           {activeTab === 'statistics' && <StatisticsTab currentMonth={currentMonth} />}
         </main>

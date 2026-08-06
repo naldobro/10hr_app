@@ -20,7 +20,10 @@ export default function Navigation({
   canGoNext,
 }: NavigationProps) {
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 paper-card paper-border paper-shadow">
+    <nav
+      className="fixed top-0 left-0 right-0 z-50 paper-card paper-border paper-shadow"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
       <div className="max-w-[1400px] mx-auto px-3 sm:px-6 lg:px-8">
         {/* Mobile layout */}
         <div className="flex md:hidden flex-col py-2 gap-2">

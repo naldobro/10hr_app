@@ -33,7 +33,7 @@ export default function GoalDrawer({ goal, attachOptions, onChange, onDelete, on
   };
 
   return (
-    <div className="fixed top-[100px] md:top-[90px] right-0 bottom-0 z-[70] w-[min(420px,92vw)] paper-card border-l border-black/10 flex flex-col animate-[drawerIn_0.32s_cubic-bezier(0.16,1,0.3,1)]">
+    <div className="fixed top-[calc(100px+env(safe-area-inset-top))] md:top-[calc(90px+env(safe-area-inset-top))] right-0 bottom-0 z-[70] w-[min(420px,92vw)] paper-card border-l border-black/10 flex flex-col animate-[drawerIn_0.32s_cubic-bezier(0.16,1,0.3,1)]">
       <style>{`@keyframes drawerIn { from { transform: translateX(102%); } to { transform: translateX(0); } }`}</style>
 
       {/* Header */}
@@ -159,7 +159,7 @@ export default function GoalDrawer({ goal, attachOptions, onChange, onDelete, on
       </div>
 
       {/* Actions */}
-      <div className="px-5 py-3.5 border-t border-black/5 flex gap-2.5">
+      <div className="px-5 pt-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))] border-t border-black/5 flex gap-2.5">
         <button
           onClick={onDelete}
           className="px-3 py-2.5 rounded-xl border border-black/10 ink-text-muted hover:text-red-600 hover:bg-red-50 transition flex-none"
