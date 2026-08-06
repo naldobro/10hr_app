@@ -98,3 +98,10 @@ export interface VisionTopic {
   created_at: string;
   updated_at: string;
 }
+
+export interface VisionSettings {
+  user_id: string;
+  reflections_title: string;
+  reflections_subtitle: string;
+  updated_at: string;
+}

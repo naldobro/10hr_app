@@ -79,6 +79,14 @@ export default function VisionTab() {
   const [versionsBusy, setVersionsBusy] = useState(false);
   const [topics, setTopics] = useState<VisionTopic[]>([]);
   const [showReflections, setShowReflections] = useState(false);
+  const [reflHeading, setReflHeading] = useState({
+    title: 'Reflections',
+    subtitle: 'Life areas and how you want to hold them.',
+  });
+  const reflHeadingRef = useRef(reflHeading);
+  useEffect(() => {
+    reflHeadingRef.current = reflHeading;
+  });
   const [ppd, setPpd] = useState<number>(() => {
     const saved = Number(localStorage.getItem('vision_ppd'));
     return saved >= PPD_MIN && saved <= PPD_MAX ? saved : PPD_DEFAULT;
@@ -183,6 +191,12 @@ export default function VisionTab() {
         setGoals(demoGoals());
       }
       reloadTopics();
+      db.visionSettings
+        .get()
+        .then((s) => {
+          if (s) setReflHeading({ title: s.reflections_title, subtitle: s.reflections_subtitle });
+        })
+        .catch(() => {});
       refreshUndo();
     })();
   }, [refreshUndo, reloadTopics]);
@@ -502,6 +516,16 @@ export default function VisionTab() {
     if (row) {
       undoManager.addToUndoHistory({ type: 'topic_delete', topic: row, timestamp: Date.now() });
       refreshUndo();
+    }
+  };
+
+  const updateReflHeading = (patch: Partial<{ title: string; subtitle: string }>, persist: boolean) => {
+    setReflHeading((prev) => ({ ...prev, ...patch }));
+    if (persist) {
+      const after = { ...reflHeadingRef.current, ...patch };
+      db.visionSettings
+        .upsert({ reflections_title: after.title, reflections_subtitle: after.subtitle })
+        .catch(() => flash('Could not save — run the vision_settings migration'));
     }
   };
 
@@ -1006,6 +1030,8 @@ export default function VisionTab() {
       {showReflections && (
         <ReflectionsPanel
           topics={topics}
+          heading={reflHeading}
+          onUpdateHeading={updateReflHeading}
           onAddTopic={addTopic}
           onUpdateTopic={updateTopic}
           onDeleteTopic={deleteTopic}

@@ -5,6 +5,8 @@ import { GOAL_COLORS } from '../lib/visionUtils';
 
 interface ReflectionsPanelProps {
   topics: VisionTopic[];
+  heading: { title: string; subtitle: string };
+  onUpdateHeading: (patch: Partial<{ title: string; subtitle: string }>, persist: boolean) => void;
   onAddTopic: () => void;
   onUpdateTopic: (id: string, patch: Partial<VisionTopic>, persist: boolean) => void;
   onDeleteTopic: (id: string) => void;
@@ -18,7 +20,15 @@ const nextColor = (c: string) => {
 const newId = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'e' + Date.now() + Math.random();
 
-export default function ReflectionsPanel({ topics, onAddTopic, onUpdateTopic, onDeleteTopic, onClose }: ReflectionsPanelProps) {
+export default function ReflectionsPanel({
+  topics,
+  heading,
+  onUpdateHeading,
+  onAddTopic,
+  onUpdateTopic,
+  onDeleteTopic,
+  onClose,
+}: ReflectionsPanelProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -36,13 +46,24 @@ export default function ReflectionsPanel({ topics, onAddTopic, onUpdateTopic, on
       >
         {/* Header */}
         <div className="px-5 pt-5 pb-4 border-b border-black/5 flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-bold ink-text flex items-center gap-2">
-              <Heart className="w-5 h-5 text-rose-500" /> Reflections
-            </h3>
-            <p className="text-xs ink-text-muted mt-1">
-              Life areas and how you want to hold them. Add emotion bubbles to each — click a bubble to shift its tone.
-            </p>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <Heart className="w-5 h-5 text-rose-500 flex-none" />
+              <input
+                value={heading.title}
+                onChange={(e) => onUpdateHeading({ title: e.target.value }, false)}
+                onBlur={() => onUpdateHeading({}, true)}
+                placeholder="Reflections"
+                className="text-lg font-bold ink-text bg-transparent outline-none w-full rounded px-1 -mx-1 hover:bg-stone-100/60 focus:bg-stone-100/60 transition"
+              />
+            </div>
+            <input
+              value={heading.subtitle}
+              onChange={(e) => onUpdateHeading({ subtitle: e.target.value }, false)}
+              onBlur={() => onUpdateHeading({}, true)}
+              placeholder="Add a short description…"
+              className="text-xs ink-text-muted mt-1 bg-transparent outline-none w-full rounded px-1 -mx-1 hover:bg-stone-100/60 focus:bg-stone-100/60 transition"
+            />
           </div>
           <div className="flex items-center gap-2">
             <button

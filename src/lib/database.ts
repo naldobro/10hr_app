@@ -1,5 +1,14 @@
 import { supabase } from './supabase';
-import { WorkSession, DailySummary, HabitEntry, HabitSchedule, VisionGoal, VisionSnapshot, VisionTopic } from '../types';
+import {
+  WorkSession,
+  DailySummary,
+  HabitEntry,
+  HabitSchedule,
+  VisionGoal,
+  VisionSnapshot,
+  VisionTopic,
+  VisionSettings,
+} from '../types';
 
 const snapshotRow = (g: VisionGoal) => ({
   id: g.id,
@@ -418,6 +427,27 @@ export const db = {
 
       if (error) throw error;
       return data;
+    },
+  },
+
+  visionSettings: {
+    get: async (): Promise<VisionSettings | null> => {
+      const { data, error } = await supabase
+        .from('vision_settings')
+        .select('*')
+        .eq('user_id', SINGLE_USER_ID)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+
+    upsert: async (patch: Partial<Omit<VisionSettings, 'user_id' | 'updated_at'>>): Promise<void> => {
+      const { error } = await supabase
+        .from('vision_settings')
+        .upsert({ user_id: SINGLE_USER_ID, ...patch, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+
+      if (error) throw error;
     },
   },
 
