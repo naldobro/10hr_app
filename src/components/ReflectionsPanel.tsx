@@ -152,10 +152,9 @@ function TopicColumn({
             <EmotionCard
               key={em.id}
               em={em}
-              onChangeText={(text) =>
-                onUpdate({ emotions: emotions.map((x) => (x.id === em.id ? { ...x, text } : x)) }, false)
+              onSaveText={(text) =>
+                onUpdate({ emotions: emotions.map((x) => (x.id === em.id ? { ...x, text } : x)) }, true)
               }
-              onCommit={() => onUpdate({}, true)}
               onCycle={() =>
                 onUpdate({ emotions: emotions.map((x) => (x.id === em.id ? { ...x, color: nextColor(x.color) } : x)) }, true)
               }
@@ -201,18 +200,19 @@ function TopicColumn({
 
 function EmotionCard({
   em,
-  onChangeText,
-  onCommit,
+  onSaveText,
   onCycle,
   onDelete,
 }: {
   em: Emotion;
-  onChangeText: (text: string) => void;
-  onCommit: () => void;
+  onSaveText: (text: string) => void;
   onCycle: () => void;
   onDelete: () => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const [text, setText] = useState(em.text);
+  // Keep the draft in sync when the emotion changes from elsewhere (e.g. undo/redo).
+  useEffect(() => setText(em.text), [em.text]);
 
   const grow = () => {
     const el = ref.current;
@@ -221,12 +221,14 @@ function EmotionCard({
       el.style.height = el.scrollHeight + 'px';
     }
   };
-  useEffect(grow, [em.text]);
+  useEffect(grow, [text]);
+
+  const dirty = text !== em.text;
 
   return (
     <div
       className="rounded-2xl px-3 py-2.5"
-      style={{ background: `${em.color}14`, border: `1px solid ${em.color}33` }}
+      style={{ background: `${em.color}14`, border: `1px solid ${em.color}${dirty ? '66' : '33'}` }}
     >
       <div className="flex items-center justify-between mb-1">
         <button
@@ -246,16 +248,34 @@ function EmotionCard({
       <textarea
         ref={ref}
         rows={1}
-        value={em.text}
+        value={text}
         onChange={(e) => {
-          onChangeText(e.target.value);
+          setText(e.target.value);
           grow();
         }}
-        onBlur={onCommit}
         placeholder="Write a reminder…"
         className="w-full bg-transparent outline-none resize-none overflow-hidden text-[13.5px] leading-snug font-medium"
         style={{ color: em.color }}
       />
+      {dirty && (
+        <div className="mt-2 flex items-center justify-between gap-2 border-t border-black/5 pt-2">
+          <span className="text-[11px] ink-text-muted">Save this change?</span>
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => setText(em.text)}
+              className="text-[11px] font-semibold ink-text-muted px-2 py-1 rounded hover:bg-stone-100 transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => onSaveText(text)}
+              className="text-[11px] font-semibold text-white px-2.5 py-1 rounded bg-stone-800 hover:bg-stone-900 transition"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
