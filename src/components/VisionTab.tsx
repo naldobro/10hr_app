@@ -83,7 +83,19 @@ export default function VisionTab() {
   useEffect(() => {
     localStorage.setItem('vision_ppd', String(ppd));
   }, [ppd]);
-  const adjustPpd = (delta: number) => setPpd((p) => Math.min(PPD_MAX, Math.max(PPD_MIN, p + delta)));
+
+  // Remember which day is at the centre of the viewport so we can zoom around it.
+  const captureAnchor = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const centerY = el.scrollTop + el.clientHeight / 2;
+    anchorDaysRef.current = (layoutH - BOT_PAD - centerY) / ppd;
+  };
+  const setPpdClamped = (v: number) => setPpd(Math.min(PPD_MAX, Math.max(PPD_MIN, v)));
+  const stepPpd = (delta: number) => {
+    captureAnchor();
+    setPpdClamped(ppd + delta);
+  };
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -94,6 +106,8 @@ export default function VisionTab() {
   const burstsRef = useRef<Burst[]>([]);
   const didInitScroll = useRef(false);
   const pausedRef = useRef(false);
+  const anchorDaysRef = useRef<number | null>(null); // day kept centered while changing spacing
+  const zoomingRef = useRef(false);
 
   useEffect(() => {
     goalsRef.current = goals;
@@ -113,6 +127,16 @@ export default function VisionTab() {
   const layoutH = Math.max(viewportH, TOP_PAD + maxDays() * ppd + BOT_PAD);
   const yForDays = (d: number) => layoutH - BOT_PAD - d * ppd;
   const yForDeadline = (dl: string) => yForDays(daysUntil(dl));
+
+  // After spacing changes, re-anchor scroll so the previously-centred day stays centred.
+  useEffect(() => {
+    const el = scrollRef.current;
+    const days = anchorDaysRef.current;
+    if (!el || days == null) return;
+    const centerY = layoutH - BOT_PAD - days * ppd;
+    el.scrollTop = Math.max(0, Math.min(centerY - el.clientHeight / 2, el.scrollHeight - el.clientHeight));
+    if (!zoomingRef.current) anchorDaysRef.current = null;
+  }, [ppd, layoutH]);
 
   const refreshUndo = useCallback(() => {
     setCanUndo(undoManager.canUndo());
@@ -531,6 +555,12 @@ export default function VisionTab() {
 
   return (
     <div className="fixed left-0 right-0 bottom-0 top-[100px] md:top-[90px] flex overflow-hidden bg-[#f7f6f3]">
+      <style>{`
+        .vision-range { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px; background: #e7e5e4; outline: none; }
+        .vision-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #57534e; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); cursor: pointer; }
+        .vision-range::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #57534e; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); cursor: pointer; }
+        .vision-range::-moz-range-track { height: 6px; border-radius: 999px; background: #e7e5e4; }
+      `}</style>
       {/* ---------------- Tray ---------------- */}
       <aside className="w-[220px] sm:w-[264px] flex-shrink-0 flex flex-col gap-3 p-4 overflow-y-auto bg-amber-50/40 border-r border-black/5">
         <div className="flex gap-2">
@@ -584,29 +614,47 @@ export default function VisionTab() {
         <h2 className="text-[11px] tracking-wider uppercase ink-text-muted font-bold mt-2">Timeline spacing</h2>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => adjustPpd(-2)}
+            onClick={() => stepPpd(-2)}
             disabled={ppd <= PPD_MIN}
-            className="w-9 h-9 rounded-lg bg-white border border-black/10 ink-text flex items-center justify-center hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="w-8 h-8 flex-none rounded-lg bg-white border border-black/10 ink-text flex items-center justify-center hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
             title="Tighter"
           >
             <Minus className="w-4 h-4" />
           </button>
-          <div className="flex-1 h-1.5 rounded-full bg-black/[0.06] overflow-hidden">
-            <div
-              className="h-full rounded-full bg-stone-400"
-              style={{ width: `${Math.round(((ppd - PPD_MIN) / (PPD_MAX - PPD_MIN)) * 100)}%` }}
-            />
-          </div>
+          <input
+            type="range"
+            min={PPD_MIN}
+            max={PPD_MAX}
+            step={1}
+            value={ppd}
+            onPointerDown={() => {
+              captureAnchor();
+              zoomingRef.current = true;
+            }}
+            onChange={(e) => {
+              if (anchorDaysRef.current == null) captureAnchor();
+              setPpdClamped(Number(e.target.value));
+            }}
+            onPointerUp={() => {
+              zoomingRef.current = false;
+              anchorDaysRef.current = null;
+            }}
+            onBlur={() => {
+              zoomingRef.current = false;
+            }}
+            className="vision-range flex-1 cursor-pointer"
+            title="Drag to spread the timeline out"
+          />
           <button
-            onClick={() => adjustPpd(2)}
+            onClick={() => stepPpd(2)}
             disabled={ppd >= PPD_MAX}
-            className="w-9 h-9 rounded-lg bg-white border border-black/10 ink-text flex items-center justify-center hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="w-8 h-8 flex-none rounded-lg bg-white border border-black/10 ink-text flex items-center justify-center hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
             title="Spread out"
           >
             <Plus className="w-4 h-4" />
           </button>
         </div>
-        <p className="text-[11px] ink-text-muted -mt-1">Spread items out when a month gets crowded.</p>
+        <p className="text-[11px] ink-text-muted -mt-1">Drag the slider to spread items out when a month gets crowded.</p>
 
         <h2 className="text-[11px] tracking-wider uppercase ink-text-muted font-bold mt-2">Unscheduled</h2>
         <div className="flex flex-col gap-2 min-h-[40px]">
