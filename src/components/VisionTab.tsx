@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Flag, CalendarClock, X, Check, Minus, Undo2, Redo2, History, RotateCcw, Save, Heart } from 'lucide-react';
+import { Plus, Flag, CalendarClock, X, Check, Minus, Undo2, Redo2, History, RotateCcw, Save, Heart, ShieldCheck } from 'lucide-react';
 import { db } from '../lib/database';
 import { undoManager } from '../lib/undoManager';
 import { VisionGoal, VisionSnapshot, VisionTopic } from '../types';
@@ -18,6 +18,7 @@ import {
 } from '../lib/visionUtils';
 import GoalDrawer from './GoalDrawer';
 import ReflectionsPanel from './ReflectionsPanel';
+import BackupModal from './BackupModal';
 
 // Single timeline; spacing (pixels-per-day) is user-adjustable to spread out cramped items.
 const PPD_MIN = 4;
@@ -79,6 +80,7 @@ export default function VisionTab() {
   const [versionsBusy, setVersionsBusy] = useState(false);
   const [topics, setTopics] = useState<VisionTopic[]>([]);
   const [showReflections, setShowReflections] = useState(false);
+  const [showBackup, setShowBackup] = useState(false);
   const [reflHeading, setReflHeading] = useState({
     title: 'Reflections',
     subtitle: 'Life areas and how you want to hold them.',
@@ -695,6 +697,13 @@ export default function VisionTab() {
         >
           <History className="w-3.5 h-3.5" /> Versions
         </button>
+        <button
+          onClick={() => setShowBackup(true)}
+          className="bg-white border border-black/10 ink-text-muted hover:ink-text font-semibold text-sm rounded-xl py-2 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
+          title="Back up or restore all your data"
+        >
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Backup
+        </button>
 
         <p className="text-xs leading-relaxed ink-text-muted mt-1">
           Drag an item onto the timeline to set its date. Drag up = further out. Click to open details.
@@ -1038,6 +1047,9 @@ export default function VisionTab() {
           onClose={() => setShowReflections(false)}
         />
       )}
+
+      {/* backup modal */}
+      {showBackup && <BackupModal onClose={() => setShowBackup(false)} />}
 
       {/* versions modal */}
       {showVersions && (
