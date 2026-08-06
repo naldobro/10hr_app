@@ -1,30 +1,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, CalendarClock, X } from 'lucide-react';
+import { Plus, Flag, CalendarClock, X, Check } from 'lucide-react';
 import { db } from '../lib/database';
 import { VisionGoal } from '../types';
 import {
   DAY,
   GOAL_COLORS,
+  MILESTONE_NEUTRAL,
   todayMidnight,
   iso,
   addDays,
   daysUntil,
   fmtDayMonth,
-  progress,
-  isDone,
   urgency,
   Urgency,
 } from '../lib/visionUtils';
 import GoalDrawer from './GoalDrawer';
 
-const ZOOMS = [
-  { name: 'Weeks', ppd: 20 },
-  { name: 'Months', ppd: 6.2 },
-  { name: 'Quarters', ppd: 2.6 },
-];
+// One fixed, well-tuned scale — no zoom switching.
+const PPD = 7; // pixels per day
 const TOP_PAD = 90;
 const BOT_PAD = 150;
-const GAP = 46; // spine → card gap
+const GAP = 46; // spine → goal card
+const GAP_M = 20; // spine → milestone label
 const CARD_W = 250;
 
 const URGENCY_COLOR: Record<Urgency, string> = {
@@ -41,7 +38,6 @@ interface Drag {
   y: number;
   previewDeadline: string | null;
 }
-
 interface Particle {
   y: number;
   vy: number;
@@ -51,7 +47,6 @@ interface Particle {
   hue: string;
   a: number;
 }
-
 interface Burst {
   x: number;
   y: number;
@@ -61,10 +56,11 @@ interface Burst {
   rgb: string;
 }
 
+const isMs = (g: VisionGoal) => g.kind === 'milestone';
+
 export default function VisionTab() {
   const [goals, setGoals] = useState<VisionGoal[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [zoomIndex, setZoomIndex] = useState(1);
   const [viewportH, setViewportH] = useState(800);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -83,13 +79,9 @@ export default function VisionTab() {
   useEffect(() => {
     goalsRef.current = goals;
   });
-
-  // Pause the animation loop while the drawer is open (it's hidden behind the scrim anyway).
   useEffect(() => {
     pausedRef.current = selectedId !== null;
   }, [selectedId]);
-
-  const ppd = ZOOMS[zoomIndex].ppd;
 
   const maxDays = useCallback(() => {
     let m = 30;
@@ -99,8 +91,8 @@ export default function VisionTab() {
     return m + 25;
   }, [goals]);
 
-  const layoutH = Math.max(viewportH, TOP_PAD + maxDays() * ppd + BOT_PAD);
-  const yForDays = (d: number) => layoutH - BOT_PAD - d * ppd;
+  const layoutH = Math.max(viewportH, TOP_PAD + maxDays() * PPD + BOT_PAD);
+  const yForDays = (d: number) => layoutH - BOT_PAD - d * PPD;
   const yForDeadline = (dl: string) => yForDays(daysUntil(dl));
 
   // ---------- load ----------
@@ -108,10 +100,8 @@ export default function VisionTab() {
     (async () => {
       try {
         let rows = await db.visionGoals.getAll();
-        if (rows.length === 0) {
-          rows = await seedDemoGoals();
-        }
-        setGoals(rows);
+        if (rows.length === 0) rows = await seedDemo();
+        setGoals(normalize(rows));
       } catch {
         setDbDown(true);
         setGoals(demoGoals());
@@ -129,7 +119,7 @@ export default function VisionTab() {
     return () => ro.disconnect();
   }, []);
 
-  // start the view at "today" (bottom), looking upward
+  // start at "today" (bottom), looking upward
   useEffect(() => {
     if (didInitScroll.current) return;
     const el = scrollRef.current;
@@ -139,9 +129,7 @@ export default function VisionTab() {
     }
   }, [goals, layoutH]);
 
-  // ---------- particles ----------
-  // The canvas is only viewport-sized and follows scroll (rather than being as tall
-  // as the whole timeline), which keeps per-frame cost tiny even when zoomed out.
+  // ---------- particles (viewport-sized, follows scroll) ----------
   useEffect(() => {
     const canvas = pCanvasRef.current;
     const scrollEl = scrollRef.current;
@@ -161,7 +149,7 @@ export default function VisionTab() {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       dimsRef.current = { w, h };
       if (particlesRef.current.length === 0) {
-        for (let i = 0; i < 32; i++) particlesRef.current.push(spawn(w, h, true));
+        for (let i = 0; i < 32; i++) particlesRef.current.push(spawn(h, true));
       }
     };
     const reposition = () => {
@@ -186,7 +174,7 @@ export default function VisionTab() {
           p.y += p.vy;
           p.drift += 0.02;
           const x = cx + Math.sin(p.drift) * p.amp;
-          if (p.y < -10) Object.assign(p, spawn(w, h, false));
+          if (p.y < -10) Object.assign(p, spawn(h, false));
           ctx.beginPath();
           ctx.fillStyle = `rgba(${p.hue},${p.a})`;
           ctx.arc(x, p.y, p.r, 0, Math.PI * 2);
@@ -238,15 +226,17 @@ export default function VisionTab() {
     if (dbDown) return;
     db.visionGoals
       .update(g.id, {
+        kind: g.kind,
+        goal_id: g.goal_id,
         title: g.title,
         target: g.target,
         note: g.note,
         color: g.color,
         deadline: g.deadline,
-        steps: g.steps,
+        done: g.done,
         sort_order: g.sort_order,
       })
-      .catch(() => flash('Could not save — check the vision_goals table'));
+      .catch(() => flash('Could not save — run the latest vision_goals migration'));
   };
 
   const updateGoal = (id: string, patch: Partial<VisionGoal>, persist: boolean) => {
@@ -257,10 +247,19 @@ export default function VisionTab() {
     }
   };
 
-  const addGoal = async () => {
+  const addItem = async (kind: 'goal' | 'milestone') => {
     const sort_order = goals.reduce((m, g) => Math.max(m, g.sort_order), 0) + 1;
-    const color = GOAL_COLORS[Math.floor(Math.random() * GOAL_COLORS.length)];
-    const draft = { title: 'New goal', target: '', note: '', color, deadline: null, steps: [], sort_order };
+    const draft = {
+      kind,
+      goal_id: null,
+      title: kind === 'goal' ? 'New goal' : 'New milestone',
+      target: '',
+      note: '',
+      color: kind === 'goal' ? GOAL_COLORS[Math.floor(Math.random() * GOAL_COLORS.length)] : MILESTONE_NEUTRAL,
+      deadline: null,
+      done: false,
+      sort_order,
+    };
     if (dbDown) {
       const local: VisionGoal = {
         id: 'local-' + Date.now(),
@@ -275,16 +274,16 @@ export default function VisionTab() {
     }
     try {
       const row = await db.visionGoals.add(draft);
-      setGoals((p) => [...p, row]);
+      setGoals((p) => [...p, { ...row, kind: row.kind ?? kind, done: row.done ?? false, goal_id: row.goal_id ?? null }]);
       setSelectedId(row.id);
     } catch {
-      flash('Could not create — run the vision_goals migration');
+      flash('Could not create — run the latest vision_goals migration');
       setDbDown(true);
     }
   };
 
   const deleteGoal = (id: string) => {
-    setGoals((p) => p.filter((g) => g.id !== id));
+    setGoals((p) => p.filter((g) => g.id !== id).map((g) => (g.goal_id === id ? { ...g, goal_id: null } : g)));
     setSelectedId(null);
     if (!dbDown) db.visionGoals.delete(id).catch(() => flash('Delete failed'));
   };
@@ -293,23 +292,21 @@ export default function VisionTab() {
   const deadlineFromClientY = (clientY: number): string => {
     const rect = canvasRef.current!.getBoundingClientRect();
     const y = clientY - rect.top;
-    const days = Math.max(0, Math.round((layoutH - BOT_PAD - y) / ppd));
+    const days = Math.max(0, Math.round((layoutH - BOT_PAD - y) / PPD));
     return iso(addDays(todayMidnight(), days));
   };
 
-  const onCardPointerDown = (e: React.PointerEvent, goal: VisionGoal) => {
+  const onItemPointerDown = (e: React.PointerEvent, item: VisionGoal) => {
     if (e.button !== 0) return;
     const startX = e.clientX;
     const startY = e.clientY;
-    const mode: 'placed' | 'tray' = goal.deadline ? 'placed' : 'tray';
+    const mode: 'placed' | 'tray' = item.deadline ? 'placed' : 'tray';
     let moved = false;
 
     const move = (ev: PointerEvent) => {
-      const dx = ev.clientX - startX;
-      const dy = ev.clientY - startY;
-      if (!moved && Math.hypot(dx, dy) > 5) {
+      if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) > 5) {
         moved = true;
-        setDrag({ id: goal.id, mode, x: ev.clientX, y: ev.clientY, previewDeadline: goal.deadline });
+        setDrag({ id: item.id, mode, x: ev.clientX, y: ev.clientY, previewDeadline: item.deadline });
       }
       if (moved) {
         if (mode === 'placed') {
@@ -324,14 +321,14 @@ export default function VisionTab() {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       if (!moved) {
-        setSelectedId(goal.id);
+        setSelectedId(item.id);
       } else if (mode === 'placed') {
-        updateGoal(goal.id, { deadline: deadlineFromClientY(ev.clientY) }, true);
+        updateGoal(item.id, { deadline: deadlineFromClientY(ev.clientY) }, true);
       } else {
         const rect = scrollRef.current!.getBoundingClientRect();
         const inside =
           ev.clientX > rect.left && ev.clientX < rect.right && ev.clientY > rect.top && ev.clientY < rect.bottom;
-        if (inside) updateGoal(goal.id, { deadline: deadlineFromClientY(ev.clientY) }, true);
+        if (inside) updateGoal(item.id, { deadline: deadlineFromClientY(ev.clientY) }, true);
       }
       setDrag(null);
     };
@@ -340,32 +337,39 @@ export default function VisionTab() {
   };
 
   // ---------- derived ----------
-  const placed = useMemo(
-    () => goals.filter((g) => g.deadline).sort((a, b) => daysUntil(a.deadline!) - daysUntil(b.deadline!)),
+  const placedGoals = useMemo(
+    () => goals.filter((g) => !isMs(g) && g.deadline).sort((a, b) => daysUntil(a.deadline!) - daysUntil(b.deadline!)),
     [goals]
   );
-  const unplaced = goals.filter((g) => !g.deadline);
-  const nextId = placed.find((g) => daysUntil(g.deadline!) >= 0 && !isDone(g))?.id ?? null;
+  const placedMilestones = useMemo(
+    () => goals.filter((g) => isMs(g) && g.deadline).sort((a, b) => daysUntil(a.deadline!) - daysUntil(b.deadline!)),
+    [goals]
+  );
+  const unscheduled = goals.filter((g) => !g.deadline);
+  const attachOptions = goals.filter((g) => !isMs(g)).map((g) => ({ id: g.id, title: g.title, color: g.color }));
+  const nextId = placedGoals.find((g) => daysUntil(g.deadline!) >= 0 && !g.done)?.id ?? null;
+  const msColor = (g: VisionGoal) =>
+    g.goal_id ? goals.find((x) => x.id === g.goal_id)?.color ?? MILESTONE_NEUTRAL : MILESTONE_NEUTRAL;
 
   const ticks = useMemo(() => {
     const today = todayMidnight();
     const end = addDays(today, maxDays());
-    const arr: { y: number; label: string; quarter: boolean; key: string }[] = [];
+    const arr: { y: number; label: string; key: string }[] = [];
     let cur = new Date(today.getFullYear(), today.getMonth(), 1);
     while (cur <= end) {
       const days = Math.round((cur.getTime() - today.getTime()) / DAY);
       if (days >= -2) {
-        const quarter = cur.getMonth() % 3 === 0;
-        const label = quarter
-          ? `Q${Math.floor(cur.getMonth() / 3) + 1} · ${cur.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()} ${cur.getFullYear()}`
-          : cur.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
-        arr.push({ y: yForDays(days), label, quarter, key: iso(cur) });
+        arr.push({
+          y: yForDays(days),
+          label: cur.toLocaleDateString('en-US', { month: 'short' }).toUpperCase() + ' ' + cur.getFullYear(),
+          key: iso(cur),
+        });
       }
       cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
     }
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [goals, ppd, viewportH]);
+  }, [goals, viewportH]);
 
   const selectedGoal = goals.find((g) => g.id === selectedId) || null;
   const today = todayMidnight();
@@ -373,90 +377,84 @@ export default function VisionTab() {
   return (
     <div className="fixed left-0 right-0 bottom-0 top-[100px] md:top-[90px] flex overflow-hidden bg-[#f7f6f3]">
       {/* ---------------- Tray ---------------- */}
-      <aside className="w-[220px] sm:w-[264px] flex-shrink-0 flex flex-col gap-3.5 p-4 overflow-y-auto bg-amber-50/40 border-r border-black/5">
+      <aside className="w-[220px] sm:w-[264px] flex-shrink-0 flex flex-col gap-3 p-4 overflow-y-auto bg-amber-50/40 border-r border-black/5">
         <button
-          onClick={addGoal}
-          className="text-white font-bold text-sm rounded-xl py-3 px-3.5 flex items-center justify-center gap-2 transition-transform hover:-translate-y-0.5"
-          style={{ background: 'linear-gradient(120deg,#06b6d4,#7c3aed)', boxShadow: '0 6px 18px rgba(124,58,237,0.35)' }}
+          onClick={() => addItem('goal')}
+          className="bg-stone-800 hover:bg-stone-900 text-white font-bold text-sm rounded-xl py-3 px-3.5 flex items-center justify-center gap-2 transition-colors"
         >
           <Plus className="w-4 h-4" /> New goal
         </button>
+        <button
+          onClick={() => addItem('milestone')}
+          className="bg-white border border-black/10 ink-text font-semibold text-sm rounded-xl py-2.5 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
+        >
+          <Flag className="w-3.5 h-3.5" /> New milestone
+        </button>
 
-        <p className="text-xs leading-relaxed ink-text-muted">
-          Drag a goal onto the timeline to set its deadline. Drag up = further out. Click any goal to open its details.
+        <p className="text-xs leading-relaxed ink-text-muted mt-1">
+          Drag an item onto the timeline to set its date. Drag up = further out. Click to open details.
         </p>
 
         {dbDown && (
           <div className="text-[11px] leading-relaxed rounded-lg border border-amber-300 bg-amber-100/60 text-amber-800 px-2.5 py-2">
-            Working offline — run the <code className="font-mono">vision_goals</code> migration to save your goals.
+            Working offline — run the latest <code className="font-mono">vision_goals</code> migration to save.
           </div>
         )}
 
-        <h2 className="text-[11px] tracking-wider uppercase ink-text-muted font-bold mt-1">Timeline scale</h2>
-        <div className="flex gap-1.5">
-          {ZOOMS.map((z, i) => (
-            <button
-              key={z.name}
-              onClick={() => setZoomIndex(i)}
-              className={`flex-1 text-xs font-semibold py-1.5 rounded-lg border transition ${
-                i === zoomIndex
-                  ? 'ink-text border-violet-400 shadow-[0_0_0_1px_#7c3aed_inset]'
-                  : 'ink-text-muted border-black/10 bg-white hover:bg-amber-50'
-              }`}
-            >
-              {z.name}
-            </button>
-          ))}
-        </div>
-
-        <h2 className="text-[11px] tracking-wider uppercase ink-text-muted font-bold mt-1">Unscheduled</h2>
-        <div className="flex flex-col gap-2.5 min-h-[40px]">
-          {unplaced.length === 0 && <p className="text-xs ink-text-muted/70">Everything is on the timeline ✦</p>}
-          {unplaced.map((g) => (
-            <div
-              key={g.id}
-              onPointerDown={(e) => onCardPointerDown(e, g)}
-              className="relative paper-card paper-border rounded-xl p-3 cursor-grab active:cursor-grabbing overflow-hidden select-none"
-              style={{ touchAction: 'none', opacity: drag?.id === g.id ? 0.4 : 1 }}
-            >
-              <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: g.color }} />
-              <div className="font-semibold text-sm ink-text leading-tight">{g.title}</div>
-              <div className="text-[11px] ink-text-muted font-mono mt-1">{g.target || 'no target'}</div>
-            </div>
-          ))}
+        <h2 className="text-[11px] tracking-wider uppercase ink-text-muted font-bold mt-2">Unscheduled</h2>
+        <div className="flex flex-col gap-2 min-h-[40px]">
+          {unscheduled.length === 0 && <p className="text-xs ink-text-muted/70">Everything is on the timeline ✦</p>}
+          {unscheduled.map((g) =>
+            isMs(g) ? (
+              <div
+                key={g.id}
+                onPointerDown={(e) => onItemPointerDown(e, g)}
+                className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 bg-white/70 border border-black/5 cursor-grab active:cursor-grabbing select-none"
+                style={{ touchAction: 'none', opacity: drag?.id === g.id ? 0.4 : 1 }}
+              >
+                <span className="w-2 h-2 rounded-full flex-none" style={{ background: msColor(g) }} />
+                <span className="text-[13px] ink-text truncate">{g.title}</span>
+              </div>
+            ) : (
+              <div
+                key={g.id}
+                onPointerDown={(e) => onItemPointerDown(e, g)}
+                className="relative paper-card paper-border rounded-xl p-3 cursor-grab active:cursor-grabbing overflow-hidden select-none"
+                style={{ touchAction: 'none', opacity: drag?.id === g.id ? 0.4 : 1 }}
+              >
+                <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: g.color }} />
+                <div className="font-semibold text-sm ink-text leading-tight">{g.title}</div>
+                <div className="text-[11px] ink-text-muted font-mono mt-1">{g.target || 'no target'}</div>
+              </div>
+            )
+          )}
         </div>
       </aside>
 
       {/* ---------------- Timeline ---------------- */}
-      <div ref={scrollRef} className={`flex-1 overflow-auto relative ${drag?.mode === 'tray' ? 'ring-2 ring-inset ring-violet-300/70' : ''}`}>
+      <div
+        ref={scrollRef}
+        className={`flex-1 overflow-auto relative ${drag?.mode === 'tray' ? 'ring-2 ring-inset ring-stone-300/70' : ''}`}
+      >
         <div ref={canvasRef} className="relative min-h-full" style={{ height: layoutH }}>
-          {/* ambient glow behind the spine */}
           <div
             className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[280px] pointer-events-none"
-            style={{ background: 'radial-gradient(closest-side, rgba(124,58,237,0.06), transparent)' }}
+            style={{ background: 'radial-gradient(closest-side, rgba(124,58,237,0.05), transparent)' }}
           />
           <canvas ref={pCanvasRef} className="absolute left-0 top-0 pointer-events-none" style={{ zIndex: 1 }} />
 
-          {/* month / quarter gridlines (line sits behind cards, label sits above the spine) */}
+          {/* month gridlines (light) + month-year labels above the spine */}
           {ticks.map((t) => (
             <div
               key={t.key + '-line'}
-              className="absolute left-[7%] right-[7%] pointer-events-none"
-              style={
-                t.quarter
-                  ? { top: t.y, height: 1, background: 'rgba(0,0,0,0.12)', zIndex: 2 }
-                  : { top: t.y, height: 0, borderTop: '1px dashed rgba(0,0,0,0.07)', zIndex: 2 }
-              }
+              className="absolute left-[6%] right-[6%] pointer-events-none"
+              style={{ top: t.y, height: 1, background: 'rgba(0,0,0,0.06)', zIndex: 2 }}
             />
           ))}
           {ticks.map((t) => (
             <div
               key={t.key + '-lbl'}
-              className={`absolute left-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap font-mono tracking-wider rounded-full border pointer-events-none ${
-                t.quarter
-                  ? 'text-[11px] font-bold ink-text px-2.5 py-0.5 bg-white border-black/10 shadow-sm'
-                  : 'text-[10px] ink-text-muted px-2 py-0.5 bg-white border-black/5 shadow-sm'
-              }`}
+              className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap font-mono tracking-wider text-[10px] font-semibold ink-text-muted px-2.5 py-0.5 rounded-full bg-white border border-black/5 shadow-sm pointer-events-none"
               style={{ top: t.y, zIndex: 7 }}
             >
               {t.label}
@@ -474,8 +472,53 @@ export default function VisionTab() {
             }}
           />
 
-          {/* nodes + connectors + cards */}
-          {placed.map((g, i) => {
+          {/* ---- milestones (small text markers) ---- */}
+          {placedMilestones.map((g, i) => {
+            const side = i % 2 === 0 ? 'left' : 'right';
+            const isDragging = drag?.id === g.id;
+            const dl = isDragging && drag?.previewDeadline ? drag.previewDeadline : g.deadline!;
+            const y = yForDeadline(dl);
+            const c = msColor(g);
+            return (
+              <div key={g.id}>
+                <div
+                  className="absolute h-px"
+                  style={{
+                    top: y,
+                    width: GAP_M,
+                    zIndex: 3,
+                    background: c,
+                    opacity: 0.5,
+                    ...(side === 'left' ? { right: 'calc(50% + 2px)' } : { left: 'calc(50% + 2px)' }),
+                  }}
+                />
+                <div
+                  className="absolute left-1/2 w-2.5 h-2.5 rounded-full -translate-x-1/2 -translate-y-1/2"
+                  style={{ top: y, zIndex: 4, background: '#fff', boxShadow: `0 0 0 2.5px ${c}` }}
+                />
+                <div
+                  onPointerDown={(e) => onItemPointerDown(e, g)}
+                  className="absolute -translate-y-1/2 flex items-center gap-1.5 rounded-full bg-white border border-black/5 shadow-sm px-2.5 py-1 cursor-grab active:cursor-grabbing select-none"
+                  style={{
+                    top: y,
+                    zIndex: isDragging ? 30 : 5,
+                    touchAction: 'none',
+                    opacity: g.done ? 0.55 : 1,
+                    ...(side === 'left' ? { right: `calc(50% + ${GAP_M + 2}px)` } : { left: `calc(50% + ${GAP_M + 2}px)` }),
+                  }}
+                >
+                  <Flag className="w-3 h-3 flex-none" style={{ color: c }} />
+                  <span className={`text-[11px] leading-none ${g.done ? 'line-through ink-text-muted' : 'ink-text'}`}>
+                    {g.title}
+                  </span>
+                  {g.done && <Check className="w-3 h-3" strokeWidth={3} style={{ color: c }} />}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* ---- goals (cards, no progress) ---- */}
+          {placedGoals.map((g, i) => {
             const side = i % 2 === 0 ? 'left' : 'right';
             const isDragging = drag?.id === g.id;
             const dl = isDragging && drag?.previewDeadline ? drag.previewDeadline : g.deadline!;
@@ -483,14 +526,11 @@ export default function VisionTab() {
             const days = daysUntil(dl);
             const u = urgency(dl);
             const uColor = URGENCY_COLOR[u];
-            const done = isDone(g);
-            const pr = progress(g);
             const isNext = g.id === nextId;
             const dm = fmtDayMonth(dl);
 
             return (
               <div key={g.id}>
-                {/* connector */}
                 <div
                   className="absolute h-[2px]"
                   style={{
@@ -504,27 +544,18 @@ export default function VisionTab() {
                       : { left: 'calc(50% + 2px)', background: `linear-gradient(270deg, ${g.color}, ${g.color}22)` }),
                   }}
                 />
-                {/* node */}
                 <div
-                  className="absolute left-1/2 w-3.5 h-3.5 rounded-full -translate-x-1/2 -translate-y-1/2"
-                  style={{
-                    top: y,
-                    zIndex: 4,
-                    background: '#fff',
-                    boxShadow: `0 0 0 3px ${g.color}, 0 0 12px 2px ${g.color}`,
-                  }}
+                  className="absolute left-1/2 w-3.5 h-3.5 rounded-full -translate-x-1/2 -translate-y-1/2 grid place-items-center"
+                  style={{ top: y, zIndex: 4, background: '#fff', boxShadow: `0 0 0 3px ${g.color}, 0 0 12px 2px ${g.color}` }}
                 >
-                  {isNext && (
-                    <span
-                      className="absolute inset-0 rounded-full animate-ping"
-                      style={{ boxShadow: `0 0 0 3px ${g.color}`, opacity: 0.6 }}
-                    />
+                  {g.done && <Check className="w-2.5 h-2.5" strokeWidth={3} style={{ color: g.color }} />}
+                  {isNext && !g.done && (
+                    <span className="absolute inset-0 rounded-full animate-ping" style={{ boxShadow: `0 0 0 3px ${g.color}`, opacity: 0.6 }} />
                   )}
                 </div>
 
-                {/* card */}
                 <div
-                  onPointerDown={(e) => onCardPointerDown(e, g)}
+                  onPointerDown={(e) => onItemPointerDown(e, g)}
                   className={`absolute paper-card rounded-2xl overflow-hidden select-none cursor-grab active:cursor-grabbing ${
                     isDragging ? 'shadow-2xl' : 'paper-shadow hover:shadow-xl'
                   }`}
@@ -537,14 +568,13 @@ export default function VisionTab() {
                     border: `1px solid ${isNext ? g.color + '66' : 'rgba(0,0,0,0.06)'}`,
                     touchAction: 'none',
                     transition: isDragging ? 'none' : 'box-shadow 0.15s ease',
-                    opacity: done ? 0.9 : 1,
+                    opacity: g.done ? 0.85 : 1,
                   }}
                 >
                   <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: g.color }} />
                   <div className="pl-4 pr-3 pt-3 pb-3 flex flex-col gap-2.5">
-                    {/* title + target */}
                     <div className="flex items-start justify-between gap-2">
-                      <div className={`font-bold text-[15px] leading-snug ink-text ${done ? 'line-through' : ''}`}>
+                      <div className={`font-bold text-[15px] leading-snug ink-text ${g.done ? 'line-through' : ''}`}>
                         {g.title}
                       </div>
                       {g.target && (
@@ -557,26 +587,8 @@ export default function VisionTab() {
                       )}
                     </div>
 
-                    {/* progress */}
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 rounded-full bg-black/[0.06] overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${Math.round(pr * 100)}%`,
-                            background: `linear-gradient(90deg, ${g.color}99, ${g.color})`,
-                            boxShadow: `0 0 8px ${g.color}66`,
-                          }}
-                        />
-                      </div>
-                      <span className="font-mono text-[10px] ink-text-muted">
-                        {g.steps.filter((s) => s.done).length}/{g.steps.length}
-                      </span>
-                    </div>
-
-                    {/* HERO deadline band */}
                     <div
-                      className="flex items-center justify-between rounded-xl px-3 py-2 mt-0.5"
+                      className="flex items-center justify-between rounded-xl px-3 py-2"
                       style={{ background: `${uColor}12`, border: `1px solid ${uColor}22` }}
                     >
                       <div className="flex items-center gap-2">
@@ -589,7 +601,11 @@ export default function VisionTab() {
                         </div>
                       </div>
                       <div className="text-right leading-none">
-                        {days === 0 ? (
+                        {g.done ? (
+                          <div className="font-extrabold text-[13px] flex items-center gap-1" style={{ color: g.color }}>
+                            <Check className="w-3.5 h-3.5" strokeWidth={3} /> DONE
+                          </div>
+                        ) : days === 0 ? (
                           <div className="font-extrabold text-[15px]" style={{ color: uColor }}>
                             TODAY
                           </div>
@@ -616,10 +632,13 @@ export default function VisionTab() {
             className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2 pointer-events-none"
             style={{ top: yForDays(0), zIndex: 6 }}
           >
-            <div className="relative w-[52px] h-[52px] rounded-full" style={{
-              background: 'radial-gradient(circle at 35% 30%, #fff, #f59e0b 55%, #d97706)',
-              boxShadow: '0 0 0 4px #f7f6f3, 0 0 0 5px #f59e0b, 0 0 26px 6px rgba(245,158,11,0.55)',
-            }}>
+            <div
+              className="relative w-[52px] h-[52px] rounded-full"
+              style={{
+                background: 'radial-gradient(circle at 35% 30%, #fff, #f59e0b 55%, #d97706)',
+                boxShadow: '0 0 0 4px #f7f6f3, 0 0 0 5px #f59e0b, 0 0 26px 6px rgba(245,158,11,0.55)',
+              }}
+            >
               <span className="absolute inset-[-14px] rounded-full border-2 border-amber-400 animate-ping opacity-40" />
             </div>
             <div className="font-mono text-[10px] tracking-widest font-bold text-amber-700 bg-white border border-black/10 px-2.5 py-0.5 rounded-full shadow-sm">
@@ -632,11 +651,11 @@ export default function VisionTab() {
       {/* floating ghost while dragging from tray */}
       {drag?.mode === 'tray' && (
         <div
-          className="fixed z-[90] w-[230px] pointer-events-none paper-card rounded-2xl p-3 border border-dashed border-violet-400 shadow-2xl font-semibold text-sm ink-text"
-          style={{ left: drag.x - 115, top: drag.y - 24 }}
+          className="fixed z-[90] w-[210px] pointer-events-none paper-card rounded-2xl p-3 border border-dashed border-stone-400 shadow-2xl font-semibold text-sm ink-text"
+          style={{ left: drag.x - 105, top: drag.y - 24 }}
         >
           <div className="flex items-center gap-2">
-            <CalendarClock className="w-4 h-4 text-violet-500" />
+            <CalendarClock className="w-4 h-4 ink-text-muted" />
             {goals.find((g) => g.id === drag.id)?.title}
           </div>
         </div>
@@ -648,6 +667,7 @@ export default function VisionTab() {
           <div className="fixed inset-0 z-[65] bg-black/25" onClick={() => setSelectedId(null)} />
           <GoalDrawer
             goal={selectedGoal}
+            attachOptions={attachOptions.filter((o) => o.id !== selectedGoal.id)}
             onChange={(patch, persist) => updateGoal(selectedGoal.id, patch, persist)}
             onDelete={() => deleteGoal(selectedGoal.id)}
             onClose={() => setSelectedId(null)}
@@ -669,8 +689,12 @@ export default function VisionTab() {
   );
 }
 
-// ---------- particle helpers ----------
-function spawn(_w: number, h: number, rand: boolean): Particle {
+// ---------- helpers ----------
+function normalize(rows: VisionGoal[]): VisionGoal[] {
+  return rows.map((r) => ({ ...r, kind: r.kind ?? 'goal', done: r.done ?? false, goal_id: r.goal_id ?? null }));
+}
+
+function spawn(h: number, rand: boolean): Particle {
   return {
     y: rand ? Math.random() * h : h + 10,
     vy: -(0.3 + Math.random() * 0.7),
@@ -686,82 +710,72 @@ function hexRgb(h: string) {
   return `${n >> 16},${(n >> 8) & 255},${n & 255}`;
 }
 
-// ---------- demo seed ----------
+// ---------- demo (offline fallback / first-run seed) ----------
 function demoGoals(): VisionGoal[] {
   const t = todayMidnight();
-  const base = {
-    user_id: 'single-user',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
+  const base = { user_id: 'single-user', created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
   const mk = (
     i: number,
+    kind: 'goal' | 'milestone',
     title: string,
     target: string,
     color: string,
     days: number | null,
-    note: string,
-    steps: { text: string; done: boolean }[]
+    goal_id: string | null = null
   ): VisionGoal => ({
     id: 'demo-' + i,
+    kind,
+    goal_id,
     title,
     target,
     color,
-    note,
-    steps,
+    note: '',
+    done: false,
     sort_order: i,
     deadline: days === null ? null : iso(addDays(t, days)),
     ...base,
   });
   return [
-    mk(1, 'Hit $10k / month', '$10,000/mo', '#d97706', 132, 'Recurring revenue across products — the north star.', [
-      { text: 'Land first 3 paying clients', done: true },
-      { text: 'Reach $3k MRR', done: true },
-      { text: 'Build referral loop', done: false },
-      { text: 'Hire first contractor', done: false },
-    ]),
-    mk(2, 'Ship the app v1.0', 'Public launch', '#06b6d4', 38, "Get the product in real users' hands.", [
-      { text: 'Finish onboarding flow', done: true },
-      { text: 'Payments live', done: false },
-      { text: 'Landing page', done: false },
-      { text: 'Launch on Product Hunt', done: false },
-    ]),
-    mk(3, 'Bench press 100kg', '100 kg × 1', '#059669', 84, 'Progressive overload, 4 sessions/week.', [
-      { text: '85kg', done: true },
-      { text: '90kg', done: true },
-      { text: '95kg', done: false },
-      { text: '100kg', done: false },
-    ]),
-    mk(4, 'Memorize Surah Al-Kahf', '110 ayahs', '#7c3aed', 26, 'Every Friday feels different once this is locked in.', [
-      { text: 'Ayahs 1–30', done: true },
-      { text: 'Ayahs 31–60', done: false },
-      { text: 'Ayahs 61–90', done: false },
-      { text: 'Ayahs 91–110', done: false },
-    ]),
-    mk(5, 'Grow to 10k followers', '10,000', '#2563eb', 205, 'Build in public. Consistency over virality.', [
-      { text: '1k', done: true },
-      { text: '3k', done: false },
-      { text: '6k', done: false },
-      { text: '10k', done: false },
-    ]),
-    mk(6, 'Launch weekly newsletter', 'Issue #1', '#e11d48', null, '', [
-      { text: 'Pick platform', done: false },
-      { text: 'Write 3 issues ahead', done: false },
-    ]),
-    mk(7, 'Read 12 books this year', '12 books', '#06b6d4', null, '', [{ text: 'Book 1', done: false }]),
+    mk(1, 'goal', 'Hit $10k / month', '$10,000/mo', '#d97706', 132),
+    mk(2, 'goal', 'Ship the app v1.0', 'Public launch', '#06b6d4', 38),
+    mk(3, 'goal', 'Bench press 100kg', '100 kg × 1', '#059669', 84),
+    mk(4, 'goal', 'Memorize Surah Al-Kahf', '110 ayahs', '#7c3aed', 26),
+    mk(5, 'milestone', 'Payments live', '', MILESTONE_NEUTRAL, 20, 'demo-2'),
+    mk(6, 'milestone', 'First 100 users', '', MILESTONE_NEUTRAL, 55),
+    mk(7, 'goal', 'Launch weekly newsletter', 'Issue #1', '#e11d48', null),
   ];
 }
 
-async function seedDemoGoals(): Promise<VisionGoal[]> {
+async function seedDemo(): Promise<VisionGoal[]> {
+  // Insert goals first so milestones can reference them.
+  const seeds = demoGoals();
+  const idMap = new Map<string, string>();
   const out: VisionGoal[] = [];
-  for (const g of demoGoals()) {
+  for (const g of seeds.filter((s) => !isMs(s))) {
     const row = await db.visionGoals.add({
+      kind: 'goal',
+      goal_id: null,
       title: g.title,
       target: g.target,
       note: g.note,
       color: g.color,
       deadline: g.deadline,
-      steps: g.steps,
+      done: false,
+      sort_order: g.sort_order,
+    });
+    idMap.set(g.id, row.id);
+    out.push(row);
+  }
+  for (const g of seeds.filter(isMs)) {
+    const row = await db.visionGoals.add({
+      kind: 'milestone',
+      goal_id: g.goal_id ? idMap.get(g.goal_id) ?? null : null,
+      title: g.title,
+      target: '',
+      note: '',
+      color: g.color,
+      deadline: g.deadline,
+      done: false,
       sort_order: g.sort_order,
     });
     out.push(row);

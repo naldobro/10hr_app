@@ -1,5 +1,3 @@
-import { VisionGoal } from '../types';
-
 export const DAY = 86400000;
 
 // Accent palette for goals (deepened for contrast on the warm-paper ground)
@@ -11,6 +9,9 @@ export const GOAL_COLORS = [
   '#059669', // emerald
   '#2563eb', // blue
 ];
+
+// Neutral tone for a standalone (unattached) milestone.
+export const MILESTONE_NEUTRAL = '#78716c'; // stone-500
 
 export function todayMidnight(): Date {
   const d = new Date();
@@ -62,14 +63,6 @@ export function relText(deadline: string): string {
   if (d === 0) return 'due today';
   if (d > 0) return 'in ' + d + ' day' + (d === 1 ? '' : 's');
   return Math.abs(d) + ' day' + (d === -1 ? '' : 's') + ' ago';
-}
-
-export function progress(g: VisionGoal): number {
-  return g.steps.length ? g.steps.filter((s) => s.done).length / g.steps.length : 0;
-}
-
-export function isDone(g: VisionGoal): boolean {
-  return g.steps.length > 0 && g.steps.every((s) => s.done);
 }
 
 // Urgency bucket drives the countdown colour on each card.

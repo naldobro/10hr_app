@@ -59,12 +59,16 @@ export interface GoalStep {
 export interface VisionGoal {
   id: string;
   user_id: string;
+  kind: 'goal' | 'milestone';
+  goal_id: string | null;
   title: string;
   target: string;
   note: string;
   color: string;
   deadline: string | null;
-  steps: GoalStep[];
+  done: boolean;
+  /** Legacy: no longer used since milestones became their own items. */
+  steps?: GoalStep[];
   sort_order: number;
   created_at: string;
   updated_at: string;
