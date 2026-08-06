@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, Trash2, Plus, Heart } from 'lucide-react';
-import { VisionTopic } from '../types';
+import { Emotion, VisionTopic } from '../types';
 import { GOAL_COLORS } from '../lib/visionUtils';
 
 interface ReflectionsPanelProps {
@@ -144,34 +144,23 @@ function TopicColumn({
         )}
       </div>
 
-      {/* emotion bubbles */}
+      {/* emotion cards */}
       <div className="flex-1 overflow-y-auto p-3">
-        <div className="flex flex-wrap gap-2 content-start">
+        <div className="flex flex-col gap-2">
           {emotions.length === 0 && <p className="text-xs ink-text-muted/70">Add how you want to feel about this.</p>}
           {emotions.map((em) => (
-            <span
+            <EmotionCard
               key={em.id}
-              onClick={() =>
-                onUpdate(
-                  { emotions: emotions.map((x) => (x.id === em.id ? { ...x, color: nextColor(x.color) } : x)) },
-                  true
-                )
+              em={em}
+              onChangeText={(text) =>
+                onUpdate({ emotions: emotions.map((x) => (x.id === em.id ? { ...x, text } : x)) }, false)
               }
-              className="group inline-flex items-center gap-1.5 rounded-full pl-3 pr-1.5 py-1.5 text-[13px] font-medium cursor-pointer select-none transition"
-              style={{ background: `${em.color}1a`, color: em.color, border: `1px solid ${em.color}40` }}
-              title="Click to shift tone"
-            >
-              {em.text}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onUpdate({ emotions: emotions.filter((x) => x.id !== em.id) }, true);
-                }}
-                className="w-4 h-4 rounded-full grid place-items-center hover:bg-black/10 transition"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
+              onCommit={() => onUpdate({}, true)}
+              onCycle={() =>
+                onUpdate({ emotions: emotions.map((x) => (x.id === em.id ? { ...x, color: nextColor(x.color) } : x)) }, true)
+              }
+              onDelete={() => onUpdate({ emotions: emotions.filter((x) => x.id !== em.id) }, true)}
+            />
           ))}
         </div>
       </div>
@@ -206,6 +195,67 @@ function TopicColumn({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function EmotionCard({
+  em,
+  onChangeText,
+  onCommit,
+  onCycle,
+  onDelete,
+}: {
+  em: Emotion;
+  onChangeText: (text: string) => void;
+  onCommit: () => void;
+  onCycle: () => void;
+  onDelete: () => void;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  const grow = () => {
+    const el = ref.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = el.scrollHeight + 'px';
+    }
+  };
+  useEffect(grow, [em.text]);
+
+  return (
+    <div
+      className="rounded-2xl px-3 py-2.5"
+      style={{ background: `${em.color}14`, border: `1px solid ${em.color}33` }}
+    >
+      <div className="flex items-center justify-between mb-1">
+        <button
+          onClick={onCycle}
+          className="w-3.5 h-3.5 rounded-full flex-none transition-transform hover:scale-110"
+          style={{ background: em.color, boxShadow: `0 0 6px ${em.color}80` }}
+          title="Shift tone"
+        />
+        <button
+          onClick={onDelete}
+          className="w-5 h-5 rounded-full grid place-items-center ink-text-muted hover:bg-black/10 transition"
+          title="Delete"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <textarea
+        ref={ref}
+        rows={1}
+        value={em.text}
+        onChange={(e) => {
+          onChangeText(e.target.value);
+          grow();
+        }}
+        onBlur={onCommit}
+        placeholder="Write a reminder…"
+        className="w-full bg-transparent outline-none resize-none overflow-hidden text-[13.5px] leading-snug font-medium"
+        style={{ color: em.color }}
+      />
     </div>
   );
 }
