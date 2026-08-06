@@ -73,3 +73,11 @@ export interface VisionGoal {
   created_at: string;
   updated_at: string;
 }
+
+export interface VisionSnapshot {
+  id: string;
+  user_id: string;
+  date: string;
+  data: VisionGoal[];
+  created_at: string;
+}

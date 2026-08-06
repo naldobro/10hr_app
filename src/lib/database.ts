@@ -1,5 +1,19 @@
 import { supabase } from './supabase';
-import { WorkSession, DailySummary, HabitEntry, HabitSchedule, VisionGoal } from '../types';
+import { WorkSession, DailySummary, HabitEntry, HabitSchedule, VisionGoal, VisionSnapshot } from '../types';
+
+const snapshotRow = (g: VisionGoal) => ({
+  id: g.id,
+  user_id: SINGLE_USER_ID,
+  kind: g.kind,
+  goal_id: g.goal_id,
+  title: g.title,
+  target: g.target,
+  note: g.note,
+  color: g.color,
+  deadline: g.deadline,
+  done: g.done,
+  sort_order: g.sort_order,
+});
 
 const SINGLE_USER_ID = 'single-user';
 
@@ -265,6 +279,79 @@ export const db = {
 
       if (error) throw error;
       return data;
+    },
+
+    // Wholesale replace all goals/milestones (used when restoring a version).
+    // Goals are inserted before milestones so goal_id foreign keys resolve.
+    replaceAll: async (goals: VisionGoal[]): Promise<void> => {
+      const { error: delErr } = await supabase.from('vision_goals').delete().eq('user_id', SINGLE_USER_ID);
+      if (delErr) throw delErr;
+
+      const parents = goals.filter((g) => g.kind !== 'milestone').map(snapshotRow);
+      const children = goals.filter((g) => g.kind === 'milestone').map(snapshotRow);
+      if (parents.length) {
+        const { error } = await supabase.from('vision_goals').insert(parents);
+        if (error) throw error;
+      }
+      if (children.length) {
+        const { error } = await supabase.from('vision_goals').insert(children);
+        if (error) throw error;
+      }
+    },
+  },
+
+  visionSnapshots: {
+    list: async (): Promise<VisionSnapshot[]> => {
+      const { data, error } = await supabase
+        .from('vision_snapshots')
+        .select('*')
+        .eq('user_id', SINGLE_USER_ID)
+        .order('date', { ascending: false })
+        .limit(60);
+
+      if (error) throw error;
+      return data || [];
+    },
+
+    get: async (date: string): Promise<VisionGoal[]> => {
+      const { data, error } = await supabase
+        .from('vision_snapshots')
+        .select('data')
+        .eq('user_id', SINGLE_USER_ID)
+        .eq('date', date)
+        .maybeSingle();
+
+      if (error) throw error;
+      return (data?.data as VisionGoal[]) || [];
+    },
+
+    // Capture today's version only if one doesn't exist yet (preserves the day's baseline).
+    ensureToday: async (date: string, goals: VisionGoal[]): Promise<void> => {
+      const { data, error } = await supabase
+        .from('vision_snapshots')
+        .select('id')
+        .eq('user_id', SINGLE_USER_ID)
+        .eq('date', date)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) {
+        const { error: e2 } = await supabase
+          .from('vision_snapshots')
+          .insert([{ user_id: SINGLE_USER_ID, date, data: goals }]);
+        if (e2) throw e2;
+      }
+    },
+
+    // Force today's version to the given state (used to save a checkpoint / before a restore).
+    saveToday: async (date: string, goals: VisionGoal[]): Promise<void> => {
+      const { error } = await supabase
+        .from('vision_snapshots')
+        .upsert({ user_id: SINGLE_USER_ID, date, data: goals, created_at: new Date().toISOString() }, {
+          onConflict: 'user_id,date',
+        });
+
+      if (error) throw error;
     },
   },
 

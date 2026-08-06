@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Flag, CalendarClock, X, Check, Minus, Undo2, Redo2 } from 'lucide-react';
+import { Plus, Flag, CalendarClock, X, Check, Minus, Undo2, Redo2, History, RotateCcw, Save } from 'lucide-react';
 import { db } from '../lib/database';
 import { undoManager } from '../lib/undoManager';
-import { VisionGoal } from '../types';
+import { VisionGoal, VisionSnapshot } from '../types';
 import {
   DAY,
   GOAL_COLORS,
@@ -72,6 +72,10 @@ export default function VisionTab() {
   const [pendingMove, setPendingMove] = useState<{ id: string; from: string | null; to: string } | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
+  const [versions, setVersions] = useState<VisionSnapshot[]>([]);
+  const [restoreDate, setRestoreDate] = useState<string | null>(null);
+  const [versionsBusy, setVersionsBusy] = useState(false);
   const [ppd, setPpd] = useState<number>(() => {
     const saved = Number(localStorage.getItem('vision_ppd'));
     return saved >= PPD_MIN && saved <= PPD_MAX ? saved : PPD_DEFAULT;
@@ -130,7 +134,10 @@ export default function VisionTab() {
       try {
         let rows = await db.visionGoals.getAll();
         if (rows.length === 0) rows = await seedDemo();
-        setGoals(normalize(rows));
+        const norm = normalize(rows);
+        setGoals(norm);
+        // Capture today's baseline version once per day (ignored if snapshots table is absent).
+        db.visionSnapshots.ensureToday(iso(todayMidnight()), norm).catch(() => {});
       } catch {
         setDbDown(true);
         setGoals(demoGoals());
@@ -138,6 +145,45 @@ export default function VisionTab() {
       refreshUndo();
     })();
   }, [refreshUndo]);
+
+  const openVersions = async () => {
+    setShowVersions(true);
+    try {
+      setVersions(await db.visionSnapshots.list());
+    } catch {
+      setVersions([]);
+      flash('Run the vision_snapshots migration to use Versions');
+    }
+  };
+
+  const saveVersionNow = async () => {
+    try {
+      await db.visionSnapshots.saveToday(iso(todayMidnight()), goalsRef.current);
+      setVersions(await db.visionSnapshots.list());
+      flash('Version saved');
+    } catch {
+      flash('Could not save version');
+    }
+  };
+
+  const doRestore = async (date: string) => {
+    setVersionsBusy(true);
+    try {
+      // checkpoint current state under today before overwriting, so the restore is reversible
+      await db.visionSnapshots.saveToday(iso(todayMidnight()), goalsRef.current);
+      const data = await db.visionSnapshots.get(date);
+      await db.visionGoals.replaceAll(data);
+      await reloadGoals();
+      undoManager.clear();
+      refreshUndo();
+      flash('Restored version from ' + fmtDate(date));
+      setShowVersions(false);
+    } catch {
+      flash('Restore failed');
+    }
+    setRestoreDate(null);
+    setVersionsBusy(false);
+  };
 
   const handleUndo = useCallback(async () => {
     if (!undoManager.canUndo()) return;
@@ -517,6 +563,13 @@ export default function VisionTab() {
         >
           <Flag className="w-3.5 h-3.5" /> New milestone
         </button>
+        <button
+          onClick={openVersions}
+          className="bg-white border border-black/10 ink-text-muted hover:ink-text font-semibold text-sm rounded-xl py-2 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
+          title="Daily version history"
+        >
+          <History className="w-3.5 h-3.5" /> Versions
+        </button>
 
         <p className="text-xs leading-relaxed ink-text-muted mt-1">
           Drag an item onto the timeline to set its date. Drag up = further out. Click to open details.
@@ -828,6 +881,85 @@ export default function VisionTab() {
             onComplete={triggerBurst}
           />
         </>
+      )}
+
+      {/* versions modal */}
+      {showVersions && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" onClick={() => setShowVersions(false)}>
+          <div className="absolute inset-0 bg-black/30" />
+          <div
+            className="relative paper-card rounded-2xl border border-black/10 shadow-2xl w-[min(460px,94vw)] max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 pt-5 pb-4 border-b border-black/5 flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-bold ink-text flex items-center gap-2">
+                  <History className="w-5 h-5" /> Versions
+                </h3>
+                <p className="text-xs ink-text-muted mt-1">
+                  A daily backup of your goals & milestones. Restoring rolls everything back to that day.
+                </p>
+              </div>
+              <button onClick={() => setShowVersions(false)} className="p-1.5 rounded-lg ink-text-muted hover:bg-stone-100 transition">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="px-5 py-3 border-b border-black/5">
+              <button
+                onClick={saveVersionNow}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-stone-800 hover:bg-stone-900 text-white text-sm font-semibold transition"
+              >
+                <Save className="w-4 h-4" /> Save current as today's version
+              </button>
+            </div>
+
+            <div className="px-5 py-3 overflow-y-auto flex flex-col gap-2">
+              {versions.length === 0 && (
+                <p className="text-sm ink-text-muted text-center py-6">No versions yet — one is saved automatically each day.</p>
+              )}
+              {versions.map((v) => {
+                const count = Array.isArray(v.data) ? v.data.length : 0;
+                const isToday = v.date === iso(today);
+                return (
+                  <div key={v.id} className="flex items-center justify-between gap-3 rounded-xl border border-black/5 bg-white px-3.5 py-3">
+                    <div>
+                      <div className="font-semibold ink-text text-sm">
+                        {fmtDate(v.date)} {isToday && <span className="ink-text-muted font-normal">· today</span>}
+                      </div>
+                      <div className="text-[11px] ink-text-muted font-mono">{count} item{count === 1 ? '' : 's'}</div>
+                    </div>
+                    {restoreDate === v.date ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setRestoreDate(null)}
+                          disabled={versionsBusy}
+                          className="px-3 py-1.5 rounded-lg border border-black/10 ink-text text-xs font-semibold hover:bg-stone-50 transition"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => doRestore(v.date)}
+                          disabled={versionsBusy}
+                          className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition disabled:opacity-50"
+                        >
+                          {versionsBusy ? 'Restoring…' : 'Confirm restore'}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setRestoreDate(v.date)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/10 ink-text text-xs font-semibold hover:bg-stone-50 transition"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" /> Restore
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* move confirmation */}

@@ -126,6 +126,11 @@ export const undoManager = {
     });
   },
 
+  clear: (): void => {
+    localStorage.setItem(UNDO_STORAGE_KEY, JSON.stringify([]));
+    localStorage.setItem(REDO_STORAGE_KEY, JSON.stringify([]));
+  },
+
   canUndo: (): boolean => {
     return undoManager.getUndoHistory().length > 0;
   },
