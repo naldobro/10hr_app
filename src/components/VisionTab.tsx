@@ -27,7 +27,6 @@ const PPD_DEFAULT = 7;
 const TOP_PAD = 90;
 const BOT_PAD = 150;
 const GAP = 46; // spine → goal card
-const GAP_M = 20; // spine → milestone label
 const CARD_W = 250;
 
 const URGENCY_COLOR: Record<Urgency, string> = {
@@ -301,7 +300,6 @@ export default function VisionTab() {
   // mid size so cards don't overflow the narrower timeline; desktop the full size.
   const cardW = viewportW < 640 ? 152 : viewportW < 1024 ? 200 : CARD_W;
   const gap = viewportW < 640 ? 22 : viewportW < 1024 ? 34 : GAP;
-  const gapM = viewportW < 640 ? 12 : viewportW < 1024 ? 16 : GAP_M;
 
   // start at "today" (bottom), looking upward
   useEffect(() => {
@@ -636,6 +634,19 @@ export default function VisionTab() {
   const msColor = (g: VisionGoal) =>
     g.goal_id ? goals.find((x) => x.id === g.goal_id)?.color ?? MILESTONE_NEUTRAL : MILESTONE_NEUTRAL;
 
+  // Where each goal card sits (spine side + vertical center) so milestones can dodge them.
+  const goalRects = useMemo(
+    () =>
+      placedGoals.map((g, i) => ({
+        y: yForDeadline(g.deadline!),
+        side: (i % 2 === 0 ? 'left' : 'right') as 'left' | 'right',
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [placedGoals, ppd, layoutH]
+  );
+  // Vertical span (px) within which a milestone would clash with a goal card.
+  const COLLIDE_T = viewportW < 640 ? 56 : 70;
+
   const ticks = useMemo(() => {
     const today = todayMidnight();
     const end = addDays(today, maxDays());
@@ -880,46 +891,65 @@ export default function VisionTab() {
             }}
           />
 
-          {/* ---- milestones (small text markers) ---- */}
+          {/* ---- milestones: dot on the spine + horizontal connector out to a pill ---- */}
           {placedMilestones.map((g, i) => {
-            const side = i % 2 === 0 ? 'left' : 'right';
             const isDragging = drag?.id === g.id;
             const dl = isDragging && drag?.previewDeadline ? drag.previewDeadline : g.deadline!;
             const y = yForDeadline(dl);
             const c = msColor(g);
+
+            // Pick the side that has no goal card near this date so the pill stays visible.
+            const leftBusy = goalRects.some((r) => r.side === 'left' && Math.abs(r.y - y) < COLLIDE_T);
+            const rightBusy = goalRects.some((r) => r.side === 'right' && Math.abs(r.y - y) < COLLIDE_T);
+            let side: 'left' | 'right';
+            let farOut = false;
+            if (!leftBusy && !rightBusy) side = i % 2 === 0 ? 'left' : 'right';
+            else if (!leftBusy) side = 'left';
+            else if (!rightBusy) side = 'right';
+            else {
+              // Both sides blocked — push the pill out past the goal card on its side.
+              side = i % 2 === 0 ? 'left' : 'right';
+              farOut = true;
+            }
+            const offset = farOut ? gap + cardW + 16 : gap;
+
             return (
               <div key={g.id}>
+                {/* connector line from the spine out to the pill */}
                 <div
-                  className="absolute h-px"
+                  className="absolute h-[2px] -translate-y-1/2"
                   style={{
                     top: y,
-                    width: gapM,
-                    zIndex: 3,
-                    background: c,
-                    opacity: 0.5,
-                    ...(side === 'left' ? { right: 'calc(50% + 2px)' } : { left: 'calc(50% + 2px)' }),
+                    width: offset,
+                    zIndex: farOut ? 6 : 3,
+                    opacity: 0.6,
+                    ...(side === 'left'
+                      ? { right: 'calc(50% + 2px)', background: `linear-gradient(270deg, ${c}, ${c}22)` }
+                      : { left: 'calc(50% + 2px)', background: `linear-gradient(90deg, ${c}, ${c}22)` }),
                   }}
                 />
+                {/* dot on the spine */}
                 <div
                   className="absolute left-1/2 w-2.5 h-2.5 rounded-full -translate-x-1/2 -translate-y-1/2"
-                  style={{ top: y, zIndex: 4, background: '#fff', boxShadow: `0 0 0 2.5px ${c}` }}
+                  style={{ top: y, zIndex: 4, background: c, boxShadow: `0 0 0 2px #fff, 0 0 8px 1px ${c}66` }}
                 />
+                {/* the milestone pill, at the far end of the connector */}
                 <div
                   onPointerDown={(e) => onItemPointerDown(e, g)}
-                  className="absolute -translate-y-1/2 flex items-center gap-1.5 rounded-full bg-white border border-black/5 shadow-sm px-2.5 py-1 cursor-grab active:cursor-grabbing select-none"
+                  className="absolute -translate-y-1/2 flex items-center gap-1.5 rounded-full bg-white border border-black/5 shadow-sm px-2.5 py-1 cursor-grab active:cursor-grabbing select-none max-w-[46vw] sm:max-w-[220px]"
                   style={{
                     top: y,
-                    zIndex: isDragging ? 30 : 5,
+                    zIndex: isDragging ? 30 : 6,
                     touchAction: 'none',
                     opacity: g.done ? 0.55 : 1,
-                    ...(side === 'left' ? { right: `calc(50% + ${gapM + 2}px)` } : { left: `calc(50% + ${gapM + 2}px)` }),
+                    ...(side === 'left' ? { right: `calc(50% + ${offset + 2}px)` } : { left: `calc(50% + ${offset + 2}px)` }),
                   }}
                 >
                   <Flag className="w-3 h-3 flex-none" style={{ color: c }} />
-                  <span className={`text-[11px] leading-none ${g.done ? 'line-through ink-text-muted' : 'ink-text'}`}>
+                  <span className={`text-[11px] leading-none truncate ${g.done ? 'line-through ink-text-muted' : 'ink-text'}`}>
                     {g.title}
                   </span>
-                  {g.done && <Check className="w-3 h-3" strokeWidth={3} style={{ color: c }} />}
+                  {g.done && <Check className="w-3 h-3 flex-none" strokeWidth={3} style={{ color: c }} />}
                 </div>
               </div>
             );
