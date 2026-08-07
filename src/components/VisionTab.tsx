@@ -948,7 +948,7 @@ export default function VisionTab() {
                 {/* the milestone pill, at the far end of the connector */}
                 <div
                   onPointerDown={(e) => onItemPointerDown(e, g)}
-                  className="absolute -translate-y-1/2 flex items-center gap-2 rounded-full bg-white border border-black/5 shadow-sm px-3.5 py-2 cursor-grab active:cursor-grabbing select-none max-w-[46vw] sm:max-w-[240px]"
+                  className="absolute -translate-y-1/2 flex items-center gap-2 rounded-2xl bg-white border border-black/5 shadow-sm px-3.5 py-2 cursor-grab active:cursor-grabbing select-none max-w-[min(70vw,340px)]"
                   style={{
                     top: y,
                     zIndex: isDragging ? 30 : 6,
@@ -958,7 +958,7 @@ export default function VisionTab() {
                   }}
                 >
                   <Flag className="w-4 h-4 flex-none" style={{ color: c }} />
-                  <span className={`text-[13px] leading-none truncate ${g.done ? 'line-through ink-text-muted' : 'ink-text'}`}>
+                  <span className={`text-[13px] leading-snug ${g.done ? 'line-through ink-text-muted' : 'ink-text'}`}>
                     {g.title}
                   </span>
                   {g.done && <Check className="w-4 h-4 flex-none" strokeWidth={3} style={{ color: c }} />}
@@ -1083,13 +1083,13 @@ export default function VisionTab() {
             style={{ top: yForDays(0), zIndex: 6 }}
           >
             <div
-              className="relative w-[52px] h-[52px] rounded-full"
+              className="relative w-[14px] h-[14px] rounded-full"
               style={{
                 background: 'radial-gradient(circle at 35% 30%, #fff, #f59e0b 55%, #d97706)',
-                boxShadow: '0 0 0 4px #f7f6f3, 0 0 0 5px #f59e0b, 0 0 26px 6px rgba(245,158,11,0.55)',
+                boxShadow: '0 0 0 2.5px #f7f6f3, 0 0 0 3px #f59e0b, 0 0 12px 2px rgba(245,158,11,0.5)',
               }}
             >
-              <span className="absolute inset-[-14px] rounded-full border-2 border-amber-400 animate-ping opacity-40" />
+              <span className="absolute inset-[-5px] rounded-full border-2 border-amber-400 animate-ping opacity-40" />
             </div>
             <div className="font-mono text-[10px] tracking-widest font-bold text-amber-700 bg-white border border-black/10 px-2.5 py-0.5 rounded-full shadow-sm">
               {today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase()} · TODAY
