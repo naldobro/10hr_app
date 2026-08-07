@@ -508,7 +508,9 @@ export const db = {
             user_id: SINGLE_USER_ID,
             month: doc.month,
             title: doc.title,
+            summary: doc.summary,
             content: doc.content,
+            color: doc.color,
             sort_order: doc.sort_order,
           },
         ])

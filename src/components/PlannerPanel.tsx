@@ -16,6 +16,7 @@ import {
   Eraser,
 } from 'lucide-react';
 import { VisionDoc } from '../types';
+import { GOAL_COLORS } from '../lib/visionUtils';
 
 interface PlannerPanelProps {
   docs: VisionDoc[];
@@ -147,7 +148,7 @@ export default function PlannerPanel({ docs, onAdd, onUpdate, onDelete, onClose 
                           d.id === selectedId ? 'bg-white shadow-sm ink-text' : 'ink-text-muted hover:bg-white/60 hover:ink-text'
                         }`}
                       >
-                        <FileText className="w-3.5 h-3.5 flex-none opacity-70" />
+                        <span className="w-2.5 h-2.5 rounded-full flex-none" style={{ background: d.color || '#0ea5e9' }} />
                         <span className="text-[13px] truncate">{d.title || 'Untitled'}</span>
                       </button>
                     ))
@@ -204,38 +205,29 @@ function DocEditor({
   onChange: (patch: Partial<VisionDoc>, persist: boolean) => void;
   onDelete: () => void;
 }) {
+  const summaryRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const [title, setTitle] = useState(doc.title);
+  const [color, setColor] = useState(doc.color || '#0ea5e9');
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [confirmDel, setConfirmDel] = useState(false);
-  const latest = useRef({ title: doc.title, content: doc.content });
+  const meta = useRef({ title: doc.title, color: doc.color || '#0ea5e9' });
   const saveTimer = useRef<number | undefined>(undefined);
   const savedTimer = useRef<number | undefined>(undefined);
 
-  const updateEmpty = () => {
-    const el = bodyRef.current;
+  const setEmpty = (el: HTMLDivElement | null) => {
     if (el) el.dataset.empty = el.textContent && el.textContent.trim() ? 'false' : 'true';
   };
 
-  // Seed the editor once; keyed by doc.id in the parent so switching docs remounts.
-  useEffect(() => {
-    if (bodyRef.current) {
-      bodyRef.current.innerHTML = doc.content || '';
-      updateEmpty();
-    }
-    return () => {
-      // Flush any pending edit when leaving this doc.
-      if (saveTimer.current) {
-        window.clearTimeout(saveTimer.current);
-        onChange({ ...latest.current }, true);
-      }
-      window.clearTimeout(savedTimer.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const snapshot = (): Partial<VisionDoc> => ({
+    title: meta.current.title,
+    color: meta.current.color,
+    summary: summaryRef.current?.innerHTML ?? '',
+    content: bodyRef.current?.innerHTML ?? '',
+  });
 
   const persistNow = () => {
-    onChange({ ...latest.current }, true);
+    onChange(snapshot(), true);
     setStatus('saved');
     window.clearTimeout(savedTimer.current);
     savedTimer.current = window.setTimeout(() => setStatus('idle'), 1500);
@@ -250,24 +242,44 @@ function DocEditor({
     }, 700);
   };
 
+  // Seed both editors once; keyed by doc.id in the parent so switching docs remounts.
+  useEffect(() => {
+    if (summaryRef.current) {
+      summaryRef.current.innerHTML = doc.summary || '';
+      setEmpty(summaryRef.current);
+    }
+    if (bodyRef.current) {
+      bodyRef.current.innerHTML = doc.content || '';
+      setEmpty(bodyRef.current);
+    }
+    return () => {
+      // Flush any pending edit when leaving this doc.
+      if (saveTimer.current) {
+        window.clearTimeout(saveTimer.current);
+        onChange(snapshot(), true);
+      }
+      window.clearTimeout(savedTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const onTitle = (v: string) => {
     setTitle(v);
-    latest.current.title = v;
+    meta.current.title = v;
     scheduleSave();
   };
 
-  const onBodyInput = () => {
-    const el = bodyRef.current;
-    if (el) latest.current.content = el.innerHTML;
-    updateEmpty();
-    scheduleSave();
+  const pickColor = (c: string) => {
+    setColor(c);
+    meta.current.color = c;
+    persistNow();
   };
 
+  // A single toolbar drives whichever section is focused (execCommand acts on the selection).
   const exec = (cmd: string, val?: string) => {
     document.execCommand(cmd, false, val);
-    bodyRef.current?.focus();
-    if (bodyRef.current) latest.current.content = bodyRef.current.innerHTML;
-    updateEmpty();
+    setEmpty(summaryRef.current);
+    setEmpty(bodyRef.current);
     scheduleSave();
   };
 
@@ -315,7 +327,7 @@ function DocEditor({
         </div>
       </div>
 
-      {/* toolbar */}
+      {/* toolbar + color swatches */}
       <div className="px-6 sm:px-10 py-2 mt-1 flex items-center gap-0.5 flex-wrap border-b border-black/5">
         <TB onClick={() => exec('bold')} title="Bold"><Bold className="w-4 h-4" /></TB>
         <TB onClick={() => exec('italic')} title="Italic"><Italic className="w-4 h-4" /></TB>
@@ -337,18 +349,54 @@ function DocEditor({
         >
           <Eraser className="w-4 h-4" />
         </TB>
+
+        <div className="ml-auto flex items-center gap-1.5 pl-2">
+          {GOAL_COLORS.map((c) => (
+            <button
+              key={c}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => pickColor(c)}
+              className="w-4 h-4 rounded-full transition-transform hover:scale-110"
+              style={{ background: c, boxShadow: c === color ? `0 0 0 2px #fff, 0 0 0 3.5px ${c}` : undefined }}
+              title="Doc color"
+            />
+          ))}
+        </div>
       </div>
 
-      {/* body */}
+      {/* objectives section + body */}
       <div className="flex-1 min-h-0 overflow-y-auto px-6 sm:px-10 py-5">
+        <div
+          className="rounded-2xl px-4 py-3 mb-5"
+          style={{ background: `${color}12`, border: `1px solid ${color}33`, borderLeft: `3px solid ${color}` }}
+        >
+          <div className="text-[11px] font-bold tracking-wider uppercase mb-1.5" style={{ color }}>
+            To do · objectives
+          </div>
+          <div
+            ref={summaryRef}
+            contentEditable
+            suppressContentEditableWarning
+            onInput={() => {
+              setEmpty(summaryRef.current);
+              scheduleSave();
+            }}
+            onBlur={persistNow}
+            data-placeholder="List what you need to get done…"
+            className="doc-body text-[14px] ink-text"
+          />
+        </div>
         <div
           ref={bodyRef}
           contentEditable
           suppressContentEditableWarning
-          onInput={onBodyInput}
+          onInput={() => {
+            setEmpty(bodyRef.current);
+            scheduleSave();
+          }}
           onBlur={persistNow}
-          data-placeholder="Start writing your plan…"
-          className="doc-body min-h-full text-[15px] ink-text"
+          data-placeholder="Write your action plan…"
+          className="doc-body min-h-[240px] text-[15px] ink-text"
         />
       </div>
     </div>

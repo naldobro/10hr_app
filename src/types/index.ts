@@ -112,8 +112,12 @@ export interface VisionDoc {
   /** Calendar month this doc belongs to, as 'YYYY-MM'. */
   month: string;
   title: string;
-  /** Rich text stored as HTML. */
+  /** Top "objectives / to-do" section, rich text (HTML). */
+  summary: string;
+  /** Main body, rich text (HTML). */
   content: string;
+  /** Accent color (hex). */
+  color: string;
   sort_order: number;
   created_at: string;
   updated_at: string;

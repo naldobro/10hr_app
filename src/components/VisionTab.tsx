@@ -564,7 +564,7 @@ export default function VisionTab() {
   // ---------- planner docs ----------
   const addDoc = async (month: string): Promise<string | null> => {
     const sort_order = docsRef.current.filter((d) => d.month === month).reduce((m, d) => Math.max(m, d.sort_order), 0) + 1;
-    const draft = { month, title: 'Untitled', content: '', sort_order };
+    const draft = { month, title: 'Untitled', summary: '', content: '', color: '#0ea5e9', sort_order };
     if (dbDown) {
       const local: VisionDoc = {
         id: 'local-' + Date.now(),
