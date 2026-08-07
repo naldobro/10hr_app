@@ -638,13 +638,22 @@ export default function VisionTab() {
   const goalRects = useMemo(
     () =>
       placedGoals.map((g, i) => ({
+        id: g.id,
         y: yForDeadline(g.deadline!),
         side: (i % 2 === 0 ? 'left' : 'right') as 'left' | 'right',
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [placedGoals, ppd, layoutH]
   );
-  // Vertical span (px) within which a milestone would clash with a goal card.
+  // Which side a goal's card is on, so an attached milestone can share that side.
+  const goalSideById = useMemo(() => {
+    const m = new Map<string, 'left' | 'right'>();
+    goalRects.forEach((r) => m.set(r.id, r.side));
+    return m;
+  }, [goalRects]);
+  // On phones there's no room for a milestone lane past the cards, so we dodge instead.
+  const wideLanes = viewportW >= 640;
+  // Vertical span (px) within which a milestone would clash with a goal card (phone dodge).
   const COLLIDE_T = viewportW < 640 ? 56 : 70;
 
   const ticks = useMemo(() => {
@@ -891,37 +900,40 @@ export default function VisionTab() {
             }}
           />
 
-          {/* ---- milestones: dot on the spine + horizontal connector out to a pill ---- */}
+          {/* ---- milestones: dot on the spine + connector out to a pill in the outer lane ---- */}
           {placedMilestones.map((g, i) => {
             const isDragging = drag?.id === g.id;
             const dl = isDragging && drag?.previewDeadline ? drag.previewDeadline : g.deadline!;
             const y = yForDeadline(dl);
             const c = msColor(g);
 
-            // Pick the side that has no goal card near this date so the pill stays visible.
-            const leftBusy = goalRects.some((r) => r.side === 'left' && Math.abs(r.y - y) < COLLIDE_T);
-            const rightBusy = goalRects.some((r) => r.side === 'right' && Math.abs(r.y - y) < COLLIDE_T);
             let side: 'left' | 'right';
-            let farOut = false;
-            if (!leftBusy && !rightBusy) side = i % 2 === 0 ? 'left' : 'right';
-            else if (!leftBusy) side = 'left';
-            else if (!rightBusy) side = 'right';
-            else {
-              // Both sides blocked — push the pill out past the goal card on its side.
-              side = i % 2 === 0 ? 'left' : 'right';
-              farOut = true;
+            let offset: number;
+            if (wideLanes) {
+              // Sit on the same side as the attached goal, in a lane past the cards.
+              const attachedSide = g.goal_id ? goalSideById.get(g.goal_id) : undefined;
+              side = attachedSide ?? (i % 2 === 0 ? 'left' : 'right');
+              offset = gap + cardW + 18;
+            } else {
+              // Phone: no room for an outer lane, so dodge to a side clear of goal cards.
+              const leftBusy = goalRects.some((r) => r.side === 'left' && Math.abs(r.y - y) < COLLIDE_T);
+              const rightBusy = goalRects.some((r) => r.side === 'right' && Math.abs(r.y - y) < COLLIDE_T);
+              if (!leftBusy && !rightBusy) side = i % 2 === 0 ? 'left' : 'right';
+              else if (!leftBusy) side = 'left';
+              else if (!rightBusy) side = 'right';
+              else side = i % 2 === 0 ? 'left' : 'right';
+              offset = gap;
             }
-            const offset = farOut ? gap + cardW + 16 : gap;
 
             return (
               <div key={g.id}>
-                {/* connector line from the spine out to the pill */}
+                {/* connector line from the spine out to the pill (runs behind the cards) */}
                 <div
                   className="absolute h-[2px] -translate-y-1/2"
                   style={{
                     top: y,
                     width: offset,
-                    zIndex: farOut ? 6 : 3,
+                    zIndex: 3,
                     opacity: 0.6,
                     ...(side === 'left'
                       ? { right: 'calc(50% + 2px)', background: `linear-gradient(270deg, ${c}, ${c}22)` }
@@ -930,13 +942,13 @@ export default function VisionTab() {
                 />
                 {/* dot on the spine */}
                 <div
-                  className="absolute left-1/2 w-2.5 h-2.5 rounded-full -translate-x-1/2 -translate-y-1/2"
+                  className="absolute left-1/2 w-3 h-3 rounded-full -translate-x-1/2 -translate-y-1/2"
                   style={{ top: y, zIndex: 4, background: c, boxShadow: `0 0 0 2px #fff, 0 0 8px 1px ${c}66` }}
                 />
                 {/* the milestone pill, at the far end of the connector */}
                 <div
                   onPointerDown={(e) => onItemPointerDown(e, g)}
-                  className="absolute -translate-y-1/2 flex items-center gap-1.5 rounded-full bg-white border border-black/5 shadow-sm px-2.5 py-1 cursor-grab active:cursor-grabbing select-none max-w-[46vw] sm:max-w-[220px]"
+                  className="absolute -translate-y-1/2 flex items-center gap-2 rounded-full bg-white border border-black/5 shadow-sm px-3.5 py-2 cursor-grab active:cursor-grabbing select-none max-w-[46vw] sm:max-w-[240px]"
                   style={{
                     top: y,
                     zIndex: isDragging ? 30 : 6,
@@ -945,11 +957,11 @@ export default function VisionTab() {
                     ...(side === 'left' ? { right: `calc(50% + ${offset + 2}px)` } : { left: `calc(50% + ${offset + 2}px)` }),
                   }}
                 >
-                  <Flag className="w-3 h-3 flex-none" style={{ color: c }} />
-                  <span className={`text-[11px] leading-none truncate ${g.done ? 'line-through ink-text-muted' : 'ink-text'}`}>
+                  <Flag className="w-4 h-4 flex-none" style={{ color: c }} />
+                  <span className={`text-[13px] leading-none truncate ${g.done ? 'line-through ink-text-muted' : 'ink-text'}`}>
                     {g.title}
                   </span>
-                  {g.done && <Check className="w-3 h-3 flex-none" strokeWidth={3} style={{ color: c }} />}
+                  {g.done && <Check className="w-4 h-4 flex-none" strokeWidth={3} style={{ color: c }} />}
                 </div>
               </div>
             );
