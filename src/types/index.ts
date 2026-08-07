@@ -105,3 +105,16 @@ export interface VisionSettings {
   reflections_subtitle: string;
   updated_at: string;
 }
+
+export interface VisionDoc {
+  id: string;
+  user_id: string;
+  /** Calendar month this doc belongs to, as 'YYYY-MM'. */
+  month: string;
+  title: string;
+  /** Rich text stored as HTML. */
+  content: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}

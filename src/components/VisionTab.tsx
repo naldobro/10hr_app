@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Flag, CalendarClock, X, Check, Minus, Undo2, Redo2, History, RotateCcw, Save, Heart, ShieldCheck, Menu } from 'lucide-react';
+import { Plus, Flag, CalendarClock, X, Check, Minus, Undo2, Redo2, History, RotateCcw, Save, Heart, ShieldCheck, Menu, NotebookPen } from 'lucide-react';
 import { db } from '../lib/database';
 import { undoManager } from '../lib/undoManager';
-import { VisionGoal, VisionSnapshot, VisionTopic } from '../types';
+import { VisionGoal, VisionSnapshot, VisionTopic, VisionDoc } from '../types';
 import {
   DAY,
   GOAL_COLORS,
@@ -19,6 +19,7 @@ import {
 import GoalDrawer from './GoalDrawer';
 import ReflectionsPanel from './ReflectionsPanel';
 import BackupModal from './BackupModal';
+import PlannerPanel from './PlannerPanel';
 
 // Single timeline; spacing (pixels-per-day) is user-adjustable to spread out cramped items.
 const PPD_MIN = 4;
@@ -78,7 +79,9 @@ export default function VisionTab() {
   const [restoreDate, setRestoreDate] = useState<string | null>(null);
   const [versionsBusy, setVersionsBusy] = useState(false);
   const [topics, setTopics] = useState<VisionTopic[]>([]);
+  const [docs, setDocs] = useState<VisionDoc[]>([]);
   const [showReflections, setShowReflections] = useState(false);
+  const [showPlanner, setShowPlanner] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
   const [trayOpen, setTrayOpen] = useState(false);
   const [viewportW, setViewportW] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1024));
@@ -116,6 +119,7 @@ export default function VisionTab() {
   const pCanvasRef = useRef<HTMLCanvasElement>(null);
   const goalsRef = useRef<VisionGoal[]>([]);
   const topicsRef = useRef<VisionTopic[]>([]);
+  const docsRef = useRef<VisionDoc[]>([]);
   const dimsRef = useRef({ w: 0, h: 0 });
   const particlesRef = useRef<Particle[]>([]);
   const burstsRef = useRef<Burst[]>([]);
@@ -129,6 +133,9 @@ export default function VisionTab() {
   });
   useEffect(() => {
     topicsRef.current = topics;
+  });
+  useEffect(() => {
+    docsRef.current = docs;
   });
   useEffect(() => {
     pausedRef.current = selectedId !== null;
@@ -179,6 +186,14 @@ export default function VisionTab() {
     }
   }, []);
 
+  const reloadDocs = useCallback(async () => {
+    try {
+      setDocs(await db.visionDocs.getAll());
+    } catch {
+      /* table may be absent until the vision_docs migration */
+    }
+  }, []);
+
   // ---------- load ----------
   useEffect(() => {
     (async () => {
@@ -194,6 +209,7 @@ export default function VisionTab() {
         setGoals(demoGoals());
       }
       reloadTopics();
+      reloadDocs();
       db.visionSettings
         .get()
         .then((s) => {
@@ -202,7 +218,7 @@ export default function VisionTab() {
         .catch(() => {});
       refreshUndo();
     })();
-  }, [refreshUndo, reloadTopics]);
+  }, [refreshUndo, reloadTopics, reloadDocs]);
 
   const openVersions = async () => {
     setShowVersions(true);
@@ -246,20 +262,20 @@ export default function VisionTab() {
   const handleUndo = useCallback(async () => {
     if (!undoManager.canUndo()) return;
     await undoManager.undo();
-    await Promise.all([reloadGoals(), reloadTopics()]);
+    await Promise.all([reloadGoals(), reloadTopics(), reloadDocs()]);
     refreshUndo();
     setToast('Undone');
     window.setTimeout(() => setToast(null), 1600);
-  }, [reloadGoals, reloadTopics, refreshUndo]);
+  }, [reloadGoals, reloadTopics, reloadDocs, refreshUndo]);
 
   const handleRedo = useCallback(async () => {
     if (!undoManager.canRedo()) return;
     await undoManager.redo();
-    await Promise.all([reloadGoals(), reloadTopics()]);
+    await Promise.all([reloadGoals(), reloadTopics(), reloadDocs()]);
     refreshUndo();
     setToast('Redone');
     window.setTimeout(() => setToast(null), 1600);
-  }, [reloadGoals, reloadTopics, refreshUndo]);
+  }, [reloadGoals, reloadTopics, reloadDocs, refreshUndo]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -545,6 +561,54 @@ export default function VisionTab() {
     }
   };
 
+  // ---------- planner docs ----------
+  const addDoc = async (month: string): Promise<string | null> => {
+    const sort_order = docsRef.current.filter((d) => d.month === month).reduce((m, d) => Math.max(m, d.sort_order), 0) + 1;
+    const draft = { month, title: 'Untitled', content: '', sort_order };
+    if (dbDown) {
+      const local: VisionDoc = {
+        id: 'local-' + Date.now(),
+        user_id: 'single-user',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        ...draft,
+      };
+      setDocs((p) => [...p, local]);
+      return local.id;
+    }
+    try {
+      const row = await db.visionDocs.add(draft);
+      setDocs((p) => [...p, row]);
+      undoManager.addToUndoHistory({ type: 'doc_add', doc: row, timestamp: Date.now() });
+      refreshUndo();
+      return row.id;
+    } catch {
+      flash('Could not create — run the vision_docs migration');
+      return null;
+    }
+  };
+
+  const updateDoc = (id: string, patch: Partial<VisionDoc>, persist: boolean) => {
+    setDocs((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+    if (persist && !dbDown) {
+      db.visionDocs
+        .update(id, patch)
+        .catch(() => flash('Could not save — run the vision_docs migration'));
+    }
+  };
+
+  const deleteDoc = (id: string) => {
+    const row = docsRef.current.find((d) => d.id === id);
+    setDocs((p) => p.filter((d) => d.id !== id));
+    if (!dbDown) {
+      db.visionDocs.delete(id).catch(() => flash('Delete failed'));
+      if (row) {
+        undoManager.addToUndoHistory({ type: 'doc_delete', doc: row, timestamp: Date.now() });
+        refreshUndo();
+      }
+    }
+  };
+
   // ---------- drag ----------
   const deadlineFromClientY = (clientY: number): string => {
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -752,6 +816,16 @@ export default function VisionTab() {
           title="Important points to keep in mind"
         >
           <Heart className="w-3.5 h-3.5 text-rose-500" /> Reflections
+        </button>
+        <button
+          onClick={() => {
+            setTrayOpen(false);
+            setShowPlanner(true);
+          }}
+          className="bg-white border border-black/10 ink-text-muted hover:ink-text font-semibold text-sm rounded-xl py-2 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
+          title="Month-by-month planning docs"
+        >
+          <NotebookPen className="w-3.5 h-3.5 text-sky-600" /> Planner
         </button>
         <button
           onClick={() => {
@@ -1136,6 +1210,17 @@ export default function VisionTab() {
           onUpdateTopic={updateTopic}
           onDeleteTopic={deleteTopic}
           onClose={() => setShowReflections(false)}
+        />
+      )}
+
+      {/* planner panel */}
+      {showPlanner && (
+        <PlannerPanel
+          docs={docs}
+          onAdd={addDoc}
+          onUpdate={updateDoc}
+          onDelete={deleteDoc}
+          onClose={() => setShowPlanner(false)}
         />
       )}
 

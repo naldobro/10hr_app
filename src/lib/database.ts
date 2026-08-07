@@ -8,6 +8,7 @@ import {
   VisionSnapshot,
   VisionTopic,
   VisionSettings,
+  VisionDoc,
 } from '../types';
 
 const snapshotRow = (g: VisionGoal) => ({
@@ -448,6 +449,74 @@ export const db = {
         .upsert({ user_id: SINGLE_USER_ID, ...patch, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
 
       if (error) throw error;
+    },
+  },
+
+  visionDocs: {
+    getAll: async (): Promise<VisionDoc[]> => {
+      const { data, error } = await supabase
+        .from('vision_docs')
+        .select('*')
+        .eq('user_id', SINGLE_USER_ID)
+        .order('month', { ascending: false })
+        .order('sort_order', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    },
+
+    add: async (
+      doc: Partial<Omit<VisionDoc, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
+    ): Promise<VisionDoc> => {
+      const { data, error } = await supabase
+        .from('vision_docs')
+        .insert([{ ...doc, user_id: SINGLE_USER_ID }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+
+    update: async (
+      id: string,
+      patch: Partial<Omit<VisionDoc, 'id' | 'user_id' | 'created_at'>>
+    ): Promise<VisionDoc> => {
+      const { data, error } = await supabase
+        .from('vision_docs')
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+
+    delete: async (id: string): Promise<void> => {
+      const { error } = await supabase.from('vision_docs').delete().eq('id', id);
+      if (error) throw error;
+    },
+
+    // Re-insert a previously-deleted doc keeping its id/content (used by undo).
+    restore: async (doc: VisionDoc): Promise<VisionDoc> => {
+      const { data, error } = await supabase
+        .from('vision_docs')
+        .insert([
+          {
+            id: doc.id,
+            user_id: SINGLE_USER_ID,
+            month: doc.month,
+            title: doc.title,
+            content: doc.content,
+            sort_order: doc.sort_order,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
     },
   },
 

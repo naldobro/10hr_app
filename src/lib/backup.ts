@@ -12,6 +12,7 @@ export const BACKUP_TABLES = [
   'vision_topics',
   'vision_snapshots',
   'vision_settings',
+  'vision_docs',
 ] as const;
 
 type Row = Record<string, unknown>;

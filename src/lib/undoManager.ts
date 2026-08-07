@@ -1,4 +1,4 @@
-import { WorkSession, VisionGoal, VisionTopic } from '../types';
+import { WorkSession, VisionGoal, VisionTopic, VisionDoc } from '../types';
 import { db } from './database';
 
 type UndoAction =
@@ -8,7 +8,9 @@ type UndoAction =
   | { type: 'vision_update'; before: VisionGoal; after: VisionGoal; timestamp: number }
   | { type: 'topic_add'; topic: VisionTopic; timestamp: number }
   | { type: 'topic_delete'; topic: VisionTopic; timestamp: number }
-  | { type: 'topic_update'; before: VisionTopic; after: VisionTopic; timestamp: number };
+  | { type: 'topic_update'; before: VisionTopic; after: VisionTopic; timestamp: number }
+  | { type: 'doc_add'; doc: VisionDoc; timestamp: number }
+  | { type: 'doc_delete'; doc: VisionDoc; timestamp: number };
 
 const visionFields = (g: VisionGoal) => ({
   kind: g.kind,
@@ -86,6 +88,10 @@ export const undoManager = {
       await db.visionTopics.restore(action.topic);
     } else if (action.type === 'topic_update') {
       await db.visionTopics.update(action.before.id, topicFields(action.before));
+    } else if (action.type === 'doc_add') {
+      await db.visionDocs.delete(action.doc.id);
+    } else if (action.type === 'doc_delete') {
+      await db.visionDocs.restore(action.doc);
     }
 
     const redoHistory = undoManager.getRedoHistory();
@@ -127,6 +133,10 @@ export const undoManager = {
       await db.visionTopics.delete(action.topic.id);
     } else if (action.type === 'topic_update') {
       await db.visionTopics.update(action.after.id, topicFields(action.after));
+    } else if (action.type === 'doc_add') {
+      await db.visionDocs.restore(action.doc);
+    } else if (action.type === 'doc_delete') {
+      await db.visionDocs.delete(action.doc.id);
     }
 
     const undoHistory = undoManager.getUndoHistory();

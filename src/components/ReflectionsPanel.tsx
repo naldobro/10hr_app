@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { X, Trash2, Plus, Heart } from 'lucide-react';
 import { Emotion, VisionTopic } from '../types';
 import { GOAL_COLORS } from '../lib/visionUtils';
@@ -38,10 +38,11 @@ export default function ReflectionsPanel({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[80]" onClick={onClose}>
       <div className="absolute inset-0 bg-black/30" />
+      <div className="absolute inset-x-0 bottom-0 top-[calc(100px+env(safe-area-inset-top))] md:top-[calc(90px+env(safe-area-inset-top))] flex items-center justify-center p-4">
       <div
-        className="relative paper-card rounded-2xl border border-black/10 shadow-2xl w-[min(1100px,96vw)] h-[min(680px,88vh)] flex flex-col"
+        className="relative paper-card rounded-2xl border border-black/10 shadow-2xl w-[min(1360px,97vw)] h-[880px] max-h-full flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -96,12 +97,13 @@ export default function ReflectionsPanel({
             ))}
             <button
               onClick={onAddTopic}
-              className="flex-none w-[150px] h-full rounded-2xl border border-dashed border-black/15 ink-text-muted hover:ink-text hover:border-stone-400 hover:bg-stone-50/50 flex flex-col items-center justify-center gap-2 text-sm font-semibold transition"
+              className="flex-none w-[184px] h-full rounded-2xl border border-dashed border-black/15 ink-text-muted hover:ink-text hover:border-stone-400 hover:bg-stone-50/50 flex flex-col items-center justify-center gap-2 text-sm font-semibold transition"
             >
               <Plus className="w-5 h-5" /> Add topic
             </button>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
@@ -129,7 +131,7 @@ function TopicColumn({
   };
 
   return (
-    <div className="flex-none w-[264px] h-full flex flex-col rounded-2xl border border-black/[0.07] bg-white overflow-hidden">
+    <div className="flex-none w-[328px] h-full flex flex-col rounded-2xl border border-black/[0.07] bg-white overflow-hidden">
       {/* column header */}
       <div className="px-3 py-3 border-b border-black/5 flex items-center gap-2" style={{ background: `${topic.color}12` }}>
         <button
@@ -142,7 +144,7 @@ function TopicColumn({
           value={topic.title}
           onChange={(e) => onUpdate({ title: e.target.value }, false)}
           onBlur={() => onUpdate({}, true)}
-          className="flex-1 bg-transparent outline-none font-bold text-[15px] ink-text min-w-0"
+          className="flex-1 bg-transparent outline-none font-bold text-[17px] ink-text min-w-0"
           placeholder="Topic…"
         />
         {confirmDel ? (
@@ -235,14 +237,32 @@ function EmotionCard({
   // Keep the draft in sync when the emotion changes from elsewhere (e.g. undo/redo).
   useEffect(() => setText(em.text), [em.text]);
 
-  const grow = () => {
+  const grow = useCallback(() => {
     const el = ref.current;
     if (el) {
       el.style.height = 'auto';
       el.style.height = el.scrollHeight + 'px';
     }
-  };
-  useEffect(grow, [text]);
+  }, []);
+
+  // Size to content before paint whenever the text changes.
+  useLayoutEffect(() => {
+    grow();
+  }, [text, grow]);
+
+  // Re-measure when the column width changes or the web font finishes loading —
+  // both change how the text wraps, and measuring too early would clip lines.
+  useEffect(() => {
+    grow();
+    let ro: ResizeObserver | undefined;
+    if (ref.current && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => grow());
+      ro.observe(ref.current);
+    }
+    const fonts = (document as Document & { fonts?: { ready: Promise<unknown> } }).fonts;
+    if (fonts?.ready) fonts.ready.then(grow).catch(() => {});
+    return () => ro?.disconnect();
+  }, [grow]);
 
   const dirty = text !== em.text;
 
@@ -275,7 +295,7 @@ function EmotionCard({
           grow();
         }}
         placeholder="Write a reminder…"
-        className="w-full bg-transparent outline-none resize-none overflow-hidden text-[13.5px] leading-snug font-medium"
+        className="w-full bg-transparent outline-none resize-none overflow-hidden text-[15px] leading-relaxed font-medium"
         style={{ color: em.color }}
       />
       {dirty && (
