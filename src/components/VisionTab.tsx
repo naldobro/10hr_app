@@ -562,9 +562,12 @@ export default function VisionTab() {
   };
 
   // ---------- planner docs ----------
-  const addDoc = async (month: string): Promise<string | null> => {
-    const sort_order = docsRef.current.filter((d) => d.month === month).reduce((m, d) => Math.max(m, d.sort_order), 0) + 1;
-    const draft = { month, title: 'Untitled', summary: '', content: '', color: '#0ea5e9', sort_order };
+  const addDoc = async (notebook: string, month: string): Promise<string | null> => {
+    const sort_order =
+      docsRef.current
+        .filter((d) => (d.notebook || 'Planner') === notebook && d.month === month)
+        .reduce((m, d) => Math.max(m, d.sort_order), 0) + 1;
+    const draft = { notebook, month, title: 'Untitled', summary: '', content: '', color: '#0ea5e9', sort_order };
     if (dbDown) {
       const local: VisionDoc = {
         id: 'local-' + Date.now(),
@@ -577,7 +580,10 @@ export default function VisionTab() {
       return local.id;
     }
     try {
-      const row = await db.visionDocs.add(draft);
+      // The built-in Planner relies on the column default so adds keep working even
+      // before the notebook migration is applied; other notebooks need the column.
+      const { notebook: nb, ...base } = draft;
+      const row = await db.visionDocs.add(nb === 'Planner' ? base : draft);
       setDocs((p) => [...p, row]);
       undoManager.addToUndoHistory({ type: 'doc_add', doc: row, timestamp: Date.now() });
       refreshUndo();

@@ -506,6 +506,7 @@ export const db = {
           {
             id: doc.id,
             user_id: SINGLE_USER_ID,
+            notebook: doc.notebook,
             month: doc.month,
             title: doc.title,
             summary: doc.summary,

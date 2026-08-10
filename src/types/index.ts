@@ -109,7 +109,9 @@ export interface VisionSettings {
 export interface VisionDoc {
   id: string;
   user_id: string;
-  /** Calendar month this doc belongs to, as 'YYYY-MM'. */
+  /** Notebook this doc belongs to. The built-in month-based one is 'Planner'; others are freeform. */
+  notebook: string;
+  /** Calendar month this doc belongs to, as 'YYYY-MM' (empty for freeform notebooks). */
   month: string;
   title: string;
   /** Top "objectives / to-do" section, rich text (HTML). */
