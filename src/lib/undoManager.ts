@@ -1,6 +1,8 @@
-import { WorkSession, VisionGoal, VisionTopic, VisionDoc } from '../types';
+import { WorkSession, VisionGoal, VisionTopic } from '../types';
 import { db } from './database';
 
+// NOTE: Planner docs are deliberately NOT part of this undo stack. They use a Trash
+// (soft-delete) instead, so a blind undo can never hard-delete a page you've filled in.
 type UndoAction =
   | { type: 'add_session' | 'delete_session'; sessionData: WorkSession; timestamp: number }
   | { type: 'vision_add'; row: VisionGoal; timestamp: number }
@@ -8,9 +10,7 @@ type UndoAction =
   | { type: 'vision_update'; before: VisionGoal; after: VisionGoal; timestamp: number }
   | { type: 'topic_add'; topic: VisionTopic; timestamp: number }
   | { type: 'topic_delete'; topic: VisionTopic; timestamp: number }
-  | { type: 'topic_update'; before: VisionTopic; after: VisionTopic; timestamp: number }
-  | { type: 'doc_add'; doc: VisionDoc; timestamp: number }
-  | { type: 'doc_delete'; doc: VisionDoc; timestamp: number };
+  | { type: 'topic_update'; before: VisionTopic; after: VisionTopic; timestamp: number };
 
 const visionFields = (g: VisionGoal) => ({
   kind: g.kind,
@@ -36,14 +36,18 @@ const REDO_STORAGE_KEY = 'redo_history';
 const MAX_HISTORY = 20;
 
 export const undoManager = {
+  // Legacy 'doc_add'/'doc_delete' entries (from before docs moved to Trash) are dropped
+  // so a stale undo stack can never delete a page again.
   getUndoHistory: (): UndoAction[] => {
     const data = localStorage.getItem(UNDO_STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    const all = data ? JSON.parse(data) : [];
+    return all.filter((a: { type: string }) => !a.type.startsWith('doc_'));
   },
 
   getRedoHistory: (): UndoAction[] => {
     const data = localStorage.getItem(REDO_STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    const all = data ? JSON.parse(data) : [];
+    return all.filter((a: { type: string }) => !a.type.startsWith('doc_'));
   },
 
   addToUndoHistory: (action: UndoAction): void => {
@@ -88,10 +92,6 @@ export const undoManager = {
       await db.visionTopics.restore(action.topic);
     } else if (action.type === 'topic_update') {
       await db.visionTopics.update(action.before.id, topicFields(action.before));
-    } else if (action.type === 'doc_add') {
-      await db.visionDocs.delete(action.doc.id);
-    } else if (action.type === 'doc_delete') {
-      await db.visionDocs.restore(action.doc);
     }
 
     const redoHistory = undoManager.getRedoHistory();
@@ -133,10 +133,6 @@ export const undoManager = {
       await db.visionTopics.delete(action.topic.id);
     } else if (action.type === 'topic_update') {
       await db.visionTopics.update(action.after.id, topicFields(action.after));
-    } else if (action.type === 'doc_add') {
-      await db.visionDocs.restore(action.doc);
-    } else if (action.type === 'doc_delete') {
-      await db.visionDocs.delete(action.doc.id);
     }
 
     const undoHistory = undoManager.getUndoHistory();

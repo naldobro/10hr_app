@@ -80,6 +80,7 @@ export default function VisionTab() {
   const [versionsBusy, setVersionsBusy] = useState(false);
   const [topics, setTopics] = useState<VisionTopic[]>([]);
   const [docs, setDocs] = useState<VisionDoc[]>([]);
+  const [trashDocs, setTrashDocs] = useState<VisionDoc[]>([]);
   const [showReflections, setShowReflections] = useState(false);
   const [showPlanner, setShowPlanner] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
@@ -188,7 +189,10 @@ export default function VisionTab() {
 
   const reloadDocs = useCallback(async () => {
     try {
-      setDocs(await db.visionDocs.getAll());
+      const rows = await db.visionDocs.getAll();
+      // Rows with a deleted_at are in the Trash; keep them separate from live docs.
+      setDocs(rows.filter((r) => !r.deleted_at));
+      setTrashDocs(rows.filter((r) => r.deleted_at));
     } catch {
       /* table may be absent until the vision_docs migration */
     }
@@ -585,8 +589,6 @@ export default function VisionTab() {
       const { notebook: nb, ...base } = draft;
       const row = await db.visionDocs.add(nb === 'Planner' ? base : draft);
       setDocs((p) => [...p, row]);
-      undoManager.addToUndoHistory({ type: 'doc_add', doc: row, timestamp: Date.now() });
-      refreshUndo();
       return row.id;
     } catch {
       flash('Could not create — run the vision_docs migration');
@@ -603,16 +605,31 @@ export default function VisionTab() {
     }
   };
 
+  // Soft-delete: move the page to the Trash instead of erasing it.
   const deleteDoc = (id: string) => {
     const row = docsRef.current.find((d) => d.id === id);
+    const when = new Date().toISOString();
     setDocs((p) => p.filter((d) => d.id !== id));
+    if (row) setTrashDocs((p) => [{ ...row, deleted_at: when }, ...p]);
     if (!dbDown) {
-      db.visionDocs.delete(id).catch(() => flash('Delete failed'));
-      if (row) {
-        undoManager.addToUndoHistory({ type: 'doc_delete', doc: row, timestamp: Date.now() });
-        refreshUndo();
-      }
+      db.visionDocs.update(id, { deleted_at: when }).catch(() => flash('Delete failed — run the trash migration'));
     }
+  };
+
+  // Bring a page back from the Trash.
+  const restoreDoc = (id: string) => {
+    setTrashDocs((p) => {
+      const row = p.find((d) => d.id === id);
+      if (row) setDocs((cur) => [...cur, { ...row, deleted_at: null }]);
+      return p.filter((d) => d.id !== id);
+    });
+    if (!dbDown) db.visionDocs.update(id, { deleted_at: null }).catch(() => flash('Restore failed'));
+  };
+
+  // Permanently remove a page from the Trash (this one really is gone).
+  const purgeDoc = (id: string) => {
+    setTrashDocs((p) => p.filter((d) => d.id !== id));
+    if (!dbDown) db.visionDocs.delete(id).catch(() => flash('Delete failed'));
   };
 
   // ---------- drag ----------
@@ -1223,9 +1240,12 @@ export default function VisionTab() {
       {showPlanner && (
         <PlannerPanel
           docs={docs}
+          trashDocs={trashDocs}
           onAdd={addDoc}
           onUpdate={updateDoc}
           onDelete={deleteDoc}
+          onRestore={restoreDoc}
+          onPurge={purgeDoc}
           onClose={() => setShowPlanner(false)}
         />
       )}

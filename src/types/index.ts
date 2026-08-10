@@ -121,6 +121,8 @@ export interface VisionDoc {
   /** Accent color (hex). */
   color: string;
   sort_order: number;
+  /** When set, the doc is in the Trash (soft-deleted) rather than gone. */
+  deleted_at?: string | null;
   created_at: string;
   updated_at: string;
 }

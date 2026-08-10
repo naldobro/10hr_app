@@ -28,16 +28,21 @@ import {
   GripVertical,
   BookOpen,
   CalendarDays,
+  RotateCcw,
 } from 'lucide-react';
 import { VisionDoc } from '../types';
 import { GOAL_COLORS } from '../lib/visionUtils';
 
 interface PlannerPanelProps {
   docs: VisionDoc[];
+  /** Soft-deleted docs, available to restore or remove for good. */
+  trashDocs: VisionDoc[];
   /** Create a doc in the given notebook + month; resolves with the new id (or null on failure). */
   onAdd: (notebook: string, month: string) => Promise<string | null>;
   onUpdate: (id: string, patch: Partial<VisionDoc>, persist: boolean) => void;
   onDelete: (id: string) => void;
+  onRestore: (id: string) => void;
+  onPurge: (id: string) => void;
   onClose: () => void;
 }
 
@@ -61,9 +66,20 @@ const FONT_SIZES: { label: string; size: string; px: string }[] = [
 const TEXT_COLORS = ['#1c1917', '#78716c', '#e11d48', '#d97706', '#059669', '#2563eb', '#7c3aed'];
 const HILITE_COLORS = ['#fef08a', '#bbf7d0', '#bfdbfe', '#fbcfe8', '#fed7aa', '#e9d5ff'];
 
-export default function PlannerPanel({ docs, onAdd, onUpdate, onDelete, onClose }: PlannerPanelProps) {
+export default function PlannerPanel({
+  docs,
+  trashDocs,
+  onAdd,
+  onUpdate,
+  onDelete,
+  onRestore,
+  onPurge,
+  onClose,
+}: PlannerPanelProps) {
   const currentMonth = monthKey(new Date());
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showTrash, setShowTrash] = useState(false);
+  const [confirmPurge, setConfirmPurge] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [notebook, setNotebook] = useState(PLANNER);
@@ -480,16 +496,107 @@ export default function PlannerPanel({ docs, onAdd, onUpdate, onDelete, onClose 
               </div>
             )}
           </div>
+
+          {/* trash entry */}
+          <button
+            onClick={() => setShowTrash(true)}
+            className={`flex items-center justify-between gap-2 px-4 py-2.5 border-t border-black/5 text-[13px] transition ${
+              showTrash ? 'bg-white ink-text' : 'ink-text-muted hover:ink-text hover:bg-white/50'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <Trash2 className="w-4 h-4" /> Trash
+            </span>
+            {trashDocs.length > 0 && (
+              <span className="text-[11px] font-bold bg-stone-200 ink-text rounded-full px-1.5 py-0.5 leading-none">
+                {trashDocs.length}
+              </span>
+            )}
+          </button>
         </aside>
 
         {/* ---------- editor ---------- */}
         <div className="flex-1 min-w-0 flex flex-col">
-          <div className="flex justify-end px-3 pt-3">
+          <div className="flex justify-between items-center px-3 pt-3">
+            {showTrash ? (
+              <button
+                onClick={() => setShowTrash(false)}
+                className="text-[13px] font-semibold ink-text-muted hover:ink-text px-2 py-1 rounded-lg hover:bg-stone-100 transition"
+              >
+                ← Back
+              </button>
+            ) : (
+              <span />
+            )}
             <button onClick={onClose} className="p-1.5 rounded-lg ink-text-muted hover:bg-stone-100 transition" title="Close">
               <X className="w-5 h-5" />
             </button>
           </div>
-          {doc ? (
+          {showTrash ? (
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 sm:px-10 py-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Trash2 className="w-5 h-5 ink-text-muted" />
+                <h2 className="text-xl font-bold ink-text">Trash</h2>
+              </div>
+              <p className="text-[13px] ink-text-muted mb-5">
+                Deleted pages wait here — restore anything you removed by accident. Only “Delete forever” erases a page.
+              </p>
+              {trashDocs.length === 0 ? (
+                <div className="text-sm ink-text-muted/70 py-12 text-center">Trash is empty.</div>
+              ) : (
+                <div className="space-y-2">
+                  {trashDocs.map((d) => (
+                    <div
+                      key={d.id}
+                      className="flex items-center gap-3 rounded-xl border border-black/5 bg-white/60 px-3.5 py-2.5"
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full flex-none" style={{ background: d.color || '#0ea5e9' }} />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[14px] ink-text truncate">{d.title || 'Untitled'}</div>
+                        <div className="text-[11px] ink-text-muted truncate">
+                          {bookOf(d)}
+                          {d.deleted_at ? ` · deleted ${new Date(d.deleted_at).toLocaleDateString()}` : ''}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => onRestore(d.id)}
+                        className="flex-none flex items-center gap-1 text-[12px] font-semibold ink-text-muted hover:ink-text px-2 py-1 rounded-lg hover:bg-stone-100 transition"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" /> Restore
+                      </button>
+                      {confirmPurge === d.id ? (
+                        <div className="flex-none flex items-center gap-1">
+                          <button
+                            onClick={() => {
+                              onPurge(d.id);
+                              setConfirmPurge(null);
+                            }}
+                            className="text-[12px] font-bold text-red-600 px-2 py-1 rounded hover:bg-red-50 transition"
+                          >
+                            Delete forever
+                          </button>
+                          <button
+                            onClick={() => setConfirmPurge(null)}
+                            className="text-[12px] ink-text-muted px-1.5 py-1 rounded hover:bg-stone-100 transition"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmPurge(d.id)}
+                          title="Delete forever"
+                          className="flex-none p-1.5 rounded-lg ink-text-muted hover:text-red-600 hover:bg-red-50 transition"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : doc ? (
             <DocEditor
               key={doc.id}
               doc={doc}
