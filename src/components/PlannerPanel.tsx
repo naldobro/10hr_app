@@ -78,6 +78,8 @@ export default function PlannerPanel({
 }: PlannerPanelProps) {
   const currentMonth = monthKey(new Date());
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // On phones the rail and editor can't sit side-by-side, so we show one at a time.
+  const [mobilePane, setMobilePane] = useState<'rail' | 'editor'>('rail');
   const [showTrash, setShowTrash] = useState(false);
   const [confirmPurge, setConfirmPurge] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -154,9 +156,16 @@ export default function PlannerPanel({
     return () => document.removeEventListener('mousedown', onDown);
   }, [nbMenu]);
 
+  // Open a page and, on mobile, slide over to the editor pane.
+  const openDoc = (id: string) => {
+    setSelectedId(id);
+    setShowTrash(false);
+    setMobilePane('editor');
+  };
+
   const handleAdd = async (month: string) => {
     const id = await onAdd(notebook, isMonthly ? month : '');
-    if (id) setSelectedId(id);
+    if (id) openDoc(id);
   };
 
   const createNotebook = async () => {
@@ -254,7 +263,7 @@ export default function PlannerPanel({
       >
         <GripVertical className="w-3.5 h-3.5 flex-none ml-1.5 ink-text-muted/40 group-hover:ink-text-muted cursor-grab active:cursor-grabbing" />
         <button
-          onClick={() => setSelectedId(d.id)}
+          onClick={() => openDoc(d.id)}
           className={`flex-1 min-w-0 flex items-center gap-2 pl-1 pr-1 py-1.5 text-left ${
             d.id === selectedId ? 'ink-text' : 'ink-text-muted group-hover:ink-text'
           }`}
@@ -262,7 +271,7 @@ export default function PlannerPanel({
           <span className="w-2.5 h-2.5 rounded-full flex-none" style={{ background: d.color || '#0ea5e9' }} />
           <span className="text-[13px] truncate">{d.title || 'Untitled'}</span>
         </button>
-        <div className="flex-none flex flex-col opacity-0 group-hover:opacity-100 transition pr-1">
+        <div className="flex-none flex flex-col opacity-100 md:opacity-0 md:group-hover:opacity-100 transition pr-1">
           <button
             onClick={() => moveDoc(d.id, -1)}
             disabled={i === 0}
@@ -312,13 +321,17 @@ export default function PlannerPanel({
         .doc-body ul.doc-tasks li.doc-task[data-checked="true"]::after { content: ''; position: absolute; left: .35em; top: .28em; width: .28em; height: .55em; border: solid #fff; border-width: 0 .16em .16em 0; transform: rotate(45deg); pointer-events: none; }
         .doc-body ul.doc-tasks li.doc-task[data-checked="true"] { color: #a8a29e; text-decoration: line-through; }
       `}</style>
-      <div className="absolute inset-x-0 bottom-0 top-[calc(100px+env(safe-area-inset-top))] md:top-[calc(90px+env(safe-area-inset-top))] flex items-center justify-center p-4">
+      <div className="absolute inset-x-0 bottom-0 top-[calc(100px+env(safe-area-inset-top))] md:top-[calc(90px+env(safe-area-inset-top))] flex items-center justify-center p-2 sm:p-4">
       <div
         className="relative paper-card rounded-2xl border border-black/10 shadow-2xl w-[min(1100px,96vw)] h-[820px] max-h-full flex overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ---------- notebook rail ---------- */}
-        <aside className="w-[248px] flex-none flex flex-col border-r border-black/5 bg-amber-50/40">
+        <aside
+          className={`w-full md:w-[248px] flex-none flex-col border-r border-black/5 bg-amber-50/40 ${
+            mobilePane === 'editor' ? 'hidden md:flex' : 'flex'
+          }`}
+        >
           {/* notebook switcher */}
           <div className="relative border-b border-black/5" data-nb-root>
             <button
@@ -499,7 +512,10 @@ export default function PlannerPanel({
 
           {/* trash entry */}
           <button
-            onClick={() => setShowTrash(true)}
+            onClick={() => {
+              setShowTrash(true);
+              setMobilePane('editor');
+            }}
             className={`flex items-center justify-between gap-2 px-4 py-2.5 border-t border-black/5 text-[13px] transition ${
               showTrash ? 'bg-white ink-text' : 'ink-text-muted hover:ink-text hover:bg-white/50'
             }`}
@@ -516,17 +532,27 @@ export default function PlannerPanel({
         </aside>
 
         {/* ---------- editor ---------- */}
-        <div className="flex-1 min-w-0 flex flex-col">
+        <div
+          className={`flex-1 min-w-0 flex-col ${mobilePane === 'rail' ? 'hidden md:flex' : 'flex'}`}
+        >
           <div className="flex justify-between items-center px-3 pt-3">
             {showTrash ? (
               <button
-                onClick={() => setShowTrash(false)}
+                onClick={() => {
+                  setShowTrash(false);
+                  setMobilePane('rail');
+                }}
                 className="text-[13px] font-semibold ink-text-muted hover:ink-text px-2 py-1 rounded-lg hover:bg-stone-100 transition"
               >
                 ← Back
               </button>
             ) : (
-              <span />
+              <button
+                onClick={() => setMobilePane('rail')}
+                className="md:hidden flex items-center gap-1 text-[13px] font-semibold ink-text-muted hover:ink-text px-2 py-1 rounded-lg hover:bg-stone-100 transition"
+              >
+                ← Pages
+              </button>
             )}
             <button onClick={onClose} className="p-1.5 rounded-lg ink-text-muted hover:bg-stone-100 transition" title="Close">
               <X className="w-5 h-5" />
