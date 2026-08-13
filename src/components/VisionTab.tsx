@@ -17,6 +17,7 @@ import {
   Urgency,
 } from '../lib/visionUtils';
 import GoalDrawer from './GoalDrawer';
+import FocusCard from './FocusCard';
 import ReflectionsPanel from './ReflectionsPanel';
 import BackupModal from './BackupModal';
 import PlannerPanel from './PlannerPanel';
@@ -94,6 +95,11 @@ export default function VisionTab() {
   useEffect(() => {
     reflHeadingRef.current = reflHeading;
   });
+  // "What I'm focusing on right now" note (top-right Focus card). Mirrored to
+  // localStorage so it survives even before the vision_settings focus migration runs.
+  const [focusNote, setFocusNote] = useState(() =>
+    typeof localStorage !== 'undefined' ? localStorage.getItem('vision_focus_note') || '' : ''
+  );
   const [ppd, setPpd] = useState<number>(() => {
     const saved = Number(localStorage.getItem('vision_ppd'));
     return saved >= PPD_MIN && saved <= PPD_MAX ? saved : PPD_DEFAULT;
@@ -217,7 +223,10 @@ export default function VisionTab() {
       db.visionSettings
         .get()
         .then((s) => {
-          if (s) setReflHeading({ title: s.reflections_title, subtitle: s.reflections_subtitle });
+          if (s) {
+            setReflHeading({ title: s.reflections_title, subtitle: s.reflections_subtitle });
+            if (s.focus_note != null) setFocusNote(s.focus_note);
+          }
         })
         .catch(() => {});
       refreshUndo();
@@ -562,6 +571,16 @@ export default function VisionTab() {
       db.visionSettings
         .upsert({ reflections_title: after.title, reflections_subtitle: after.subtitle })
         .catch(() => flash('Could not save — run the vision_settings migration'));
+    }
+  };
+
+  const updateFocusNote = (text: string, persist: boolean) => {
+    setFocusNote(text);
+    localStorage.setItem('vision_focus_note', text);
+    if (persist && !dbDown) {
+      db.visionSettings
+        .upsert({ focus_note: text })
+        .catch(() => flash('Could not save — run the vision_settings focus migration'));
     }
   };
 
@@ -1194,6 +1213,9 @@ export default function VisionTab() {
           </div>
         </div>
       </div>
+
+      {/* focus note — top-right, hidden while a goal drawer is open */}
+      <FocusCard text={focusNote} onChange={updateFocusNote} hidden={!!selectedGoal} />
 
       {/* floating ghost while dragging from tray */}
       {drag?.mode === 'tray' && (

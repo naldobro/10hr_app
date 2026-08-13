@@ -103,6 +103,8 @@ export interface VisionSettings {
   user_id: string;
   reflections_title: string;
   reflections_subtitle: string;
+  /** Free-text "what I'm focusing on right now" note, shown in the Focus card. */
+  focus_note: string;
   updated_at: string;
 }
 

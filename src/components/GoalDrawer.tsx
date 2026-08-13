@@ -21,7 +21,8 @@ export default function GoalDrawer({ goal, attachOptions, onChange, onDelete, on
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const [noteExpanded, setNoteExpanded] = useState(false);
+  // Expanded by default so the note fills the drawer — no need to hit "Expand" each time.
+  const [noteExpanded, setNoteExpanded] = useState(true);
   const isMilestone = goal.kind === 'milestone';
   const linked = attachOptions.find((o) => o.id === goal.goal_id);
   const accent = isMilestone ? (linked ? linked.color : MILESTONE_NEUTRAL) : goal.color;
@@ -135,7 +136,7 @@ export default function GoalDrawer({ goal, attachOptions, onChange, onDelete, on
         )}
 
         {!isMilestone && (
-          <div>
+          <div className={noteExpanded ? 'flex flex-col flex-1 min-h-0' : ''}>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-[11px] tracking-wider uppercase ink-text-muted font-bold">Why this matters</label>
               <button
@@ -151,8 +152,8 @@ export default function GoalDrawer({ goal, attachOptions, onChange, onDelete, on
               onChange={(e) => onChange({ note: e.target.value }, false)}
               onBlur={() => onChange({}, true)}
               placeholder="The reason you'll push through…"
-              className="drawer-input resize-none transition-[height] duration-200"
-              style={{ height: noteExpanded ? '52vh' : 128 }}
+              className={`drawer-input resize-none transition-[height] duration-200 ${noteExpanded ? 'flex-1 min-h-[180px]' : ''}`}
+              style={noteExpanded ? undefined : { height: 128 }}
             />
           </div>
         )}
