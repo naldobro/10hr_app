@@ -1,4 +1,5 @@
-import { ChevronLeft, ChevronRight, Flame, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Flame, Sparkles, Moon, Sun } from 'lucide-react';
+import { useTheme } from '../lib/theme';
 
 type Tab = 'track' | 'statistics' | 'vision';
 
@@ -19,6 +20,9 @@ export default function Navigation({
   streakDays,
   canGoNext,
 }: NavigationProps) {
+  const { theme, toggleTheme } = useTheme();
+  const ThemeIcon = theme === 'dark' ? Sun : Moon;
+  const themeLabel = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
   return (
     <nav
       className="fixed top-0 left-0 right-0 z-50 paper-card paper-border paper-shadow"
@@ -52,6 +56,14 @@ export default function Navigation({
                 <Flame className="w-4 h-4 text-amber-600" />
                 <span className="text-base font-bold ink-text">{streakDays}</span>
               </div>
+              <button
+                onClick={toggleTheme}
+                aria-label={themeLabel}
+                title={themeLabel}
+                className="p-1.5 rounded-lg hover:bg-amber-50 transition-all active:scale-95"
+              >
+                <ThemeIcon className="w-5 h-5 ink-text-muted" />
+              </button>
               <img src="/profile.png" alt="profile" className="w-8 h-8 rounded-full object-cover" />
             </div>
           </div>
@@ -160,6 +172,14 @@ export default function Navigation({
                 </div>
               </div>
             </div>
+            <button
+              onClick={toggleTheme}
+              aria-label={themeLabel}
+              title={themeLabel}
+              className="p-2 rounded-lg hover:bg-amber-50 transition-all hover:scale-105 active:scale-95"
+            >
+              <ThemeIcon className="w-5 h-5 lg:w-6 lg:h-6 ink-text-muted" />
+            </button>
             <img src="/profile.png" alt="profile" className="w-9 h-9 lg:w-10 lg:h-10 rounded-full object-cover" />
           </div>
         </div>

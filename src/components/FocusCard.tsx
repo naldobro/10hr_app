@@ -57,7 +57,7 @@ export default function FocusCard({ text, onChange, hidden }: FocusCardProps) {
       <style>{`@keyframes focusIn { from { opacity: 0; transform: translateY(-8px) scale(0.98); } to { opacity: 1; transform: none; } }`}</style>
 
       {/* header */}
-      <div className="flex items-center justify-between pl-3 pr-2 py-2 border-b border-black/5 bg-white/40">
+      <div className="flex items-center justify-between pl-3 pr-2 py-2 border-b border-black/5 dark:border-white/[0.13] bg-white/40 dark:bg-paper/40">
         <div className="flex items-center gap-2">
           <span
             className="grid place-items-center w-6 h-6 rounded-lg"

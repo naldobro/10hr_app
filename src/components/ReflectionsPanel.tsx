@@ -42,11 +42,11 @@ export default function ReflectionsPanel({
       <div className="absolute inset-0 bg-black/30" />
       <div className="absolute inset-x-0 bottom-0 top-[calc(100px+env(safe-area-inset-top))] md:top-[calc(90px+env(safe-area-inset-top))] flex items-center justify-center p-4">
       <div
-        className="relative paper-card rounded-2xl border border-black/10 shadow-2xl w-[min(1360px,97vw)] h-[880px] max-h-full flex flex-col"
+        className="relative paper-card rounded-2xl border border-black/10 dark:border-white/[0.2] shadow-2xl w-[min(1360px,97vw)] h-[880px] max-h-full flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 pt-5 pb-4 border-b border-black/5 flex items-start justify-between gap-4">
+        <div className="px-5 pt-5 pb-4 border-b border-black/5 dark:border-white/[0.13] flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <Heart className="w-5 h-5 text-rose-500 flex-none" />
@@ -97,7 +97,7 @@ export default function ReflectionsPanel({
             ))}
             <button
               onClick={onAddTopic}
-              className="flex-none w-[184px] h-full rounded-2xl border border-dashed border-black/15 ink-text-muted hover:ink-text hover:border-stone-400 hover:bg-stone-50/50 flex flex-col items-center justify-center gap-2 text-sm font-semibold transition"
+              className="flex-none w-[184px] h-full rounded-2xl border border-dashed border-black/15 dark:border-white/[0.27] ink-text-muted hover:ink-text hover:border-stone-400 hover:bg-stone-50/50 flex flex-col items-center justify-center gap-2 text-sm font-semibold transition"
             >
               <Plus className="w-5 h-5" /> Add topic
             </button>
@@ -131,9 +131,9 @@ function TopicColumn({
   };
 
   return (
-    <div className="flex-none w-[328px] h-full flex flex-col rounded-2xl border border-black/[0.07] bg-white overflow-hidden">
+    <div className="flex-none w-[328px] h-full flex flex-col rounded-2xl border border-black/[0.07] dark:border-white/[0.13] bg-white dark:bg-paper overflow-hidden">
       {/* column header */}
-      <div className="px-3 py-3 border-b border-black/5 flex items-center gap-2" style={{ background: `${topic.color}12` }}>
+      <div className="px-3 py-3 border-b border-black/5 dark:border-white/[0.13] flex items-center gap-2" style={{ background: `${topic.color}12` }}>
         <button
           onClick={() => onUpdate({ color: nextColor(topic.color) }, true)}
           className="w-4 h-4 rounded-full flex-none"
@@ -188,7 +188,7 @@ function TopicColumn({
       </div>
 
       {/* add emotion */}
-      <div className="p-3 border-t border-black/5 flex flex-col gap-2">
+      <div className="p-3 border-t border-black/5 dark:border-white/[0.13] flex flex-col gap-2">
         <div className="flex gap-1.5">
           {GOAL_COLORS.map((c) => (
             <button
@@ -207,7 +207,7 @@ function TopicColumn({
               if (e.key === 'Enter') addEmotion();
             }}
             placeholder="Add a feeling…"
-            className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg bg-stone-50 border border-black/[0.07] outline-none focus:border-stone-400 ink-text"
+            className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg bg-stone-50 border border-black/[0.07] dark:border-white/[0.13] outline-none focus:border-stone-400 ink-text"
           />
           <button
             onClick={addEmotion}
@@ -299,7 +299,7 @@ function EmotionCard({
         style={{ color: em.color }}
       />
       {dirty && (
-        <div className="mt-2 flex items-center justify-between gap-2 border-t border-black/5 pt-2">
+        <div className="mt-2 flex items-center justify-between gap-2 border-t border-black/5 dark:border-white/[0.13] pt-2">
           <span className="text-[11px] ink-text-muted">Save this change?</span>
           <div className="flex gap-1.5">
             <button

@@ -22,7 +22,7 @@ function getPrayerCount(h: HabitEntry): number {
 function Led({ status }: { status: 'on' | 'yellow' | 'off' }) {
   if (status === 'on') return <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 lg:w-3 lg:h-3 rounded-full bg-emerald-500 inline-block flex-shrink-0 ring-[1px] sm:ring-[1.5px] ring-white/80 shadow-[0_0_4px_rgba(16,185,129,0.9)] sm:shadow-[0_0_6px_rgba(16,185,129,0.9)]" />;
   if (status === 'yellow') return <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 lg:w-3 lg:h-3 rounded-full bg-orange-400 inline-block flex-shrink-0 ring-[1px] sm:ring-[1.5px] ring-white/80 shadow-[0_0_4px_rgba(251,146,60,0.9)] sm:shadow-[0_0_6px_rgba(251,146,60,0.9)]" />;
-  return <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 lg:w-3 lg:h-3 rounded-full bg-black/25 inline-block flex-shrink-0 ring-[1px] sm:ring-[1.5px] ring-black/10" />;
+  return <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 lg:w-3 lg:h-3 rounded-full bg-black/25 inline-block flex-shrink-0 ring-[1px] sm:ring-[1.5px] ring-black/10 dark:ring-white/[0.2]" />;
 }
 
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
@@ -96,6 +96,10 @@ export default function MonthOverview({
                 const isToday = isCurrentMonth && dayData.day === todayDay;
                 const isSelected = dayData.day === selectedDay && panelOpen;
                 const isFuture = isCurrentMonth && dayData.day > today.getDate();
+                // Accent cells stay light in dark mode, so dark text reads on them.
+                // Neutral (no-data) cells go dark, so their text must follow the theme.
+                const isAccentCell = ['red', 'yellow', 'green', 'bright-green'].includes(dayData.color);
+                const dayInk = isAccentCell ? 'text-stone-800' : 'ink-text';
                 const habit = habitData.get(dayData.date);
                 const dow = new Date(dayData.date + 'T00:00:00').getDay();
                 const isScheduled = (key: string) => (habitSchedules[key] || ALL_DAYS).includes(dow);
@@ -119,11 +123,11 @@ export default function MonthOverview({
                   >
                     {/* Mobile: centered day + hours */}
                     <div className="flex flex-col items-center justify-center sm:hidden w-full h-full">
-                      <span className={`font-bold leading-none ${isFuture ? 'ink-text-muted' : 'text-stone-800'} text-base`}>
+                      <span className={`font-bold leading-none ${isFuture ? 'ink-text-muted' : dayInk} text-base`}>
                         {dayData.day}
                       </span>
                       {!isFuture && dayData.hours > 0 && (
-                        <span className="font-bold text-stone-800 leading-none text-[9px] mt-0.5">
+                        <span className={`font-bold ${dayInk} leading-none text-[9px] mt-0.5`}>
                           {dayData.hours.toFixed(1)}h
                         </span>
                       )}
@@ -140,7 +144,7 @@ export default function MonthOverview({
                         ].map(({ label, led }) => (
                           <div key={label} className="flex items-center gap-1 lg:gap-2">
                             <Led status={led} />
-                            <span className="hidden lg:inline font-bold text-stone-800 leading-none text-[11px] xl:text-[15px]">
+                            <span className={`hidden lg:inline font-bold ${dayInk} leading-none text-[11px] xl:text-[15px]`}>
                               {label}
                             </span>
                           </div>
@@ -151,12 +155,12 @@ export default function MonthOverview({
                     {/* Tablet+: right zone */}
                     <div className="hidden sm:flex flex-col justify-between items-end flex-shrink-0 ml-0.5 lg:ml-1">
                       <span
-                        className={`font-bold leading-none ${isFuture ? 'ink-text-muted' : 'text-stone-800 drop-shadow-[0_1px_2px_rgba(255,255,255,0.3)]'} text-xl md:text-2xl lg:text-4xl xl:text-[45px]`}
+                        className={`font-bold leading-none ${isFuture ? 'ink-text-muted' : `${dayInk} ${isAccentCell ? 'drop-shadow-[0_1px_2px_rgba(255,255,255,0.3)]' : ''}`} text-xl md:text-2xl lg:text-4xl xl:text-[45px]`}
                       >
                         {dayData.day}
                       </span>
                       {!isFuture && (
-                        <span className="font-bold text-stone-800 leading-none drop-shadow-[0_1px_2px_rgba(255,255,255,0.3)] text-xs md:text-sm lg:text-lg xl:text-[22px]">
+                        <span className={`font-bold ${dayInk} leading-none ${isAccentCell ? 'drop-shadow-[0_1px_2px_rgba(255,255,255,0.3)]' : ''} text-xs md:text-sm lg:text-lg xl:text-[22px]`}>
                           {dayData.hours.toFixed(1)}h
                         </span>
                       )}

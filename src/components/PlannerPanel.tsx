@@ -258,7 +258,7 @@ export default function PlannerPanel({
           handleDrop(d.id);
         }}
         className={`group flex items-center gap-0.5 rounded-lg transition ${
-          d.id === selectedId ? 'bg-white shadow-sm' : 'hover:bg-white/60'
+          d.id === selectedId ? 'bg-white dark:bg-paper shadow-sm' : 'hover:bg-white/60 dark:hover:bg-paper/60'
         } ${d.id === dragId ? 'opacity-40' : ''} ${isOver ? 'ring-2 ring-amber-400' : ''}`}
       >
         <GripVertical className="w-3.5 h-3.5 flex-none ml-1.5 ink-text-muted/40 group-hover:ink-text-muted cursor-grab active:cursor-grabbing" />
@@ -323,20 +323,20 @@ export default function PlannerPanel({
       `}</style>
       <div className="absolute inset-x-0 bottom-0 top-[calc(100px+env(safe-area-inset-top))] md:top-[calc(90px+env(safe-area-inset-top))] flex items-center justify-center p-2 sm:p-4">
       <div
-        className="relative paper-card rounded-2xl border border-black/10 shadow-2xl w-[min(1100px,96vw)] h-[820px] max-h-full flex overflow-hidden"
+        className="relative paper-card rounded-2xl border border-black/10 dark:border-white/[0.2] shadow-2xl w-[min(1100px,96vw)] h-[820px] max-h-full flex overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ---------- notebook rail ---------- */}
         <aside
-          className={`w-full md:w-[248px] flex-none flex-col border-r border-black/5 bg-amber-50/40 ${
+          className={`w-full md:w-[248px] flex-none flex-col border-r border-black/5 dark:border-white/[0.13] bg-amber-50/40 ${
             mobilePane === 'editor' ? 'hidden md:flex' : 'flex'
           }`}
         >
           {/* notebook switcher */}
-          <div className="relative border-b border-black/5" data-nb-root>
+          <div className="relative border-b border-black/5 dark:border-white/[0.13]" data-nb-root>
             <button
               onClick={() => setNbMenu((v) => !v)}
-              className="w-full flex items-center gap-2 px-4 pt-4 pb-3 text-left hover:bg-white/40 transition"
+              className="w-full flex items-center gap-2 px-4 pt-4 pb-3 text-left hover:bg-white/40 dark:hover:bg-paper/40 transition"
               title="Switch notebook"
             >
               <NotebookPen className="w-5 h-5 ink-text flex-none" />
@@ -352,7 +352,7 @@ export default function PlannerPanel({
             </button>
 
             {nbMenu && (
-              <div className="absolute left-2 right-2 top-full -mt-1 z-30 paper-card rounded-xl border border-black/10 shadow-xl p-1.5">
+              <div className="absolute left-2 right-2 top-full -mt-1 z-30 paper-card rounded-xl border border-black/10 dark:border-white/[0.2] shadow-xl p-1.5">
                 {notebooks.map((n) => {
                   const active = n === notebook;
                   const isPlanner = n === PLANNER;
@@ -405,7 +405,7 @@ export default function PlannerPanel({
                   );
                 })}
 
-                <div className="border-t border-black/5 mt-1 pt-1">
+                <div className="border-t border-black/5 dark:border-white/[0.13] mt-1 pt-1">
                   {creating ? (
                     <div className="flex items-center gap-1 px-1">
                       <input
@@ -420,7 +420,7 @@ export default function PlannerPanel({
                           }
                         }}
                         placeholder="Notebook name…"
-                        className="flex-1 min-w-0 text-[13px] px-2 py-1.5 rounded-lg border border-black/10 bg-white outline-none focus:border-amber-400"
+                        className="flex-1 min-w-0 text-[13px] px-2 py-1.5 rounded-lg border border-black/10 dark:border-white/[0.2] bg-white dark:bg-paper outline-none focus:border-amber-400"
                       />
                       <button
                         onClick={createNotebook}
@@ -462,7 +462,7 @@ export default function PlannerPanel({
                       </div>
                       <button
                         onClick={() => handleAdd(m)}
-                        className="p-1 rounded-md ink-text-muted hover:ink-text hover:bg-white/70 transition flex-none"
+                        className="p-1 rounded-md ink-text-muted hover:ink-text hover:bg-white/70 dark:hover:bg-paper/70 transition flex-none"
                         title={`New doc in ${monthLabel(m)}`}
                       >
                         <Plus className="w-3.5 h-3.5" />
@@ -472,7 +472,7 @@ export default function PlannerPanel({
                     {list.length === 0 ? (
                       <button
                         onClick={() => handleAdd(m)}
-                        className="w-full text-left text-[12px] ink-text-muted/70 hover:ink-text px-2.5 py-1.5 rounded-lg hover:bg-white/60 transition"
+                        className="w-full text-left text-[12px] ink-text-muted/70 hover:ink-text px-2.5 py-1.5 rounded-lg hover:bg-white/60 dark:hover:bg-paper/60 transition"
                       >
                         + Add the first doc
                       </button>
@@ -490,7 +490,7 @@ export default function PlannerPanel({
                   </span>
                   <button
                     onClick={() => handleAdd('')}
-                    className="p-1 rounded-md ink-text-muted hover:ink-text hover:bg-white/70 transition flex-none"
+                    className="p-1 rounded-md ink-text-muted hover:ink-text hover:bg-white/70 dark:hover:bg-paper/70 transition flex-none"
                     title="New page"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -499,7 +499,7 @@ export default function PlannerPanel({
                 {flatDocs.length === 0 ? (
                   <button
                     onClick={() => handleAdd('')}
-                    className="w-full text-left text-[12px] ink-text-muted/70 hover:ink-text px-2.5 py-1.5 rounded-lg hover:bg-white/60 transition"
+                    className="w-full text-left text-[12px] ink-text-muted/70 hover:ink-text px-2.5 py-1.5 rounded-lg hover:bg-white/60 dark:hover:bg-paper/60 transition"
                   >
                     + Add the first page
                   </button>
@@ -516,8 +516,8 @@ export default function PlannerPanel({
               setShowTrash(true);
               setMobilePane('editor');
             }}
-            className={`flex items-center justify-between gap-2 px-4 py-2.5 border-t border-black/5 text-[13px] transition ${
-              showTrash ? 'bg-white ink-text' : 'ink-text-muted hover:ink-text hover:bg-white/50'
+            className={`flex items-center justify-between gap-2 px-4 py-2.5 border-t border-black/5 dark:border-white/[0.13] text-[13px] transition ${
+              showTrash ? 'bg-white dark:bg-paper ink-text' : 'ink-text-muted hover:ink-text hover:bg-white/50 dark:hover:bg-paper/50'
             }`}
           >
             <span className="flex items-center gap-2">
@@ -574,7 +574,7 @@ export default function PlannerPanel({
                   {trashDocs.map((d) => (
                     <div
                       key={d.id}
-                      className="flex items-center gap-3 rounded-xl border border-black/5 bg-white/60 px-3.5 py-2.5"
+                      className="flex items-center gap-3 rounded-xl border border-black/5 dark:border-white/[0.13] bg-white/60 dark:bg-paper/60 px-3.5 py-2.5"
                     >
                       <span className="w-2.5 h-2.5 rounded-full flex-none" style={{ background: d.color || '#0ea5e9' }} />
                       <div className="min-w-0 flex-1">
@@ -928,7 +928,7 @@ function DocEditor({
       </div>
 
       {/* toolbar */}
-      <div className="px-6 sm:px-10 py-2 mt-1 flex items-center gap-0.5 flex-wrap border-b border-black/5">
+      <div className="px-6 sm:px-10 py-2 mt-1 flex items-center gap-0.5 flex-wrap border-b border-black/5 dark:border-white/[0.13]">
         <TB onClick={() => exec('bold')} title="Bold"><Bold className="w-4 h-4" /></TB>
         <TB onClick={() => exec('italic')} title="Italic"><Italic className="w-4 h-4" /></TB>
         <TB onClick={() => exec('underline')} title="Underline"><Underline className="w-4 h-4" /></TB>
@@ -1177,7 +1177,7 @@ function Menu({
       </button>
       {open && (
         <div
-          className={`absolute top-full left-0 mt-1 z-20 paper-card rounded-xl border border-black/10 shadow-xl p-1.5 ${
+          className={`absolute top-full left-0 mt-1 z-20 paper-card rounded-xl border border-black/10 dark:border-white/[0.2] shadow-xl p-1.5 ${
             wide ? '' : 'min-w-[150px]'
           }`}
         >
@@ -1196,7 +1196,7 @@ function Swatches({ colors, onPick }: { colors: string[]; onPick: (c: string) =>
           key={c}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => onPick(c)}
-          className="w-6 h-6 rounded-md border border-black/10 transition-transform hover:scale-110"
+          className="w-6 h-6 rounded-md border border-black/10 dark:border-white/[0.2] transition-transform hover:scale-110"
           style={{ background: c }}
           title={c}
         />
@@ -1222,7 +1222,7 @@ function TableSizePicker({ onPick }: { onPick: (rows: number, cols: number) => v
               onMouseDown={(e) => e.preventDefault()}
               onMouseEnter={() => setHover({ r, c })}
               onClick={() => onPick(hover.r || r, hover.c || c)}
-              className={`w-4 h-4 rounded-sm border ${on ? 'bg-amber-400 border-amber-500' : 'bg-white border-stone-300'}`}
+              className={`w-4 h-4 rounded-sm border ${on ? 'bg-amber-400 border-amber-500' : 'bg-white dark:bg-paper border-stone-300'}`}
             />
           );
         })}

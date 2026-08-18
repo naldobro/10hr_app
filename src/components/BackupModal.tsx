@@ -65,10 +65,10 @@ export default function BackupModal({ onClose }: BackupModalProps) {
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" onClick={() => !busy && onClose()}>
       <div className="absolute inset-0 bg-black/30" />
       <div
-        className="relative paper-card rounded-2xl border border-black/10 shadow-2xl w-[min(480px,94vw)] max-h-[86vh] flex flex-col"
+        className="relative paper-card rounded-2xl border border-black/10 dark:border-white/[0.2] shadow-2xl w-[min(480px,94vw)] max-h-[86vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 pt-5 pb-4 border-b border-black/5 flex items-start justify-between">
+        <div className="px-5 pt-5 pb-4 border-b border-black/5 dark:border-white/[0.13] flex items-start justify-between">
           <div>
             <h3 className="text-lg font-bold ink-text flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-emerald-600" /> Backup &amp; Restore
@@ -82,7 +82,7 @@ export default function BackupModal({ onClose }: BackupModalProps) {
 
         <div className="px-5 py-4 overflow-y-auto flex flex-col gap-4">
           {/* Export */}
-          <div className="rounded-xl border border-black/[0.07] p-4">
+          <div className="rounded-xl border border-black/[0.07] dark:border-white/[0.13] p-4">
             <div className="font-semibold ink-text text-sm mb-1">Download a backup</div>
             <p className="text-xs ink-text-muted mb-3">
               Saves one JSON file you fully own. Do this regularly, or before anything risky.
@@ -97,7 +97,7 @@ export default function BackupModal({ onClose }: BackupModalProps) {
           </div>
 
           {/* Import */}
-          <div className="rounded-xl border border-black/[0.07] p-4">
+          <div className="rounded-xl border border-black/[0.07] dark:border-white/[0.13] p-4">
             <div className="font-semibold ink-text text-sm mb-1">Restore from a backup</div>
             <p className="text-xs ink-text-muted mb-3">
               Load a backup file. This <span className="font-semibold">replaces all current data</span>. Also how you move
@@ -114,7 +114,7 @@ export default function BackupModal({ onClose }: BackupModalProps) {
               <button
                 onClick={() => fileRef.current?.click()}
                 disabled={busy}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-black/10 ink-text text-sm font-semibold hover:bg-stone-50 transition disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-black/10 dark:border-white/[0.2] ink-text text-sm font-semibold hover:bg-stone-50 transition disabled:opacity-50"
               >
                 <Upload className="w-4 h-4" /> Choose backup file…
               </button>
@@ -137,7 +137,7 @@ export default function BackupModal({ onClose }: BackupModalProps) {
                   <button
                     onClick={() => setPreview(null)}
                     disabled={busy}
-                    className="flex-1 py-2 rounded-lg border border-black/10 ink-text text-sm font-semibold hover:bg-white transition disabled:opacity-50"
+                    className="flex-1 py-2 rounded-lg border border-black/10 dark:border-white/[0.2] ink-text text-sm font-semibold hover:bg-white dark:hover:bg-paper transition disabled:opacity-50"
                   >
                     Cancel
                   </button>

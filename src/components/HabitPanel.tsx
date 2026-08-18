@@ -30,12 +30,12 @@ function ToggleSwitch({ checked, onToggle }: { checked: boolean; onToggle: () =>
       relative w-10 h-6 sm:w-12 sm:h-7 rounded-full transition-all duration-300 flex-shrink-0 border
       ${checked
         ? 'bg-gradient-to-r from-emerald-400 to-emerald-500 border-emerald-600/30 shadow-[0_0_14px_rgba(16,185,129,0.4)]'
-        : 'bg-white/10 border-white/10 hover:bg-white/20'
+        : 'bg-white/10 dark:bg-paper/10 border-white/10 hover:bg-white/20 dark:hover:bg-paper/20'
       }
     `}>
       <div className={`
         absolute top-[2px] sm:top-[3px] w-[18px] h-[18px] sm:w-[22px] sm:h-[22px] rounded-full transition-all duration-300 flex items-center justify-center shadow-sm
-        ${checked ? 'left-[19px] sm:left-[23px] bg-white' : 'left-[2px] sm:left-[3px] bg-white/40'}
+        ${checked ? 'left-[19px] sm:left-[23px] bg-white dark:bg-paper' : 'left-[2px] sm:left-[3px] bg-white/40 dark:bg-paper/40'}
       `}>
         {checked && <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-600 stroke-[3]" />}
       </div>
@@ -74,7 +74,7 @@ export default function HabitPanel({ date, habit, onToggle, habitSchedules }: Ha
               ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30 shadow-[0_0_14px_rgba(16,185,129,0.25)]'
               : prayerCount >= 4
               ? 'bg-amber-400/20 text-amber-200 border-amber-400/30'
-              : 'bg-white/5 text-indigo-300/50 border-indigo-400/20'}
+              : 'bg-white/5 dark:bg-paper/5 text-indigo-300/50 border-indigo-400/20'}
           `}>
             🕌 {prayerCount}/5
           </div>
@@ -141,7 +141,7 @@ export default function HabitPanel({ date, habit, onToggle, habitSchedules }: Ha
                     h-2 sm:h-2.5 flex-1 rounded-full transition-all duration-500
                     ${i < totalScore
                       ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 shadow-[0_0_8px_rgba(16,185,129,0.35)]'
-                      : 'bg-white/10'
+                      : 'bg-white/10 dark:bg-paper/10'
                     }
                   `} />
                 ))}

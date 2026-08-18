@@ -129,7 +129,7 @@ export default function TimelineGraph({ sessions, currentDay, onDeleteSession }:
                     </div>
 
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      <span className="text-white font-bold text-[10px] sm:text-xs bg-white/20 px-1 sm:px-1.5 py-0.5 rounded">
+                      <span className="text-white font-bold text-[10px] sm:text-xs bg-white/20 dark:bg-paper/20 px-1 sm:px-1.5 py-0.5 rounded">
                         {duration.toFixed(1)}h
                       </span>
                       <button
@@ -144,7 +144,7 @@ export default function TimelineGraph({ sessions, currentDay, onDeleteSession }:
                     </div>
                   </div>
 
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-white/30 rounded-l-lg"></div>
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-white/30 dark:bg-paper/30 rounded-l-lg"></div>
                   <div className="absolute right-0 top-0 bottom-0 w-1 bg-black/20 rounded-r-lg"></div>
                 </div>
               );
