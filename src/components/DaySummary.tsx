@@ -62,7 +62,7 @@ export default function DaySummary({ workedHours, targetHours = 10 }: DaySummary
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
         <div className="paper-card rounded-xl p-3 sm:p-4 lg:p-6 paper-shadow paper-border hover:shadow-lg transition-shadow">
           <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
-            <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700" />
+            <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700 dark:text-amber-300" />
             <div className="text-xs sm:text-sm font-semibold ink-text-muted">Current Time</div>
           </div>
           <div className="text-2xl sm:text-3xl lg:text-4xl font-bold ink-text tracking-tight">{formatTime(currentTime)}</div>
@@ -78,12 +78,12 @@ export default function DaySummary({ workedHours, targetHours = 10 }: DaySummary
           </div>
         </div>
 
-        <div className="bg-amber-50 rounded-xl p-3 sm:p-4 lg:p-6 paper-shadow paper-border hover:shadow-lg transition-shadow">
+        <div className="bg-amber-50 dark:bg-amber-400/10 rounded-xl p-3 sm:p-4 lg:p-6 paper-shadow paper-border hover:shadow-lg transition-shadow">
           <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
-            <Target className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700" />
-            <div className="text-xs sm:text-sm font-semibold text-amber-700">To Goal</div>
+            <Target className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700 dark:text-amber-300" />
+            <div className="text-xs sm:text-sm font-semibold text-amber-700 dark:text-amber-300">To Goal</div>
           </div>
-          <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-amber-800">
+          <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-amber-800 dark:text-amber-200">
             {getHoursLeft().toFixed(1)}h
           </div>
         </div>
@@ -110,7 +110,7 @@ export default function DaySummary({ workedHours, targetHours = 10 }: DaySummary
         </div>
 
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-sm sm:text-base lg:text-lg font-bold ink-text drop-shadow-lg px-3 py-0.5 sm:px-4 sm:py-1 bg-amber-50/90 rounded-full paper-border">
+          <span className="text-sm sm:text-base lg:text-lg font-bold ink-text drop-shadow-lg px-3 py-0.5 sm:px-4 sm:py-1 bg-amber-50/90 dark:bg-amber-400/10 rounded-full paper-border">
             {workedHours.toFixed(1)} / {targetHours}h
           </span>
         </div>

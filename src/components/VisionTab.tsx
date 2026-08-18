@@ -786,12 +786,16 @@ export default function VisionTab() {
   const today = todayMidnight();
 
   return (
-    <div className="fixed left-0 right-0 bottom-0 top-[calc(100px+env(safe-area-inset-top))] md:top-[calc(90px+env(safe-area-inset-top))] flex overflow-hidden bg-[#f7f6f3]">
+    <div className="fixed left-0 right-0 bottom-0 top-[calc(100px+env(safe-area-inset-top))] md:top-[calc(90px+env(safe-area-inset-top))] flex overflow-hidden bg-[var(--timeline-bg)]">
       <style>{`
         .vision-range { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px; background: #e7e5e4; outline: none; }
         .vision-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #57534e; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); cursor: pointer; }
         .vision-range::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #57534e; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); cursor: pointer; }
         .vision-range::-moz-range-track { height: 6px; border-radius: 999px; background: #e7e5e4; }
+        .dark .vision-range { background: #3a3842; }
+        .dark .vision-range::-webkit-slider-thumb { background: #cfcdd6; border-color: #201f28; }
+        .dark .vision-range::-moz-range-thumb { background: #cfcdd6; border-color: #201f28; }
+        .dark .vision-range::-moz-range-track { background: #3a3842; }
       `}</style>
       {/* phone: open-tray button */}
       {!trayOpen && (
@@ -808,7 +812,7 @@ export default function VisionTab() {
 
       {/* ---------------- Tray ---------------- */}
       <aside
-        className={`w-[264px] max-w-[82vw] flex-shrink-0 flex flex-col gap-3 p-4 overflow-y-auto border-r border-black/5 dark:border-white/[0.13] bg-amber-50 sm:bg-amber-50/40 absolute sm:relative inset-y-0 left-0 z-40 transition-transform duration-300 sm:transition-none ${
+        className={`w-[264px] max-w-[82vw] flex-shrink-0 flex flex-col gap-3 p-4 overflow-y-auto border-r border-black/5 dark:border-white/[0.13] bg-amber-50 dark:bg-amber-400/10 sm:bg-amber-50/40 dark:sm:bg-amber-400/10 absolute sm:relative inset-y-0 left-0 z-40 transition-transform duration-300 sm:transition-none ${
           trayOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full sm:translate-x-0 sm:shadow-none'
         }`}
       >
@@ -895,7 +899,7 @@ export default function VisionTab() {
         </p>
 
         {dbDown && (
-          <div className="text-[11px] leading-relaxed rounded-lg border border-amber-300 bg-amber-100/60 text-amber-800 px-2.5 py-2">
+          <div className="text-[11px] leading-relaxed rounded-lg border border-amber-300 bg-amber-100/60 dark:bg-amber-400/20 text-amber-800 dark:text-amber-200 px-2.5 py-2">
             Working offline — run the latest <code className="font-mono">vision_goals</code> migration to save.
           </div>
         )}
@@ -992,7 +996,7 @@ export default function VisionTab() {
             <div
               key={t.key + '-line'}
               className="absolute left-[6%] right-[6%] pointer-events-none"
-              style={{ top: t.y, height: 1, background: 'rgba(0,0,0,0.06)', zIndex: 2 }}
+              style={{ top: t.y, height: 1, background: 'var(--hairline)', zIndex: 2 }}
             />
           ))}
           {ticks.map((t) => (
@@ -1202,12 +1206,12 @@ export default function VisionTab() {
               className="relative w-[14px] h-[14px] rounded-full"
               style={{
                 background: 'radial-gradient(circle at 35% 30%, #fff, #f59e0b 55%, #d97706)',
-                boxShadow: '0 0 0 2.5px #f7f6f3, 0 0 0 3px #f59e0b, 0 0 12px 2px rgba(245,158,11,0.5)',
+                boxShadow: '0 0 0 2.5px var(--timeline-bg), 0 0 0 3px #f59e0b, 0 0 12px 2px rgba(245,158,11,0.5)',
               }}
             >
               <span className="absolute inset-[-5px] rounded-full border-2 border-amber-400 animate-ping opacity-40" />
             </div>
-            <div className="font-mono text-[10px] tracking-widest font-bold text-amber-700 bg-white dark:bg-paper border border-black/10 dark:border-white/[0.2] px-2.5 py-0.5 rounded-full shadow-sm">
+            <div className="font-mono text-[10px] tracking-widest font-bold text-amber-700 dark:text-amber-300 bg-white dark:bg-paper border border-black/10 dark:border-white/[0.2] px-2.5 py-0.5 rounded-full shadow-sm">
               {today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase()} · TODAY
             </div>
           </div>

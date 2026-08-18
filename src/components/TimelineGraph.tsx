@@ -73,7 +73,7 @@ export default function TimelineGraph({ sessions, currentDay, onDeleteSession }:
     <div className="paper-card rounded-2xl paper-shadow p-3 sm:p-4 lg:p-6 paper-border">
       <h3 className="text-base sm:text-lg font-bold ink-text mb-3 sm:mb-4">Timeline</h3>
 
-      <div className="relative bg-amber-50/30 rounded-xl p-2 sm:p-4 paper-border overflow-x-auto" style={{ minHeight: `${timelineHeight}px` }}>
+      <div className="relative bg-amber-50/30 dark:bg-amber-400/10 rounded-xl p-2 sm:p-4 paper-border overflow-x-auto" style={{ minHeight: `${timelineHeight}px` }}>
         <div className="relative min-w-[600px]" style={{ height: `${timelineHeight}px` }}>
           {hourMarkers.map((hour) => (
             <div

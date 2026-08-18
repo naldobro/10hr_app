@@ -328,7 +328,7 @@ export default function PlannerPanel({
       >
         {/* ---------- notebook rail ---------- */}
         <aside
-          className={`w-full md:w-[248px] flex-none flex-col border-r border-black/5 dark:border-white/[0.13] bg-amber-50/40 ${
+          className={`w-full md:w-[248px] flex-none flex-col border-r border-black/5 dark:border-white/[0.13] bg-amber-50/40 dark:bg-amber-400/10 ${
             mobilePane === 'editor' ? 'hidden md:flex' : 'flex'
           }`}
         >
@@ -359,7 +359,7 @@ export default function PlannerPanel({
                   return (
                     <div
                       key={n}
-                      className={`group flex items-center gap-1 rounded-lg ${active ? 'bg-amber-100/70' : 'hover:bg-stone-100'}`}
+                      className={`group flex items-center gap-1 rounded-lg ${active ? 'bg-amber-100/70 dark:bg-amber-400/20' : 'hover:bg-stone-100'}`}
                     >
                       <button
                         onClick={() => {
@@ -381,7 +381,7 @@ export default function PlannerPanel({
                           <div className="flex items-center gap-1 pr-1.5 flex-none">
                             <button
                               onClick={() => deleteNotebook(n)}
-                              className="text-[11px] font-bold text-red-600 px-1.5 py-0.5 rounded hover:bg-red-50"
+                              className="text-[11px] font-bold text-red-600 px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-400/10"
                             >
                               Delete
                             </button>
@@ -396,7 +396,7 @@ export default function PlannerPanel({
                           <button
                             onClick={() => setConfirmDelNb(n)}
                             title="Delete notebook"
-                            className="flex-none opacity-0 group-hover:opacity-100 p-1 mr-1 rounded ink-text-muted hover:text-red-600 hover:bg-red-50 transition"
+                            className="flex-none opacity-0 group-hover:opacity-100 p-1 mr-1 rounded ink-text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-400/10 transition"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -455,7 +455,7 @@ export default function PlannerPanel({
                           {monthLabel(m)}
                         </span>
                         {m === currentMonth && (
-                          <span className="text-[9px] font-bold text-amber-700 bg-amber-100 rounded-full px-1.5 py-0.5 leading-none flex-none">
+                          <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-400/20 rounded-full px-1.5 py-0.5 leading-none flex-none">
                             NOW
                           </span>
                         )}
@@ -597,7 +597,7 @@ export default function PlannerPanel({
                               onPurge(d.id);
                               setConfirmPurge(null);
                             }}
-                            className="text-[12px] font-bold text-red-600 px-2 py-1 rounded hover:bg-red-50 transition"
+                            className="text-[12px] font-bold text-red-600 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-400/10 transition"
                           >
                             Delete forever
                           </button>
@@ -612,7 +612,7 @@ export default function PlannerPanel({
                         <button
                           onClick={() => setConfirmPurge(d.id)}
                           title="Delete forever"
-                          className="flex-none p-1.5 rounded-lg ink-text-muted hover:text-red-600 hover:bg-red-50 transition"
+                          className="flex-none p-1.5 rounded-lg ink-text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-400/10 transition"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -903,7 +903,7 @@ function DocEditor({
               <div className="flex items-center gap-1">
                 <button
                   onClick={onDelete}
-                  className="text-[11px] font-bold text-red-600 px-2 py-1 rounded hover:bg-red-50 transition"
+                  className="text-[11px] font-bold text-red-600 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-400/10 transition"
                 >
                   Delete
                 </button>
@@ -917,7 +917,7 @@ function DocEditor({
             ) : (
               <button
                 onClick={() => setConfirmDel(true)}
-                className="p-1.5 rounded-lg ink-text-muted hover:text-red-600 hover:bg-red-50 transition"
+                className="p-1.5 rounded-lg ink-text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-400/10 transition"
                 title="Delete this doc"
               >
                 <Trash2 className="w-4 h-4" />
@@ -1136,7 +1136,7 @@ function TextBtn({
       onClick={onClick}
       title={title}
       className={`h-8 px-2 grid place-items-center rounded-lg text-[12px] font-semibold transition ${
-        danger ? 'text-red-600 hover:bg-red-50' : 'ink-text-muted hover:ink-text hover:bg-stone-100'
+        danger ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-400/10' : 'ink-text-muted hover:ink-text hover:bg-stone-100'
       }`}
     >
       {children}

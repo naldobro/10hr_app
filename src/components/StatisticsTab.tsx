@@ -206,7 +206,7 @@ export default function StatisticsTab({ currentMonth }: StatisticsTabProps) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <div className="paper-card rounded-xl p-4 sm:p-6 paper-shadow paper-border">
           <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
-            <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700" />
+            <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700 dark:text-amber-300" />
             <div className="text-xs sm:text-sm font-semibold ink-text-muted">Total Hours</div>
           </div>
           <div className="text-2xl sm:text-3xl font-bold ink-text">
@@ -216,7 +216,7 @@ export default function StatisticsTab({ currentMonth }: StatisticsTabProps) {
 
         <div className="paper-card rounded-xl p-4 sm:p-6 paper-shadow paper-border">
           <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
-            <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700" />
+            <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700 dark:text-amber-300" />
             <div className="text-xs sm:text-sm font-semibold ink-text-muted">Total Sessions</div>
           </div>
           <div className="text-2xl sm:text-3xl font-bold ink-text">{stats.totalSessions}</div>
@@ -224,7 +224,7 @@ export default function StatisticsTab({ currentMonth }: StatisticsTabProps) {
 
         <div className="paper-card rounded-xl p-4 sm:p-6 paper-shadow paper-border">
           <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
-            <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700" />
+            <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700 dark:text-amber-300" />
             <div className="text-xs sm:text-sm font-semibold ink-text-muted">Avg Per Day</div>
           </div>
           <div className="text-2xl sm:text-3xl font-bold ink-text">
@@ -234,7 +234,7 @@ export default function StatisticsTab({ currentMonth }: StatisticsTabProps) {
 
         <div className="paper-card rounded-xl p-4 sm:p-6 paper-shadow paper-border">
           <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
-            <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700" />
+            <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700 dark:text-amber-300" />
             <div className="text-xs sm:text-sm font-semibold ink-text-muted">Days Worked</div>
           </div>
           <div className="text-2xl sm:text-3xl font-bold ink-text">{stats.daysWorked}</div>
@@ -244,19 +244,19 @@ export default function StatisticsTab({ currentMonth }: StatisticsTabProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         <div className="paper-card rounded-2xl p-4 sm:p-6 paper-shadow paper-border">
           <h3 className="text-lg sm:text-xl font-bold ink-text mb-3 sm:mb-4 flex items-center gap-2">
-            <Award className="w-5 h-5 sm:w-6 sm:h-6 text-amber-700" />
+            <Award className="w-5 h-5 sm:w-6 sm:h-6 text-amber-700 dark:text-amber-300" />
             Achievements
           </h3>
 
           <div className="space-y-3 sm:space-y-4">
-            <div className="flex justify-between items-center p-3 sm:p-4 bg-amber-50/30 rounded-xl paper-border">
+            <div className="flex justify-between items-center p-3 sm:p-4 bg-amber-50/30 dark:bg-amber-400/10 rounded-xl paper-border">
               <div>
                 <div className="text-xs sm:text-sm ink-text-muted">Current Streak</div>
                 <div className="text-xl sm:text-2xl font-bold ink-text">{stats.currentStreak} days</div>
               </div>
             </div>
 
-            <div className="flex justify-between items-center p-3 sm:p-4 bg-amber-50/30 rounded-xl paper-border">
+            <div className="flex justify-between items-center p-3 sm:p-4 bg-amber-50/30 dark:bg-amber-400/10 rounded-xl paper-border">
               <div>
                 <div className="text-xs sm:text-sm ink-text-muted">Longest Streak</div>
                 <div className="text-xl sm:text-2xl font-bold ink-text">{stats.longestStreak} days</div>
@@ -264,7 +264,7 @@ export default function StatisticsTab({ currentMonth }: StatisticsTabProps) {
             </div>
 
             {stats.bestDay && (
-              <div className="flex justify-between items-center p-3 sm:p-4 bg-amber-50/30 rounded-xl paper-border">
+              <div className="flex justify-between items-center p-3 sm:p-4 bg-amber-50/30 dark:bg-amber-400/10 rounded-xl paper-border">
                 <div>
                   <div className="text-xs sm:text-sm ink-text-muted">Best Day</div>
                   <div className="text-xl sm:text-2xl font-bold ink-text">
@@ -279,12 +279,12 @@ export default function StatisticsTab({ currentMonth }: StatisticsTabProps) {
 
         <div className="paper-card rounded-2xl p-4 sm:p-6 paper-shadow paper-border">
           <h3 className="text-lg sm:text-xl font-bold ink-text mb-3 sm:mb-4 flex items-center gap-2">
-            <Target className="w-5 h-5 sm:w-6 sm:h-6 text-amber-700" />
+            <Target className="w-5 h-5 sm:w-6 sm:h-6 text-amber-700 dark:text-amber-300" />
             Performance
           </h3>
 
           <div className="space-y-3 sm:space-y-4">
-            <div className="p-3 sm:p-4 bg-amber-50/30 rounded-xl paper-border">
+            <div className="p-3 sm:p-4 bg-amber-50/30 dark:bg-amber-400/10 rounded-xl paper-border">
               <div className="text-xs sm:text-sm ink-text-muted mb-2">Target Completion Rate</div>
               <div className="text-xl sm:text-2xl font-bold ink-text mb-2">
                 {stats.completionRate.toFixed(1)}%
@@ -297,14 +297,14 @@ export default function StatisticsTab({ currentMonth }: StatisticsTabProps) {
               </div>
             </div>
 
-            <div className="p-3 sm:p-4 bg-amber-50/30 rounded-xl paper-border">
+            <div className="p-3 sm:p-4 bg-amber-50/30 dark:bg-amber-400/10 rounded-xl paper-border">
               <div className="text-xs sm:text-sm ink-text-muted">4-Week Average</div>
               <div className="text-xl sm:text-2xl font-bold ink-text">
                 {stats.weeklyAverage.toFixed(1)}h/week
               </div>
             </div>
 
-            <div className="p-3 sm:p-4 bg-amber-50/30 rounded-xl paper-border">
+            <div className="p-3 sm:p-4 bg-amber-50/30 dark:bg-amber-400/10 rounded-xl paper-border">
               <div className="text-xs sm:text-sm ink-text-muted">Most Productive Hour</div>
               <div className="text-xl sm:text-2xl font-bold ink-text">
                 {stats.mostProductiveHour}:00
@@ -324,7 +324,7 @@ export default function StatisticsTab({ currentMonth }: StatisticsTabProps) {
             recentSessions.map((session) => (
               <div
                 key={session.id}
-                className="flex items-center justify-between p-3 sm:p-4 bg-amber-50/30 rounded-xl hover:bg-amber-50/50 transition-colors paper-border gap-2"
+                className="flex items-center justify-between p-3 sm:p-4 bg-amber-50/30 dark:bg-amber-400/10 rounded-xl hover:bg-amber-50/50 dark:hover:bg-amber-400/10 transition-colors paper-border gap-2"
               >
                 <div className="flex items-center gap-2 sm:gap-4 min-w-0">
                   <div className="text-xs sm:text-sm ink-text-muted whitespace-nowrap">
@@ -336,7 +336,7 @@ export default function StatisticsTab({ currentMonth }: StatisticsTabProps) {
                   <div className="text-xs sm:text-sm ink-text-muted hidden sm:block">
                     {formatHour(session.start_time)} - {formatHour(session.end_time)}
                   </div>
-                  <div className="font-bold text-amber-700 text-sm sm:text-base">
+                  <div className="font-bold text-amber-700 dark:text-amber-300 text-sm sm:text-base">
                     {(session.end_time - session.start_time).toFixed(1)}h
                   </div>
                 </div>

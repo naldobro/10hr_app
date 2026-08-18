@@ -35,7 +35,7 @@ export default function Navigation({
             <div className="flex items-center gap-0.5">
               <button
                 onClick={() => onMonthChange('prev')}
-                className="p-1.5 hover:bg-amber-50 rounded-lg transition-all active:scale-95"
+                className="p-1.5 hover:bg-amber-50 dark:hover:bg-amber-400/10 rounded-lg transition-all active:scale-95"
               >
                 <ChevronLeft className="w-5 h-5 ink-text-muted" />
               </button>
@@ -43,7 +43,7 @@ export default function Navigation({
               {canGoNext ? (
                 <button
                   onClick={() => onMonthChange('next')}
-                  className="p-1.5 hover:bg-amber-50 rounded-lg transition-all active:scale-95"
+                  className="p-1.5 hover:bg-amber-50 dark:hover:bg-amber-400/10 rounded-lg transition-all active:scale-95"
                 >
                   <ChevronRight className="w-5 h-5 ink-text-muted" />
                 </button>
@@ -52,7 +52,7 @@ export default function Navigation({
               )}
             </div>
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 bg-amber-50 px-2.5 py-1 rounded-lg paper-border">
+              <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-400/10 px-2.5 py-1 rounded-lg paper-border">
                 <Flame className="w-4 h-4 text-amber-600" />
                 <span className="text-base font-bold ink-text">{streakDays}</span>
               </div>
@@ -60,20 +60,20 @@ export default function Navigation({
                 onClick={toggleTheme}
                 aria-label={themeLabel}
                 title={themeLabel}
-                className="p-1.5 rounded-lg hover:bg-amber-50 transition-all active:scale-95"
+                className="p-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-400/10 transition-all active:scale-95"
               >
                 <ThemeIcon className="w-5 h-5 ink-text-muted" />
               </button>
               <img src="/profile.png" alt="profile" className="w-8 h-8 rounded-full object-cover" />
             </div>
           </div>
-          <div className="flex gap-1.5 bg-amber-50/50 rounded-lg p-1 paper-border">
+          <div className="flex gap-1.5 bg-amber-50/50 dark:bg-amber-400/10 rounded-lg p-1 paper-border">
             <button
               onClick={() => onTabChange('track')}
               className={`flex-1 py-1.5 rounded-md text-sm font-semibold transition-all ${
                 activeTab === 'track'
                   ? 'paper-card ink-text paper-shadow'
-                  : 'ink-text-muted hover:bg-amber-50'
+                  : 'ink-text-muted hover:bg-amber-50 dark:hover:bg-amber-400/10'
               }`}
             >
               Track
@@ -83,7 +83,7 @@ export default function Navigation({
               className={`flex-1 py-1.5 rounded-md text-sm font-semibold transition-all ${
                 activeTab === 'statistics'
                   ? 'paper-card ink-text paper-shadow'
-                  : 'ink-text-muted hover:bg-amber-50'
+                  : 'ink-text-muted hover:bg-amber-50 dark:hover:bg-amber-400/10'
               }`}
             >
               Statistics
@@ -93,7 +93,7 @@ export default function Navigation({
               className={`flex-1 py-1.5 rounded-md text-sm font-semibold transition-all flex items-center justify-center gap-1 ${
                 activeTab === 'vision'
                   ? 'paper-card ink-text paper-shadow'
-                  : 'ink-text-muted hover:bg-amber-50'
+                  : 'ink-text-muted hover:bg-amber-50 dark:hover:bg-amber-400/10'
               }`}
             >
               <Sparkles className={`w-3.5 h-3.5 ${activeTab === 'vision' ? 'text-violet-500' : ''}`} />
@@ -107,18 +107,18 @@ export default function Navigation({
           <div className="flex items-center gap-4 lg:gap-6">
             <button
               onClick={() => onMonthChange('prev')}
-              className="p-2.5 hover:bg-amber-50 rounded-lg transition-all hover:scale-105 active:scale-95"
+              className="p-2.5 hover:bg-amber-50 dark:hover:bg-amber-400/10 rounded-lg transition-all hover:scale-105 active:scale-95"
             >
               <ChevronLeft className="w-5 h-5 ink-text-muted" />
             </button>
 
-            <div className="flex gap-2 bg-amber-50/50 rounded-lg p-1.5 paper-border">
+            <div className="flex gap-2 bg-amber-50/50 dark:bg-amber-400/10 rounded-lg p-1.5 paper-border">
               <button
                 onClick={() => onTabChange('track')}
                 className={`px-4 lg:px-6 py-2 rounded-md font-semibold transition-all ${
                   activeTab === 'track'
                     ? 'paper-card ink-text paper-shadow'
-                    : 'ink-text-muted hover:bg-amber-50'
+                    : 'ink-text-muted hover:bg-amber-50 dark:hover:bg-amber-400/10'
                 }`}
               >
                 Track
@@ -128,7 +128,7 @@ export default function Navigation({
                 className={`px-4 lg:px-6 py-2 rounded-md font-semibold transition-all ${
                   activeTab === 'statistics'
                     ? 'paper-card ink-text paper-shadow'
-                    : 'ink-text-muted hover:bg-amber-50'
+                    : 'ink-text-muted hover:bg-amber-50 dark:hover:bg-amber-400/10'
                 }`}
               >
                 Statistics
@@ -138,7 +138,7 @@ export default function Navigation({
                 className={`px-4 lg:px-6 py-2 rounded-md font-semibold transition-all flex items-center gap-1.5 ${
                   activeTab === 'vision'
                     ? 'paper-card ink-text paper-shadow'
-                    : 'ink-text-muted hover:bg-amber-50'
+                    : 'ink-text-muted hover:bg-amber-50 dark:hover:bg-amber-400/10'
                 }`}
               >
                 <Sparkles className={`w-4 h-4 ${activeTab === 'vision' ? 'text-violet-500' : ''}`} />
@@ -154,7 +154,7 @@ export default function Navigation({
             {canGoNext && (
               <button
                 onClick={() => onMonthChange('next')}
-                className="p-2 hover:bg-amber-50 rounded-lg transition-all hover:scale-105 active:scale-95"
+                className="p-2 hover:bg-amber-50 dark:hover:bg-amber-400/10 rounded-lg transition-all hover:scale-105 active:scale-95"
               >
                 <ChevronRight className="w-5 h-5 ink-text-muted" />
               </button>
@@ -162,12 +162,12 @@ export default function Navigation({
           </div>
 
           <div className="flex items-center gap-3 lg:gap-4">
-            <div className="flex items-center gap-2 lg:gap-3 bg-amber-50 px-3 lg:px-5 py-2 lg:py-2.5 rounded-lg paper-border paper-shadow">
+            <div className="flex items-center gap-2 lg:gap-3 bg-amber-50 dark:bg-amber-400/10 px-3 lg:px-5 py-2 lg:py-2.5 rounded-lg paper-border paper-shadow">
               <Flame className="w-5 h-5 lg:w-6 lg:h-6 text-amber-600" />
               <div className="flex items-center gap-1.5 lg:gap-2">
                 <span className="text-xl lg:text-2xl font-bold ink-text">{streakDays}</span>
                 <div className="flex flex-col">
-                  <span className="text-[10px] lg:text-xs font-semibold text-amber-700 leading-tight">day streak</span>
+                  <span className="text-[10px] lg:text-xs font-semibold text-amber-700 dark:text-amber-300 leading-tight">day streak</span>
                   <span className="text-[10px] lg:text-xs ink-text-muted leading-tight">&ge;8h/day</span>
                 </div>
               </div>
@@ -176,7 +176,7 @@ export default function Navigation({
               onClick={toggleTheme}
               aria-label={themeLabel}
               title={themeLabel}
-              className="p-2 rounded-lg hover:bg-amber-50 transition-all hover:scale-105 active:scale-95"
+              className="p-2 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-400/10 transition-all hover:scale-105 active:scale-95"
             >
               <ThemeIcon className="w-5 h-5 lg:w-6 lg:h-6 ink-text-muted" />
             </button>

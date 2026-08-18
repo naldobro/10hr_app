@@ -119,8 +119,8 @@ export default function BackupModal({ onClose }: BackupModalProps) {
                 <Upload className="w-4 h-4" /> Choose backup file…
               </button>
             ) : (
-              <div className="rounded-lg border border-amber-300 bg-amber-50/70 p-3">
-                <div className="flex items-center gap-2 text-amber-800 text-sm font-semibold mb-2">
+              <div className="rounded-lg border border-amber-300 bg-amber-50/70 dark:bg-amber-400/10 p-3">
+                <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-sm font-semibold mb-2">
                   <AlertTriangle className="w-4 h-4" /> Replace everything with this backup?
                 </div>
                 <div className="text-[11px] font-mono ink-text-muted mb-3 flex flex-wrap gap-x-3 gap-y-0.5">
@@ -153,8 +153,8 @@ export default function BackupModal({ onClose }: BackupModalProps) {
             )}
           </div>
 
-          {status && <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">{status}</div>}
-          {error && <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
+          {status && <div className="text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-400/10 border border-emerald-200 rounded-lg px-3 py-2">{status}</div>}
+          {error && <div className="text-xs text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-400/10 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
         </div>
       </div>
     </div>

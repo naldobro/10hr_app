@@ -71,7 +71,7 @@ export default function FocusCard({ text, onChange, hidden }: FocusCardProps) {
           {editing ? (
             <button
               onClick={done}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-emerald-700 hover:bg-emerald-50 transition"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-400/10 transition"
               title="Done"
             >
               <Check className="w-3.5 h-3.5" strokeWidth={3} /> Done

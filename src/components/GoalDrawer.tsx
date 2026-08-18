@@ -163,7 +163,7 @@ export default function GoalDrawer({ goal, attachOptions, onChange, onDelete, on
       <div className="px-5 pt-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))] border-t border-black/5 dark:border-white/[0.13] flex gap-2.5">
         <button
           onClick={onDelete}
-          className="px-3 py-2.5 rounded-xl border border-black/10 dark:border-white/[0.2] ink-text-muted hover:text-red-600 hover:bg-red-50 transition flex-none"
+          className="px-3 py-2.5 rounded-xl border border-black/10 dark:border-white/[0.2] ink-text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-400/10 transition flex-none"
           title="Delete"
         >
           <Trash2 className="w-4 h-4" />

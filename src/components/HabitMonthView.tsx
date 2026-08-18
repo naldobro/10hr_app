@@ -100,7 +100,7 @@ export default function HabitMonthView({ currentMonth, habitData, habitSchedules
       {/* Header */}
       <div className="px-3 sm:px-6 pt-3 sm:pt-4 pb-2 sm:pb-3">
         <div className="flex items-center justify-between mb-2 sm:mb-3">
-          <button onClick={prevHabit} className="p-1 sm:p-1.5 rounded-lg hover:bg-amber-100 transition-colors paper-border">
+          <button onClick={prevHabit} className="p-1 sm:p-1.5 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-400/20 transition-colors paper-border">
             <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 ink-text-muted" />
           </button>
           <div className="text-center">
@@ -110,7 +110,7 @@ export default function HabitMonthView({ currentMonth, habitData, habitSchedules
               {doneCount} of {scheduledCount} days
             </p>
           </div>
-          <button onClick={nextHabit} className="p-1 sm:p-1.5 rounded-lg hover:bg-amber-100 transition-colors paper-border">
+          <button onClick={nextHabit} className="p-1 sm:p-1.5 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-400/20 transition-colors paper-border">
             <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 ink-text-muted" />
           </button>
         </div>
@@ -186,8 +186,8 @@ export default function HabitMonthView({ currentMonth, habitData, habitSchedules
                       rounded-lg sm:rounded-xl flex flex-col items-center justify-center gap-0 sm:gap-0.5 transition-all
                       ${isFuture ? 'bg-stone-200/50' :
                         !scheduled ? 'bg-stone-100/50 paper-border opacity-50' :
-                        status === 'green' ? 'bg-emerald-100 border-2 border-emerald-400' :
-                        status === 'yellow' ? 'bg-amber-100 border-2 border-amber-400' :
+                        status === 'green' ? 'bg-emerald-100 dark:bg-emerald-400/20 border-2 border-emerald-400' :
+                        status === 'yellow' ? 'bg-amber-100 dark:bg-amber-400/20 border-2 border-amber-400' :
                         'bg-stone-200/70 paper-border'
                       }
                       ${isToday ? 'ring-2 ring-amber-600' : ''}
@@ -195,8 +195,8 @@ export default function HabitMonthView({ currentMonth, habitData, habitSchedules
                   >
                     <span className={`text-sm sm:text-xl font-bold leading-none ${
                       isFuture || !scheduled ? 'ink-text-muted' :
-                      status === 'green' ? 'text-emerald-800' :
-                      status === 'yellow' ? 'text-amber-800' :
+                      status === 'green' ? 'text-emerald-800 dark:text-emerald-200' :
+                      status === 'yellow' ? 'text-amber-800 dark:text-amber-200' :
                       'ink-text-muted'
                     }`}>
                       {day}

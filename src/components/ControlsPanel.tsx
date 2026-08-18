@@ -284,7 +284,7 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
             </h3>
 
             {validationError && (
-              <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg border border-red-200 text-sm">
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-400/10 text-red-700 dark:text-red-300 rounded-lg border border-red-200 text-sm">
                 {validationError}
               </div>
             )}
@@ -317,7 +317,7 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
                       className={`py-2 sm:py-3 rounded-lg font-semibold text-sm sm:text-base transition-all ${
                         manualDuration === duration && !useCustomDuration
                           ? 'bg-amber-600 text-white paper-shadow'
-                          : 'bg-amber-50 ink-text hover:bg-amber-100 paper-border'
+                          : 'bg-amber-50 dark:bg-amber-400/10 ink-text hover:bg-amber-100 dark:hover:bg-amber-400/20 paper-border'
                       }`}
                     >
                       {duration}h
@@ -439,7 +439,7 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
             </h3>
 
             {validationError && (
-              <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg border border-red-200 text-sm">
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-400/10 text-red-700 dark:text-red-300 rounded-lg border border-red-200 text-sm">
                 {validationError}
               </div>
             )}

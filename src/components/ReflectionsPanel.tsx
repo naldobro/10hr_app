@@ -149,7 +149,7 @@ function TopicColumn({
         />
         {confirmDel ? (
           <div className="flex items-center gap-1">
-            <button onClick={onDelete} className="text-[11px] font-bold text-red-600 px-1.5 py-1 rounded hover:bg-red-50">
+            <button onClick={onDelete} className="text-[11px] font-bold text-red-600 px-1.5 py-1 rounded hover:bg-red-50 dark:hover:bg-red-400/10">
               Delete
             </button>
             <button onClick={() => setConfirmDel(false)} className="text-[11px] ink-text-muted px-1 py-1 rounded hover:bg-stone-100">
@@ -159,7 +159,7 @@ function TopicColumn({
         ) : (
           <button
             onClick={() => setConfirmDel(true)}
-            className="p-1 rounded ink-text-muted hover:text-red-600 hover:bg-red-50 transition flex-none"
+            className="p-1 rounded ink-text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-400/10 transition flex-none"
             title="Delete topic"
           >
             <Trash2 className="w-4 h-4" />
