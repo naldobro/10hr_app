@@ -70,7 +70,3 @@ CREATE POLICY "single_user_delete_goals" ON goals
 CREATE POLICY "public_read_quotes" ON milestone_quotes
   FOR SELECT TO public USING (true);
 
--- Add CHECK constraints for time values
-ALTER TABLE work_sessions DROP CONSTRAINT IF EXISTS valid_time_range;
-ALTER TABLE work_sessions ADD CONSTRAINT valid_time_range
-  CHECK (start_time >= 0 AND end_time <= 24 AND end_time > start_time);
