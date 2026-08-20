@@ -10,7 +10,11 @@ type UndoAction =
   | { type: 'vision_update'; before: VisionGoal; after: VisionGoal; timestamp: number }
   | { type: 'topic_add'; topic: VisionTopic; timestamp: number }
   | { type: 'topic_delete'; topic: VisionTopic; timestamp: number }
-  | { type: 'topic_update'; before: VisionTopic; after: VisionTopic; timestamp: number };
+  | { type: 'topic_update'; before: VisionTopic; after: VisionTopic; timestamp: number }
+  // Focus note edits. `day` = a Track per-day note (keyed by date); `global` = the
+  // single Vision focus note. Committed once per edit (on Done/blur), not per keystroke.
+  | { type: 'focus_update'; scope: 'day'; date: string; before: string; after: string; timestamp: number }
+  | { type: 'focus_update'; scope: 'global'; before: string; after: string; timestamp: number };
 
 const visionFields = (g: VisionGoal) => ({
   kind: g.kind,
@@ -92,6 +96,12 @@ export const undoManager = {
       await db.visionTopics.restore(action.topic);
     } else if (action.type === 'topic_update') {
       await db.visionTopics.update(action.before.id, topicFields(action.before));
+    } else if (action.type === 'focus_update') {
+      if (action.scope === 'day') {
+        await db.summaries.setFocus(action.date, action.before);
+      } else {
+        await db.visionSettings.upsert({ focus_note: action.before });
+      }
     }
 
     const redoHistory = undoManager.getRedoHistory();
@@ -133,6 +143,12 @@ export const undoManager = {
       await db.visionTopics.delete(action.topic.id);
     } else if (action.type === 'topic_update') {
       await db.visionTopics.update(action.after.id, topicFields(action.after));
+    } else if (action.type === 'focus_update') {
+      if (action.scope === 'day') {
+        await db.summaries.setFocus(action.date, action.after);
+      } else {
+        await db.visionSettings.upsert({ focus_note: action.after });
+      }
     }
 
     const undoHistory = undoManager.getUndoHistory();

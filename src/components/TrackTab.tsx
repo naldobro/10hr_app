@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { db } from '../lib/database';
 import { undoManager } from '../lib/undoManager';
 import { WorkSession, DayData, HabitEntry } from '../types';
@@ -35,6 +35,9 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
   const [habitSchedules, setHabitSchedules] = useState<Record<string, number[]>>({});
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [focusNote, setFocusNote] = useState('');
+  // Last-committed focus text for the selected day, so an edit can be captured as
+  // a single before/after step on the undo stack.
+  const focusBaselineRef = useRef('');
 
   const currentDayString = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
 
@@ -66,6 +69,7 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
     if (await undoManager.undo()) {
       await loadSessions();
       await loadMonthData();
+      await loadFocus();
       updateUndoRedoState();
       showFeedback('success', 'Undone');
     }
@@ -76,6 +80,7 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
     if (await undoManager.redo()) {
       await loadSessions();
       await loadMonthData();
+      await loadFocus();
       updateUndoRedoState();
       showFeedback('success', 'Redone');
     }
@@ -147,15 +152,31 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
   const loadFocus = async () => {
     try {
       const summary = await db.summaries.getByDate(currentDayString);
-      setFocusNote(summary?.focus_note ?? '');
+      const note = summary?.focus_note ?? '';
+      setFocusNote(note);
+      focusBaselineRef.current = note;
     } catch {
       setFocusNote('');
+      focusBaselineRef.current = '';
     }
   };
 
   const updateFocusNote = (text: string, persist: boolean) => {
     setFocusNote(text);
     if (persist) {
+      // Record one undo step per committed edit (Done/blur), not per keystroke.
+      if (text !== focusBaselineRef.current) {
+        undoManager.addToUndoHistory({
+          type: 'focus_update',
+          scope: 'day',
+          date: currentDayString,
+          before: focusBaselineRef.current,
+          after: text,
+          timestamp: Date.now(),
+        });
+        focusBaselineRef.current = text;
+        updateUndoRedoState();
+      }
       db.summaries
         .setFocus(currentDayString, text)
         .catch(() => showFeedback('error', 'Could not save — run the daily_summaries focus migration'));

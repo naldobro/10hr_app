@@ -100,6 +100,10 @@ export default function VisionTab() {
   const [focusNote, setFocusNote] = useState(() =>
     typeof localStorage !== 'undefined' ? localStorage.getItem('vision_focus_note') || '' : ''
   );
+  // Last-committed focus text, so an edit lands as a single before/after undo step.
+  const focusBaselineRef = useRef(
+    typeof localStorage !== 'undefined' ? localStorage.getItem('vision_focus_note') || '' : ''
+  );
   const [ppd, setPpd] = useState<number>(() => {
     const saved = Number(localStorage.getItem('vision_ppd'));
     return saved >= PPD_MIN && saved <= PPD_MAX ? saved : PPD_DEFAULT;
@@ -184,6 +188,18 @@ export default function VisionTab() {
     }
   }, []);
 
+  const reloadFocus = useCallback(async () => {
+    try {
+      const s = await db.visionSettings.get();
+      const note = s?.focus_note ?? '';
+      setFocusNote(note);
+      localStorage.setItem('vision_focus_note', note);
+      focusBaselineRef.current = note;
+    } catch {
+      /* table may be absent until migration */
+    }
+  }, []);
+
   const reloadTopics = useCallback(async () => {
     try {
       const rows = await db.visionTopics.getAll();
@@ -225,7 +241,10 @@ export default function VisionTab() {
         .then((s) => {
           if (s) {
             setReflHeading({ title: s.reflections_title, subtitle: s.reflections_subtitle });
-            if (s.focus_note != null) setFocusNote(s.focus_note);
+            if (s.focus_note != null) {
+              setFocusNote(s.focus_note);
+              focusBaselineRef.current = s.focus_note;
+            }
           }
         })
         .catch(() => {});
@@ -275,20 +294,20 @@ export default function VisionTab() {
   const handleUndo = useCallback(async () => {
     if (!undoManager.canUndo()) return;
     await undoManager.undo();
-    await Promise.all([reloadGoals(), reloadTopics(), reloadDocs()]);
+    await Promise.all([reloadGoals(), reloadTopics(), reloadDocs(), reloadFocus()]);
     refreshUndo();
     setToast('Undone');
     window.setTimeout(() => setToast(null), 1600);
-  }, [reloadGoals, reloadTopics, reloadDocs, refreshUndo]);
+  }, [reloadGoals, reloadTopics, reloadDocs, reloadFocus, refreshUndo]);
 
   const handleRedo = useCallback(async () => {
     if (!undoManager.canRedo()) return;
     await undoManager.redo();
-    await Promise.all([reloadGoals(), reloadTopics(), reloadDocs()]);
+    await Promise.all([reloadGoals(), reloadTopics(), reloadDocs(), reloadFocus()]);
     refreshUndo();
     setToast('Redone');
     window.setTimeout(() => setToast(null), 1600);
-  }, [reloadGoals, reloadTopics, reloadDocs, refreshUndo]);
+  }, [reloadGoals, reloadTopics, reloadDocs, reloadFocus, refreshUndo]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -577,10 +596,24 @@ export default function VisionTab() {
   const updateFocusNote = (text: string, persist: boolean) => {
     setFocusNote(text);
     localStorage.setItem('vision_focus_note', text);
-    if (persist && !dbDown) {
-      db.visionSettings
-        .upsert({ focus_note: text })
-        .catch(() => flash('Could not save — run the vision_settings focus migration'));
+    if (persist) {
+      // Record one undo step per committed edit (Done/blur), not per keystroke.
+      if (text !== focusBaselineRef.current) {
+        undoManager.addToUndoHistory({
+          type: 'focus_update',
+          scope: 'global',
+          before: focusBaselineRef.current,
+          after: text,
+          timestamp: Date.now(),
+        });
+        focusBaselineRef.current = text;
+        refreshUndo();
+      }
+      if (!dbDown) {
+        db.visionSettings
+          .upsert({ focus_note: text })
+          .catch(() => flash('Could not save — run the vision_settings focus migration'));
+      }
     }
   };
 
