@@ -12,7 +12,9 @@ interface TodayFocusProps {
 // toolbar (next to Undo/Redo) so it never eats calendar space; clicking it drops
 // down a floating panel anchored to the pill. Scoped to the selected day.
 export default function TodayFocus({ text, dayLabel, onChange }: TodayFocusProps) {
-  const [open, setOpen] = useState(false);
+  // Default to open on every mount — opening the app or returning to this page
+  // reopens it. Closing only dismisses it for the current session.
+  const [open, setOpen] = useState(true);
   const [editing, setEditing] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
