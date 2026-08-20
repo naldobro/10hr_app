@@ -442,21 +442,26 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
             `}</style>
           </div>
         )}
+
+        {/* Per-day Focus note — floats over the top-right of the calendar,
+            mirroring the Vision Focus card. Hidden while the habit month
+            overlay is open so it never fights that view. */}
+        {!habitViewOpen && (
+          <TodayFocus
+            text={focusNote}
+            dayLabel={new Date(currentMonth.getFullYear(), currentMonth.getMonth(), selectedDay).toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            })}
+            onChange={updateFocusNote}
+          />
+        )}
       </div>
 
       <MotivationalQuote workedHours={workedHours} />
 
       <DaySummary workedHours={workedHours} targetHours={10} />
-
-      <TodayFocus
-        text={focusNote}
-        dayLabel={new Date(currentMonth.getFullYear(), currentMonth.getMonth(), selectedDay).toLocaleDateString('en-US', {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric',
-        })}
-        onChange={updateFocusNote}
-      />
 
       <TimelineGraph
         sessions={sessions}
