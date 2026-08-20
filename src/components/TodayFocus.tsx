@@ -30,8 +30,9 @@ export default function TodayFocus({ text, dayLabel, onChange }: TodayFocusProps
   };
 
   return (
-    <div className="paper-card rounded-2xl paper-shadow paper-border p-4 sm:p-6">
-      <div className="flex items-center justify-between mb-3">
+    <div className="paper-card paper-border paper-shadow rounded-2xl overflow-hidden">
+      {/* header — mirrors the Vision Focus sticker: divider + subtle tint */}
+      <div className="flex items-center justify-between pl-3 pr-2 py-2 border-b border-black/5 dark:border-white/[0.13] bg-white/40 dark:bg-paper/40">
         <div className="flex items-center gap-2.5">
           <span
             className="grid place-items-center w-7 h-7 rounded-lg text-white"
@@ -40,7 +41,7 @@ export default function TodayFocus({ text, dayLabel, onChange }: TodayFocusProps
             <Sparkles className="w-4 h-4" />
           </span>
           <div className="leading-tight">
-            <div className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">Focus</div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">Focus</div>
             <div className="text-[11px] ink-text-muted">{dayLabel}</div>
           </div>
         </div>
@@ -63,6 +64,7 @@ export default function TodayFocus({ text, dayLabel, onChange }: TodayFocusProps
         )}
       </div>
 
+      {/* body */}
       {editing ? (
         <textarea
           ref={taRef}
@@ -70,10 +72,14 @@ export default function TodayFocus({ text, dayLabel, onChange }: TodayFocusProps
           onChange={(e) => onChange(e.target.value, false)}
           onBlur={done}
           placeholder="What are you setting out to focus on today?"
-          className="block w-full resize-none outline-none bg-transparent text-sm sm:text-[15px] leading-relaxed ink-text placeholder:text-stone-400 min-h-[72px]"
+          className="block w-full resize-none outline-none bg-transparent px-4 sm:px-6 py-4 text-sm sm:text-[15px] leading-relaxed ink-text placeholder:text-stone-400 min-h-[96px]"
         />
       ) : (
-        <div onClick={() => setEditing(true)} className="cursor-text" title="Click to edit">
+        <div
+          onClick={() => setEditing(true)}
+          className="px-4 sm:px-6 py-4 cursor-text"
+          title="Click to edit"
+        >
           {text.trim() ? (
             <p className="text-sm sm:text-[15px] leading-relaxed ink-text whitespace-pre-wrap">{text}</p>
           ) : (
