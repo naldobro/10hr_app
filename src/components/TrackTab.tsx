@@ -385,29 +385,43 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
         </div>
       )}
 
-      {/* Undo/Redo — compact inline */}
-      {(canUndo || canRedo) && (
-        <div className="flex gap-2 justify-end">
-          <button
-            onClick={handleUndo}
-            disabled={!canUndo}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-200 hover:bg-stone-300 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-sm font-medium ink-text transition-colors paper-border"
-            title="Undo (Ctrl+Z)"
-          >
-            <Undo2 className="w-4 h-4" />
-            <span className="hidden sm:inline">Undo</span>
-          </button>
-          <button
-            onClick={handleRedo}
-            disabled={!canRedo}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-200 hover:bg-stone-300 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-sm font-medium ink-text transition-colors paper-border"
-            title="Redo (Ctrl+Shift+Z)"
-          >
-            <Redo2 className="w-4 h-4" />
-            <span className="hidden sm:inline">Redo</span>
-          </button>
-        </div>
-      )}
+      {/* Toolbar — Undo/Redo plus the per-day Focus note pill, kept out of the
+          calendar so it never overlaps the days. */}
+      <div className="flex items-center gap-2 justify-end">
+        {(canUndo || canRedo) && (
+          <>
+            <button
+              onClick={handleUndo}
+              disabled={!canUndo}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-200 hover:bg-stone-300 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-sm font-medium ink-text transition-colors paper-border"
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Undo</span>
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={!canRedo}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-200 hover:bg-stone-300 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-sm font-medium ink-text transition-colors paper-border"
+              title="Redo (Ctrl+Shift+Z)"
+            >
+              <Redo2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Redo</span>
+            </button>
+          </>
+        )}
+        {!habitViewOpen && (
+          <TodayFocus
+            text={focusNote}
+            dayLabel={new Date(currentMonth.getFullYear(), currentMonth.getMonth(), selectedDay).toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            })}
+            onChange={updateFocusNote}
+          />
+        )}
+      </div>
 
       <div className="relative">
         <MonthOverview
@@ -462,21 +476,6 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
               }
             `}</style>
           </div>
-        )}
-
-        {/* Per-day Focus note — floats over the top-right of the calendar,
-            mirroring the Vision Focus card. Hidden while the habit month
-            overlay is open so it never fights that view. */}
-        {!habitViewOpen && (
-          <TodayFocus
-            text={focusNote}
-            dayLabel={new Date(currentMonth.getFullYear(), currentMonth.getMonth(), selectedDay).toLocaleDateString('en-US', {
-              weekday: 'short',
-              month: 'short',
-              day: 'numeric',
-            })}
-            onChange={updateFocusNote}
-          />
         )}
       </div>
 
