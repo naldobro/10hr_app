@@ -143,6 +143,22 @@ export const db = {
 
       if (error) throw error;
     },
+
+    // Persist only the focus note, leaving total_hours / milestone state untouched.
+    setFocus: async (date: string, focus_note: string): Promise<void> => {
+      const { error } = await supabase
+        .from('daily_summaries')
+        .upsert({
+          user_id: SINGLE_USER_ID,
+          date,
+          focus_note,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id,date',
+        });
+
+      if (error) throw error;
+    },
   },
 
   habits: {

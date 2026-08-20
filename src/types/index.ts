@@ -15,6 +15,8 @@ export interface DailySummary {
   date: string;
   total_hours: number;
   milestone_quotes_shown: string[];
+  /** Free-text "what I'm focusing on today" note, shown in the Track Focus card. */
+  focus_note: string;
   updated_at: string;
 }
 

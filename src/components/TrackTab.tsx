@@ -8,6 +8,7 @@ import HabitScheduleModal from './HabitScheduleModal';
 import MotivationalQuote from './MotivationalQuote';
 import DaySummary from './DaySummary';
 import TimelineGraph from './TimelineGraph';
+import TodayFocus from './TodayFocus';
 import ControlsPanel from './ControlsPanel';
 import MilestoneQuote from './MilestoneQuote';
 import { Undo2, Redo2, ChevronRight, ChevronLeft, Settings, X } from 'lucide-react';
@@ -33,6 +34,7 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
   const [habitViewOpen, setHabitViewOpen] = useState(false);
   const [habitSchedules, setHabitSchedules] = useState<Record<string, number[]>>({});
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [focusNote, setFocusNote] = useState('');
 
   const currentDayString = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
 
@@ -48,12 +50,14 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
     loadSessions();
     loadHabitData();
     loadHabitSchedules();
+    loadFocus();
     updateUndoRedoState();
   }, [currentMonth]);
 
   useEffect(() => {
     loadSessions();
     loadCurrentHabit();
+    loadFocus();
     updateUndoRedoState();
   }, [selectedDay]);
 
@@ -137,6 +141,24 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
       setCurrentHabit(map.get(currentDayString) || null);
     } catch {
       // Table might not exist yet
+    }
+  };
+
+  const loadFocus = async () => {
+    try {
+      const summary = await db.summaries.getByDate(currentDayString);
+      setFocusNote(summary?.focus_note ?? '');
+    } catch {
+      setFocusNote('');
+    }
+  };
+
+  const updateFocusNote = (text: string, persist: boolean) => {
+    setFocusNote(text);
+    if (persist) {
+      db.summaries
+        .setFocus(currentDayString, text)
+        .catch(() => showFeedback('error', 'Could not save — run the daily_summaries focus migration'));
     }
   };
 
@@ -425,6 +447,16 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
       <MotivationalQuote workedHours={workedHours} />
 
       <DaySummary workedHours={workedHours} targetHours={10} />
+
+      <TodayFocus
+        text={focusNote}
+        dayLabel={new Date(currentMonth.getFullYear(), currentMonth.getMonth(), selectedDay).toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        })}
+        onChange={updateFocusNote}
+      />
 
       <TimelineGraph
         sessions={sessions}
