@@ -3,15 +3,13 @@ import { Sparkles, Pencil, Check, X } from 'lucide-react';
 
 interface TodayFocusProps {
   text: string;
-  /** Human label for the selected day, e.g. "Thu, Aug 20". */
-  dayLabel: string;
   onChange: (text: string, persist: boolean) => void;
 }
 
-// A per-day "what I'm focusing on today" note. Lives as a compact pill in the
-// toolbar (next to Undo/Redo) so it never eats calendar space; clicking it drops
-// down a floating panel anchored to the pill. Scoped to the selected day.
-export default function TodayFocus({ text, dayLabel, onChange }: TodayFocusProps) {
+// A single global "what I'm focusing on" note, shared across every day. Lives as a
+// compact pill in the toolbar (next to Undo/Redo) so it never eats calendar space;
+// clicking it drops down a floating panel anchored to the pill.
+export default function TodayFocus({ text, onChange }: TodayFocusProps) {
   // Default to open on every mount — opening the app or returning to this page
   // reopens it. Closing only dismisses it for the current session.
   const [open, setOpen] = useState(true);
@@ -87,10 +85,7 @@ export default function TodayFocus({ text, dayLabel, onChange }: TodayFocusProps
               >
                 <Sparkles className="w-4 h-4 text-white" />
               </span>
-              <div className="leading-tight">
-                <div className="text-[11px] font-bold uppercase tracking-wider ink-text-muted">Focus</div>
-                <div className="text-[11px] ink-text-muted">{dayLabel}</div>
-              </div>
+              <div className="text-[11px] font-bold uppercase tracking-wider ink-text-muted">Focus</div>
             </div>
             <div className="flex items-center gap-0.5">
               {editing ? (
@@ -130,7 +125,7 @@ export default function TodayFocus({ text, dayLabel, onChange }: TodayFocusProps
               value={text}
               onChange={(e) => onChange(e.target.value, false)}
               onBlur={done}
-              placeholder="What are you setting out to focus on today? What should you spend your hours on?"
+              placeholder="What are you setting out to focus on? What should you spend your hours on?"
               className="block w-full resize-none outline-none bg-transparent px-4 py-3.5 text-[13.5px] leading-relaxed ink-text placeholder:text-stone-400"
               style={{ height: 'min(46vh, 320px)' }}
             />
@@ -144,7 +139,7 @@ export default function TodayFocus({ text, dayLabel, onChange }: TodayFocusProps
                 <p className="text-[13.5px] leading-relaxed ink-text whitespace-pre-wrap">{text}</p>
               ) : (
                 <p className="text-[13px] leading-relaxed text-stone-400 italic">
-                  Click to add today's focus — what should you spend your hours on? ✦
+                  Click to add your focus — what should you spend your hours on? ✦
                 </p>
               )}
             </div>

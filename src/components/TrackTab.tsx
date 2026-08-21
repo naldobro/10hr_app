@@ -34,10 +34,18 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
   const [habitViewOpen, setHabitViewOpen] = useState(false);
   const [habitSchedules, setHabitSchedules] = useState<Record<string, number[]>>({});
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
-  const [focusNote, setFocusNote] = useState('');
-  // Last-committed focus text for the selected day, so an edit can be captured as
-  // a single before/after step on the undo stack.
-  const focusBaselineRef = useRef('');
+  // The Track tab's own single global Focus note — day-independent, and entirely
+  // separate from the Vision tab's Focus (that one lives in vision_settings.focus_note).
+  // Stored in vision_settings.track_focus_note; seeded from localStorage so it shows
+  // instantly before the network read lands.
+  const [focusNote, setFocusNote] = useState(() =>
+    typeof localStorage !== 'undefined' ? localStorage.getItem('track_focus_note') || '' : ''
+  );
+  // Last-committed focus text, so an edit can be captured as a single before/after
+  // step on the undo stack.
+  const focusBaselineRef = useRef(
+    typeof localStorage !== 'undefined' ? localStorage.getItem('track_focus_note') || '' : ''
+  );
 
   const currentDayString = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
 
@@ -151,25 +159,25 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
 
   const loadFocus = async () => {
     try {
-      const summary = await db.summaries.getByDate(currentDayString);
-      const note = summary?.focus_note ?? '';
+      const s = await db.visionSettings.get();
+      const note = s?.track_focus_note ?? '';
       setFocusNote(note);
+      localStorage.setItem('track_focus_note', note);
       focusBaselineRef.current = note;
     } catch {
-      setFocusNote('');
-      focusBaselineRef.current = '';
+      // Keep whatever the localStorage seed gave us rather than blanking it out.
     }
   };
 
   const updateFocusNote = (text: string, persist: boolean) => {
     setFocusNote(text);
+    localStorage.setItem('track_focus_note', text);
     if (persist) {
       // Record one undo step per committed edit (Done/blur), not per keystroke.
       if (text !== focusBaselineRef.current) {
         undoManager.addToUndoHistory({
           type: 'focus_update',
-          scope: 'day',
-          date: currentDayString,
+          scope: 'track',
           before: focusBaselineRef.current,
           after: text,
           timestamp: Date.now(),
@@ -177,9 +185,9 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
         focusBaselineRef.current = text;
         updateUndoRedoState();
       }
-      db.summaries
-        .setFocus(currentDayString, text)
-        .catch(() => showFeedback('error', 'Could not save — run the daily_summaries focus migration'));
+      db.visionSettings
+        .upsert({ track_focus_note: text })
+        .catch(() => showFeedback('error', 'Could not save — run the track_focus_note migration'));
     }
   };
 
@@ -385,7 +393,7 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
         </div>
       )}
 
-      {/* Toolbar — Undo/Redo plus the per-day Focus note pill, kept out of the
+      {/* Toolbar — Undo/Redo plus the global Focus note pill, kept out of the
           calendar so it never overlaps the days. */}
       <div className="flex items-center gap-2 justify-end">
         {(canUndo || canRedo) && (
@@ -411,15 +419,7 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
           </>
         )}
         {!habitViewOpen && (
-          <TodayFocus
-            text={focusNote}
-            dayLabel={new Date(currentMonth.getFullYear(), currentMonth.getMonth(), selectedDay).toLocaleDateString('en-US', {
-              weekday: 'short',
-              month: 'short',
-              day: 'numeric',
-            })}
-            onChange={updateFocusNote}
-          />
+          <TodayFocus text={focusNote} onChange={updateFocusNote} />
         )}
       </div>
 

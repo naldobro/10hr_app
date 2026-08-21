@@ -105,8 +105,10 @@ export interface VisionSettings {
   user_id: string;
   reflections_title: string;
   reflections_subtitle: string;
-  /** Free-text "what I'm focusing on right now" note, shown in the Focus card. */
+  /** Free-text "what I'm focusing on right now" note, shown in the Vision Focus card. */
   focus_note: string;
+  /** Separate global Focus note for the Track tab, day-independent. Distinct from focus_note. */
+  track_focus_note: string;
   updated_at: string;
 }
 
