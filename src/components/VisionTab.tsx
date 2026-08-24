@@ -1305,6 +1305,7 @@ export default function VisionTab() {
           onDelete={deleteDoc}
           onRestore={restoreDoc}
           onPurge={purgeDoc}
+          onUploadImage={(blob, type) => db.visionImages.upload(blob, type)}
           onClose={() => setShowPlanner(false)}
         />
       )}

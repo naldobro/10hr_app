@@ -27,6 +27,14 @@ const snapshotRow = (g: VisionGoal) => ({
 
 const SINGLE_USER_ID = 'single-user';
 
+// File extensions for the image types the planner produces / accepts.
+const IMG_EXT: Record<string, string> = {
+  'image/webp': 'webp',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+};
+
 export const db = {
   sessions: {
     getAll: async (): Promise<WorkSession[]> => {
@@ -536,6 +544,20 @@ export const db = {
 
       if (error) throw error;
       return data;
+    },
+  },
+
+  // Images embedded in planner docs live in Storage; the doc HTML keeps only the URL.
+  visionImages: {
+    // Upload one already-compressed image blob; returns its permanent public URL.
+    upload: async (blob: Blob, contentType: string): Promise<string> => {
+      const ext = IMG_EXT[contentType] || 'bin';
+      const path = `${SINGLE_USER_ID}/${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage
+        .from('vision-images')
+        .upload(path, blob, { contentType, cacheControl: '31536000', upsert: false });
+      if (error) throw error;
+      return supabase.storage.from('vision-images').getPublicUrl(path).data.publicUrl;
     },
   },
 

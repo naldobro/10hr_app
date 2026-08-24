@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Plus,
@@ -19,6 +20,7 @@ import {
   Baseline,
   Highlighter,
   Table,
+  Image as ImageIcon,
   Minus,
   AlignLeft,
   AlignCenter,
@@ -43,6 +45,8 @@ interface PlannerPanelProps {
   onDelete: (id: string) => void;
   onRestore: (id: string) => void;
   onPurge: (id: string) => void;
+  /** Upload a compressed image blob to storage; resolves with its public URL. */
+  onUploadImage?: (blob: Blob, contentType: string) => Promise<string>;
   onClose: () => void;
 }
 
@@ -66,6 +70,64 @@ const FONT_SIZES: { label: string; size: string; px: string }[] = [
 const TEXT_COLORS = ['#1c1917', '#78716c', '#e11d48', '#d97706', '#059669', '#2563eb', '#7c3aed'];
 const HILITE_COLORS = ['#fef08a', '#bbf7d0', '#bfdbfe', '#fbcfe8', '#fed7aa', '#e9d5ff'];
 
+// Images are embedded as data URLs inside the doc HTML so they persist through the
+// normal save path — no separate storage bucket, no broken links, works offline.
+// To keep that HTML from ballooning, we downscale + re-encode before embedding.
+const IMG_MAX_DIM = 1600; // px, longest edge
+
+const blobToDataUrl = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result as string);
+    fr.onerror = () => reject(fr.error);
+    fr.readAsDataURL(blob);
+  });
+
+const loadImage = (src: string): Promise<HTMLImageElement> =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+
+const canvasToBlob = (canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob | null> =>
+  new Promise((resolve) => canvas.toBlob((b) => resolve(b && b.type === type ? b : null), type, quality));
+
+// Downscale + re-encode an image file into a compact blob for upload. Returns
+// the original file untouched if the canvas step can't run (GIF, no 2d context).
+async function compressImage(file: File): Promise<{ blob: Blob; type: string }> {
+  const original = { blob: file as Blob, type: file.type };
+  // GIFs would lose animation if re-drawn on a canvas, so keep them verbatim.
+  if (file.type === 'image/gif') return original;
+
+  const objUrl = URL.createObjectURL(file);
+  try {
+    const img = await loadImage(objUrl);
+    let w = img.naturalWidth || img.width;
+    let h = img.naturalHeight || img.height;
+    if (w > IMG_MAX_DIM || h > IMG_MAX_DIM) {
+      const scale = Math.min(IMG_MAX_DIM / w, IMG_MAX_DIM / h);
+      w = Math.round(w * scale);
+      h = Math.round(h * scale);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return original;
+    ctx.drawImage(img, 0, 0, w, h);
+    // WebP is the smallest; if the platform can't encode it, fall back to JPEG.
+    const blob =
+      (await canvasToBlob(canvas, 'image/webp', 0.85)) ?? (await canvasToBlob(canvas, 'image/jpeg', 0.85));
+    return blob ? { blob, type: blob.type } : original;
+  } catch {
+    return original;
+  } finally {
+    URL.revokeObjectURL(objUrl);
+  }
+}
+
 export default function PlannerPanel({
   docs,
   trashDocs,
@@ -74,6 +136,7 @@ export default function PlannerPanel({
   onDelete,
   onRestore,
   onPurge,
+  onUploadImage,
   onClose,
 }: PlannerPanelProps) {
   const currentMonth = monthKey(new Date());
@@ -308,6 +371,7 @@ export default function PlannerPanel({
         .doc-body blockquote { border-left: 3px solid #d6d3d1; padding-left: .8rem; margin: .5em 0; color: #78716c; font-style: italic; }
         .doc-body a { color: #2563eb; text-decoration: underline; }
         .doc-body hr { border: none; border-top: 1px solid #d6d3d1; margin: .9em 0; }
+        .doc-body img { max-width: 100%; height: auto; border-radius: .5rem; margin: .5em 0; display: block; }
         .doc-body[data-empty="true"]::before { content: attr(data-placeholder); color: #a8a29e; }
         /* tables */
         .doc-body table.doc-table { border-collapse: collapse; width: 100%; margin: .6em 0; }
@@ -628,6 +692,7 @@ export default function PlannerPanel({
               doc={doc}
               onChange={(patch, persist) => onUpdate(doc.id, patch, persist)}
               onDelete={() => onDelete(doc.id)}
+              onUploadImage={onUploadImage}
             />
           ) : (
             <div className="flex-1 grid place-items-center px-6 -mt-8">
@@ -658,13 +723,21 @@ function DocEditor({
   doc,
   onChange,
   onDelete,
+  onUploadImage,
 }: {
   doc: VisionDoc;
   onChange: (patch: Partial<VisionDoc>, persist: boolean) => void;
   onDelete: () => void;
+  onUploadImage?: (blob: Blob, contentType: string) => Promise<string>;
 }) {
   const summaryRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // The image currently clicked for resizing, plus its on-screen box (viewport
+  // coords) used to place the outline + drag handle.
+  const selImgRef = useRef<HTMLImageElement | null>(null);
+  const [imgBox, setImgBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const [title, setTitle] = useState(doc.title);
   const [color, setColor] = useState(doc.color || '#0ea5e9');
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -761,6 +834,31 @@ function DocEditor({
     return () => document.removeEventListener('mousedown', onDown);
   }, [menu]);
 
+  // Keep the resize handle glued to the image as the doc scrolls or the window resizes.
+  useEffect(() => {
+    if (!imgBox) return;
+    const onMove = () => syncImgBox();
+    const sc = scrollRef.current;
+    sc?.addEventListener('scroll', onMove, true);
+    window.addEventListener('resize', onMove);
+    return () => {
+      sc?.removeEventListener('scroll', onMove, true);
+      window.removeEventListener('resize', onMove);
+    };
+  }, [imgBox]);
+
+  // Clicking anywhere that isn't the image or its handle drops the selection.
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.tagName === 'IMG' || t.closest('[data-img-handle]')) return;
+      selImgRef.current = null;
+      setImgBox(null);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, []);
+
   const onTitle = (v: string) => {
     setTitle(v);
     meta.current.title = v;
@@ -840,6 +938,99 @@ function DocEditor({
       '<ul class="doc-tasks"><li class="doc-task" data-checked="false">&#8203;</li></ul>'
     );
     afterEdit();
+  };
+
+  // Insert one or more image files at the caret. Each is compressed, then
+  // uploaded to storage so the doc HTML holds only a short URL (fast to save/load,
+  // no bloat over the years). If the upload fails — offline, bucket not set up —
+  // we embed the image inline as a data URL so it's never silently lost.
+  const insertImageFiles = async (files: File[]) => {
+    const images = files.filter((f) => f.type.startsWith('image/'));
+    if (images.length === 0) return;
+    ensureFocus();
+    for (const file of images) {
+      const { blob, type } = await compressImage(file);
+      let src: string | null = null;
+      if (onUploadImage) {
+        try {
+          src = await onUploadImage(blob, type);
+        } catch {
+          src = null; // fall through to inline embedding
+        }
+      }
+      if (!src) src = await blobToDataUrl(blob).catch(() => null);
+      if (!src) continue;
+      // Keep the caret inside the editor even if focus drifted during the upload.
+      ensureFocus();
+      // insertHTML drops the caret right after the inserted node, so a series
+      // of images lands in order and there's an empty line to keep typing on.
+      document.execCommand('insertHTML', false, `<img src="${src}" alt="" /><p><br></p>`);
+    }
+    afterEdit();
+  };
+
+  // Screenshots / copied images arrive as clipboard files — grab them before the
+  // default paste turns them into anything lossy (or nothing at all).
+  const onEditorPaste = (e: React.ClipboardEvent) => {
+    const files = Array.from(e.clipboardData?.files || []).filter((f) => f.type.startsWith('image/'));
+    if (files.length === 0) return;
+    e.preventDefault();
+    void insertImageFiles(files);
+  };
+
+  const onEditorDrop = (e: React.DragEvent) => {
+    const files = Array.from(e.dataTransfer?.files || []).filter((f) => f.type.startsWith('image/'));
+    if (files.length === 0) return;
+    e.preventDefault();
+    void insertImageFiles(files);
+  };
+
+  const pickImage = () => {
+    ensureFocus();
+    fileInputRef.current?.click();
+  };
+
+  // Recompute the selected image's on-screen box (or drop the selection if it's
+  // gone from the DOM, e.g. deleted).
+  const syncImgBox = () => {
+    const img = selImgRef.current;
+    if (!img || !img.isConnected) {
+      selImgRef.current = null;
+      setImgBox(null);
+      return;
+    }
+    const r = img.getBoundingClientRect();
+    setImgBox({ left: r.left, top: r.top, width: r.width, height: r.height });
+  };
+
+  const selectImage = (img: HTMLImageElement) => {
+    selImgRef.current = img;
+    syncImgBox();
+  };
+
+  // Drag the corner handle to make the image smaller or bigger; the new width is
+  // written as an inline style so it saves with the doc HTML.
+  const startResize = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const img = selImgRef.current;
+    if (!img) return;
+    const startX = e.clientX;
+    const startW = img.getBoundingClientRect().width;
+    const maxW = img.parentElement?.clientWidth || startW * 3;
+    const onMove = (ev: PointerEvent) => {
+      const w = Math.max(48, Math.min(startW + (ev.clientX - startX), maxW));
+      img.style.width = `${Math.round(w)}px`;
+      img.style.height = 'auto';
+      syncImgBox();
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      syncImgBox();
+      afterEdit(); // persist the new width
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
   };
 
   // Table row/column edits, relative to the cell holding the caret.
@@ -1019,6 +1210,7 @@ function DocEditor({
           <TableSizePicker onPick={insertTable} />
         </Menu>
         <TB onClick={() => exec('insertHorizontalRule')} title="Divider line"><Minus className="w-4 h-4" /></TB>
+        <TB onClick={pickImage} title="Insert image (or just paste / drop one)"><ImageIcon className="w-4 h-4" /></TB>
 
         <Sep />
         <TB onClick={() => exec('justifyLeft')} title="Align left"><AlignLeft className="w-4 h-4" /></TB>
@@ -1062,7 +1254,7 @@ function DocEditor({
       </div>
 
       {/* objectives section + body */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 sm:px-10 py-5">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-6 sm:px-10 py-5">
         <div
           className="rounded-2xl px-4 py-3 mb-5"
           style={{ background: `${color}12`, border: `1px solid ${color}33`, borderLeft: `3px solid ${color}` }}
@@ -1076,6 +1268,9 @@ function DocEditor({
             suppressContentEditableWarning
             onInput={afterEdit}
             onClick={onTaskClick}
+            onPaste={onEditorPaste}
+            onDrop={onEditorDrop}
+            onDragOver={(e) => e.preventDefault()}
             onBlur={persistNow}
             data-placeholder="List what you need to get done…"
             className="doc-body text-[14px] ink-text"
@@ -1087,17 +1282,77 @@ function DocEditor({
           suppressContentEditableWarning
           onInput={afterEdit}
           onClick={onTaskClick}
+          onPaste={onEditorPaste}
+          onDrop={onEditorDrop}
+          onDragOver={(e) => e.preventDefault()}
           onBlur={persistNow}
           data-placeholder="Write your action plan…"
           className="doc-body min-h-[240px] text-[15px] ink-text"
         />
+        {/* Hidden picker for the toolbar's insert-image button. */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            void insertImageFiles(Array.from(e.target.files || []));
+            e.target.value = ''; // let the same file be picked again later
+          }}
+        />
       </div>
+
+      {/* Resize overlay for the selected image — portaled so it's never clipped. */}
+      {imgBox &&
+        createPortal(
+          <>
+            <div
+              style={{
+                position: 'fixed',
+                left: imgBox.left,
+                top: imgBox.top,
+                width: imgBox.width,
+                height: imgBox.height,
+                outline: '2px solid #f59e0b',
+                borderRadius: '0.5rem',
+                pointerEvents: 'none',
+                zIndex: 90,
+              }}
+            />
+            <div
+              data-img-handle
+              onPointerDown={startResize}
+              title="Drag to resize"
+              style={{
+                position: 'fixed',
+                left: imgBox.left + imgBox.width - 8,
+                top: imgBox.top + imgBox.height - 8,
+                width: 16,
+                height: 16,
+                background: '#f59e0b',
+                border: '2px solid #fff',
+                borderRadius: '50%',
+                cursor: 'nwse-resize',
+                touchAction: 'none',
+                zIndex: 91,
+              }}
+            />
+          </>,
+          document.body
+        )}
     </div>
   );
 
-  // Toggle a checklist item when its tick box (the left ~26px) is clicked.
+  // Toggle a checklist item when its tick box (the left ~26px) is clicked, or
+  // select an image for resizing when the image itself is clicked.
   function onTaskClick(e: React.MouseEvent) {
-    const li = (e.target as HTMLElement).closest?.('li.doc-task') as HTMLElement | null;
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'IMG') {
+      selectImage(target as HTMLImageElement);
+      return;
+    }
+    const li = target.closest?.('li.doc-task') as HTMLElement | null;
     if (!li) return;
     if (e.clientX - li.getBoundingClientRect().left > 26) return;
     li.dataset.checked = li.dataset.checked === 'true' ? 'false' : 'true';
