@@ -1,14 +1,59 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { db } from './lib/database';
+import type { FocusPillar } from './types';
 import Navigation from './components/Navigation';
 import TrackTab from './components/TrackTab';
 import StatisticsTab from './components/StatisticsTab';
 import VisionTab from './components/VisionTab';
 
+// Always work with exactly three focus pillars, whatever the stored array looks like.
+function normalizePillars(raw: unknown): FocusPillar[] {
+  const arr = Array.isArray(raw) ? raw : [];
+  return Array.from({ length: 3 }, (_, i) => {
+    const p = arr[i] as Partial<FocusPillar> | undefined;
+    return {
+      title: typeof p?.title === 'string' ? p.title : '',
+      body: typeof p?.body === 'string' ? p.body : '',
+    };
+  });
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState<'track' | 'statistics' | 'vision'>('track');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [streakDays, setStreakDays] = useState(0);
+
+  // The 3 focus pillars in the Vision nav bar. Seed from localStorage for an
+  // instant paint, then reconcile with Supabase.
+  const [focusPillars, setFocusPillars] = useState<FocusPillar[]>(() => {
+    try {
+      return normalizePillars(JSON.parse(localStorage.getItem('vision_focus_pillars') || '[]'));
+    } catch {
+      return normalizePillars([]);
+    }
+  });
+  const pillarsSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    db.visionSettings
+      .get()
+      .then((s) => {
+        if (s?.focus_pillars != null) setFocusPillars(normalizePillars(s.focus_pillars));
+      })
+      .catch(() => {});
+  }, []);
+
+  // Update immediately for a snappy UI + localStorage, and debounce the DB write.
+  const updateFocusPillars = (next: FocusPillar[]) => {
+    setFocusPillars(next);
+    localStorage.setItem('vision_focus_pillars', JSON.stringify(next));
+    if (pillarsSaveTimer.current) clearTimeout(pillarsSaveTimer.current);
+    pillarsSaveTimer.current = setTimeout(() => {
+      db.visionSettings
+        .upsert({ focus_pillars: next })
+        .catch(() => {});
+    }, 600);
+  };
 
   useEffect(() => {
     calculateStreak();
@@ -78,6 +123,8 @@ function App() {
         onMonthChange={handleMonthChange}
         streakDays={streakDays}
         canGoNext={canGoNext()}
+        focusPillars={focusPillars}
+        onFocusPillarsChange={updateFocusPillars}
       />
 
       {activeTab === 'vision' ? (

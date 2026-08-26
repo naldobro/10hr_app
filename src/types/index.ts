@@ -101,6 +101,14 @@ export interface VisionTopic {
   updated_at: string;
 }
 
+/** One of the three "focus things" pinned to the Vision nav bar. */
+export interface FocusPillar {
+  /** Short heading shown on the pill (the topic). */
+  title: string;
+  /** Longer note revealed when the pill is expanded. */
+  body: string;
+}
+
 export interface VisionSettings {
   user_id: string;
   reflections_title: string;
@@ -109,6 +117,8 @@ export interface VisionSettings {
   focus_note: string;
   /** Separate global Focus note for the Track tab, day-independent. Distinct from focus_note. */
   track_focus_note: string;
+  /** The 3 focus pillars shown in the Vision nav bar. Always normalised to length 3 in the UI. */
+  focus_pillars: FocusPillar[];
   updated_at: string;
 }
 

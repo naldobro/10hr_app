@@ -1,5 +1,7 @@
 import { ChevronLeft, ChevronRight, Flame, Sparkles, Moon, Sun } from 'lucide-react';
 import { useTheme } from '../lib/theme';
+import type { FocusPillar } from '../types';
+import FocusPillars from './FocusPillars';
 
 type Tab = 'track' | 'statistics' | 'vision';
 
@@ -10,6 +12,8 @@ interface NavigationProps {
   onMonthChange: (direction: 'prev' | 'next') => void;
   streakDays: number;
   canGoNext: boolean;
+  focusPillars: FocusPillar[];
+  onFocusPillarsChange: (pillars: FocusPillar[]) => void;
 }
 
 export default function Navigation({
@@ -19,10 +23,13 @@ export default function Navigation({
   onMonthChange,
   streakDays,
   canGoNext,
+  focusPillars,
+  onFocusPillarsChange,
 }: NavigationProps) {
   const { theme, toggleTheme } = useTheme();
   const ThemeIcon = theme === 'dark' ? Sun : Moon;
   const themeLabel = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  const isVision = activeTab === 'vision';
   return (
     <nav
       className="fixed top-0 left-0 right-0 z-50 paper-card paper-border paper-shadow"
@@ -100,6 +107,18 @@ export default function Navigation({
               Vision
             </button>
           </div>
+          {/* The 3 focus pillars drop in below the tabs on Vision. */}
+          {isVision && (
+            <div className="flex justify-center pb-1 animate-[pillarsRow_0.28s_cubic-bezier(0.16,1,0.3,1)]">
+              <style>{`@keyframes pillarsRow { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }`}</style>
+              <FocusPillars
+                pillars={focusPillars}
+                onChange={onFocusPillarsChange}
+                active={isVision}
+                compact
+              />
+            </div>
+          )}
         </div>
 
         {/* Desktop layout */}
@@ -147,28 +166,56 @@ export default function Navigation({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl lg:text-2xl font-bold ink-text tracking-tight whitespace-nowrap">
-              {currentMonth}
-            </h1>
-            {canGoNext && (
-              <button
-                onClick={() => onMonthChange('next')}
-                className="p-2 hover:bg-amber-50 dark:hover:bg-amber-400/10 rounded-lg transition-all hover:scale-105 active:scale-95"
-              >
-                <ChevronRight className="w-5 h-5 ink-text-muted" />
-              </button>
-            )}
+          {/* Center: the month cross-fades out and the 3 focus pillars slide in on Vision. */}
+          <div className="relative flex items-center justify-center">
+            <div
+              className={`flex items-center gap-2 transition-all duration-300 ${
+                isVision ? 'opacity-0 -translate-y-1 pointer-events-none' : 'opacity-100'
+              }`}
+            >
+              <h1 className="text-xl lg:text-2xl font-bold ink-text tracking-tight whitespace-nowrap">
+                {currentMonth}
+              </h1>
+              {canGoNext && (
+                <button
+                  onClick={() => onMonthChange('next')}
+                  className="p-2 hover:bg-amber-50 dark:hover:bg-amber-400/10 rounded-lg transition-all hover:scale-105 active:scale-95"
+                >
+                  <ChevronRight className="w-5 h-5 ink-text-muted" />
+                </button>
+              )}
+            </div>
+            <div
+              className={`absolute left-1/2 -translate-x-1/2 transition-all duration-300 ${
+                isVision ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1 pointer-events-none'
+              }`}
+            >
+              <FocusPillars
+                pillars={focusPillars}
+                onChange={onFocusPillarsChange}
+                active={isVision}
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-3 lg:gap-4">
-            <div className="flex items-center gap-2 lg:gap-3 bg-amber-50 dark:bg-amber-400/10 px-3 lg:px-5 py-2 lg:py-2.5 rounded-lg paper-border paper-shadow">
-              <Flame className="w-5 h-5 lg:w-6 lg:h-6 text-amber-600" />
+            {/* On Vision the streak shrinks to just the flame + count, giving the pillars room. */}
+            <div
+              title={isVision ? `${streakDays} day streak (≥8h/day)` : undefined}
+              className={`flex items-center bg-amber-50 dark:bg-amber-400/10 py-2 lg:py-2.5 rounded-lg paper-border paper-shadow transition-all duration-300 ${
+                isVision ? 'gap-1.5 px-2.5 lg:px-3' : 'gap-2 lg:gap-3 px-3 lg:px-5'
+              }`}
+            >
+              <Flame className="w-5 h-5 lg:w-6 lg:h-6 text-amber-600 shrink-0" />
               <div className="flex items-center gap-1.5 lg:gap-2">
                 <span className="text-xl lg:text-2xl font-bold ink-text">{streakDays}</span>
-                <div className="flex flex-col">
-                  <span className="text-[10px] lg:text-xs font-semibold text-amber-700 dark:text-amber-300 leading-tight">day streak</span>
-                  <span className="text-[10px] lg:text-xs ink-text-muted leading-tight">&ge;8h/day</span>
+                <div
+                  className={`flex flex-col overflow-hidden transition-all duration-300 ${
+                    isVision ? 'max-w-0 opacity-0' : 'max-w-[80px] opacity-100'
+                  }`}
+                >
+                  <span className="text-[10px] lg:text-xs font-semibold text-amber-700 dark:text-amber-300 leading-tight whitespace-nowrap">day streak</span>
+                  <span className="text-[10px] lg:text-xs ink-text-muted leading-tight whitespace-nowrap">&ge;8h/day</span>
                 </div>
               </div>
             </div>
