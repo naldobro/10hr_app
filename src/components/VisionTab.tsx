@@ -113,7 +113,7 @@ export default function VisionTab() {
     typeof localStorage !== 'undefined' ? localStorage.getItem('vision_diary_note') || '' : ''
   );
   // Planner notebook display metadata (accent colour + sort order), keyed by name.
-  const [notebookMeta, setNotebookMeta] = useState<Record<string, { color?: string; order?: number }>>(() => {
+  const [notebookMeta, setNotebookMeta] = useState<Record<string, { color?: string; order?: number; pinnedName?: string }>>(() => {
     try {
       return JSON.parse(localStorage.getItem('vision_planner_notebooks') || '{}');
     } catch {
@@ -677,7 +677,7 @@ export default function VisionTab() {
     }
   };
 
-  const updateNotebookMeta = (next: Record<string, { color?: string; order?: number }>) => {
+  const updateNotebookMeta = (next: Record<string, { color?: string; order?: number; pinnedName?: string }>) => {
     setNotebookMeta(next);
     localStorage.setItem('vision_planner_notebooks', JSON.stringify(next));
     if (!dbDown) {

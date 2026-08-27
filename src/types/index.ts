@@ -118,7 +118,7 @@ export interface VisionSettings {
   /** Free-text diary — goals & progression — shown under the Focus card. Paper-styled. */
   diary_note: string;
   /** Per-notebook display metadata for the Planner gallery, keyed by notebook name. */
-  planner_notebooks: Record<string, { color?: string; order?: number }>;
+  planner_notebooks: Record<string, { color?: string; order?: number; pinnedName?: string }>;
   /** Separate global Focus note for the Track tab, day-independent. Distinct from focus_note. */
   track_focus_note: string;
   /** The 3 focus pillars shown in the Vision nav bar. Always normalised to length 3 in the UI. */

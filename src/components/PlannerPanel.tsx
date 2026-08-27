@@ -28,7 +28,9 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronLeft,
+  ChevronRight,
   Pencil,
+  Lock,
   GripVertical,
   BookOpen,
   CalendarDays,
@@ -36,14 +38,15 @@ import {
 } from 'lucide-react';
 import { VisionDoc } from '../types';
 import { GOAL_COLORS } from '../lib/visionUtils';
+import ColorPicker from './ColorPicker';
 
 interface PlannerPanelProps {
   docs: VisionDoc[];
   /** Soft-deleted docs, available to restore or remove for good. */
   trashDocs: VisionDoc[];
-  /** Per-notebook accent colour + sort order for the gallery, keyed by name. */
-  notebookMeta: Record<string, { color?: string; order?: number }>;
-  onNotebookMetaChange: (next: Record<string, { color?: string; order?: number }>) => void;
+  /** Per-notebook accent colour + sort order + pinned-section name, keyed by name. */
+  notebookMeta: Record<string, { color?: string; order?: number; pinnedName?: string }>;
+  onNotebookMetaChange: (next: Record<string, { color?: string; order?: number; pinnedName?: string }>) => void;
   /** Create a doc in the given notebook + month; resolves with the new id (or null on failure). */
   onAdd: (notebook: string, month: string) => Promise<string | null>;
   onUpdate: (id: string, patch: Partial<VisionDoc>, persist: boolean) => void;
@@ -64,6 +67,9 @@ const byOrder = (a: VisionDoc, b: VisionDoc) => a.sort_order - b.sort_order;
 // The built-in, month-based notebook. Any other notebook name is a freeform idea notebook.
 const PLANNER = 'Planner';
 const bookOf = (d: VisionDoc) => d.notebook || PLANNER;
+// Planner pages with an empty month live in the fixed "pinned" section at the top,
+// above every month. (Non-Planner notebooks also use '' but render as a flat list.)
+const PINNED = '';
 
 // Quick presets ------------------------------------------------------------
 const FONT_SIZES: { label: string; size: string; px: string }[] = [
@@ -182,8 +188,21 @@ export default function PlannerPanel({
   const [dragNb, setDragNb] = useState<string | null>(null);
   const [dragOverNb, setDragOverNb] = useState<string | null>(null);
   const [colorMenuNb, setColorMenuNb] = useState<string | null>(null);
+  // Live (unsaved) colour while dragging the wheel, so the card previews instantly.
+  const [colorPreview, setColorPreview] = useState<{ name: string; color: string } | null>(null);
   const [renamingNb, setRenamingNb] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  // Collapsed sections (per notebook+month), remembered locally. Key: `${notebook}::${month}`.
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    try {
+      return new Set<string>(JSON.parse(localStorage.getItem('planner_collapsed') || '[]'));
+    } catch {
+      return new Set();
+    }
+  });
+  // Inline rename of the pinned section header.
+  const [renamingPinned, setRenamingPinned] = useState(false);
+  const [pinnedDraft, setPinnedDraft] = useState('');
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -197,7 +216,10 @@ export default function PlannerPanel({
   useEffect(() => {
     if (!colorMenuNb) return;
     const onDown = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest('[data-color-menu]')) setColorMenuNb(null);
+      if (!(e.target as HTMLElement).closest('[data-color-menu]')) {
+        setColorMenuNb(null);
+        setColorPreview(null);
+      }
     };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
@@ -255,9 +277,9 @@ export default function PlannerPanel({
     onNotebookMetaChange(next);
   };
 
+  // Persist a notebook colour. Keeps the menu open (the wheel commits repeatedly).
   const setNotebookColor = (name: string, color: string) => {
     onNotebookMetaChange({ ...notebookMeta, [name]: { ...notebookMeta[name], color } });
-    setColorMenuNb(null);
   };
 
   // Rename a user notebook: move every page onto the new name and carry its
@@ -282,11 +304,17 @@ export default function PlannerPanel({
   };
 
   // Planner is grouped by month; other notebooks are one flat, ordered list.
+  // Empty-month pages are the pinned section, not a month, so they're excluded here.
   const months = useMemo(() => {
     const set = new Set<string>([currentMonth]);
-    nbDocs.forEach((d) => set.add(d.month));
+    nbDocs.forEach((d) => {
+      if (d.month) set.add(d.month);
+    });
     return [...set].sort().reverse();
   }, [nbDocs, currentMonth]);
+
+  // Pages in the Planner's fixed pinned section (empty month), ordered.
+  const pinnedDocs = useMemo(() => nbDocs.filter((d) => d.month === PINNED).sort(byOrder), [nbDocs]);
 
   const docsByMonth = useMemo(() => {
     const m = new Map<string, VisionDoc[]>();
@@ -331,6 +359,30 @@ export default function PlannerPanel({
   const handleAdd = async (month: string) => {
     const id = await onAdd(notebook, isMonthly ? month : '');
     if (id) openDoc(id);
+  };
+
+  // Section collapse (per notebook + month), persisted locally.
+  const sectionKey = (month: string) => `${notebook}::${month || '__pinned__'}`;
+  const isCollapsed = (month: string) => collapsed.has(sectionKey(month));
+  const toggleCollapse = (month: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      const k = sectionKey(month);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      localStorage.setItem('planner_collapsed', JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  // The pinned section's name (renamable); defaults to "Private".
+  const pinnedName = notebookMeta[notebook]?.pinnedName || 'Private';
+  const commitPinnedName = () => {
+    const name = pinnedDraft.trim();
+    setRenamingPinned(false);
+    if (name && name !== pinnedName) {
+      onNotebookMetaChange({ ...notebookMeta, [notebook]: { ...notebookMeta[notebook], pinnedName: name } });
+    }
   };
 
   const createNotebook = async () => {
@@ -517,7 +569,9 @@ export default function PlannerPanel({
 
           <div className="flex-1 min-h-0 overflow-y-auto px-6 sm:px-8 py-6">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-              {notebookCards.map((nb) => (
+              {notebookCards.map((nb) => {
+                const cardColor = colorPreview?.name === nb.name ? colorPreview.color : nb.color;
+                return (
                 <div
                   key={nb.name}
                   draggable={renamingNb !== nb.name}
@@ -540,10 +594,10 @@ export default function PlannerPanel({
                 >
                   {renamingNb === nb.name ? (
                     <div className="paper-card rounded-2xl border border-black/10 dark:border-white/[0.15] p-4 overflow-hidden">
-                      <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: nb.color }} />
+                      <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: cardColor }} />
                       <span
                         className="grid place-items-center w-9 h-9 rounded-xl mb-3"
-                        style={{ background: `${nb.color}1e`, color: nb.color }}
+                        style={{ background: `${cardColor}1e`, color: cardColor }}
                       >
                         {nb.isPlanner ? <CalendarDays className="w-5 h-5" /> : <BookOpen className="w-5 h-5" />}
                       </span>
@@ -568,10 +622,10 @@ export default function PlannerPanel({
                       onClick={() => openNotebook(nb.name)}
                       className="w-full text-left paper-card rounded-2xl border border-black/10 dark:border-white/[0.15] p-4 hover:shadow-lg hover:-translate-y-0.5 transition-all overflow-hidden cursor-grab active:cursor-grabbing"
                     >
-                      <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: nb.color }} />
+                      <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: cardColor }} />
                       <span
                         className="grid place-items-center w-9 h-9 rounded-xl mb-3"
-                        style={{ background: `${nb.color}1e`, color: nb.color }}
+                        style={{ background: `${cardColor}1e`, color: cardColor }}
                       >
                         {nb.isPlanner ? <CalendarDays className="w-5 h-5" /> : <BookOpen className="w-5 h-5" />}
                       </span>
@@ -590,25 +644,39 @@ export default function PlannerPanel({
                         title="Set colour"
                         className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg ink-text-muted hover:bg-stone-100 dark:hover:bg-white/10 transition"
                       >
-                        <span className="block w-3.5 h-3.5 rounded-full border border-black/20" style={{ background: nb.color }} />
+                        <span className="block w-3.5 h-3.5 rounded-full border border-black/20" style={{ background: cardColor }} />
                       </button>
                       {colorMenuNb === nb.name && (
                         <div
                           data-color-menu
-                          className="absolute right-0 top-full mt-1 z-30 w-[204px] paper-card rounded-xl border border-black/10 dark:border-white/[0.2] shadow-xl p-2 grid grid-cols-6 gap-1.5"
+                          className="absolute right-0 top-full mt-1 z-30 w-[228px] paper-card rounded-xl border border-black/10 dark:border-white/[0.2] shadow-xl p-2.5"
                         >
-                          {NOTEBOOK_COLORS.map((c) => (
-                            <button
-                              key={c}
-                              onClick={() => setNotebookColor(nb.name, c)}
-                              className="w-6 h-6 rounded-md border border-black/10 dark:border-white/[0.2] transition-transform hover:scale-110"
-                              style={{
-                                background: c,
-                                boxShadow: c === nb.color ? `0 0 0 2px #fff, 0 0 0 3.5px ${c}` : undefined,
-                              }}
-                              title={c}
-                            />
-                          ))}
+                          <div className="grid grid-cols-6 gap-1.5">
+                            {NOTEBOOK_COLORS.map((c) => (
+                              <button
+                                key={c}
+                                onClick={() => {
+                                  setNotebookColor(nb.name, c);
+                                  setColorPreview(null);
+                                }}
+                                className="w-6 h-6 rounded-md border border-black/10 dark:border-white/[0.2] transition-transform hover:scale-110"
+                                style={{
+                                  background: c,
+                                  boxShadow: c === cardColor ? `0 0 0 2px #fff, 0 0 0 3.5px ${c}` : undefined,
+                                }}
+                                title={c}
+                              />
+                            ))}
+                          </div>
+                          <div className="border-t border-black/5 dark:border-white/[0.13] my-2.5" />
+                          <ColorPicker
+                            value={cardColor}
+                            onChange={(hex) => setColorPreview({ name: nb.name, color: hex })}
+                            onCommit={(hex) => {
+                              setNotebookColor(nb.name, hex);
+                              setColorPreview(null);
+                            }}
+                          />
                         </div>
                       )}
                     </div>
@@ -652,7 +720,8 @@ export default function PlannerPanel({
                       ))}
                   </div>
                 </div>
-              ))}
+                );
+              })}
 
               {/* new notebook card */}
               {creating ? (
@@ -755,44 +824,137 @@ export default function PlannerPanel({
 
           <div className="flex-1 overflow-y-auto py-2">
             {isMonthly ? (
-              months.map((m) => {
-                const list = docsByMonth.get(m) ?? [];
-                const dragActiveHere = !!dragDoc && bookOf(dragDoc) === PLANNER && dragDoc.month === m;
-                return (
-                  <div key={m} className="px-2 mb-1">
-                    <div className="flex items-center justify-between px-2 py-1.5">
-                      <div className="flex items-baseline gap-1.5 min-w-0">
-                        <span className="text-[11px] tracking-wider uppercase font-bold ink-text-muted truncate">
-                          {monthLabel(m)}
-                        </span>
-                        {m === currentMonth && (
-                          <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-400/20 rounded-full px-1.5 py-0.5 leading-none flex-none">
-                            NOW
-                          </span>
+              <>
+                {/* fixed pinned section — always on top, above every month */}
+                {(() => {
+                  const open = !isCollapsed(PINNED);
+                  const dragActiveHere = !!dragDoc && bookOf(dragDoc) === PLANNER && dragDoc.month === PINNED;
+                  return (
+                    <div className="px-2 mb-1">
+                      <div className="group flex items-center gap-1 px-2 py-1.5">
+                        <button
+                          onClick={() => toggleCollapse(PINNED)}
+                          className="p-0.5 rounded ink-text-muted hover:ink-text flex-none"
+                          title={open ? 'Collapse' : 'Expand'}
+                        >
+                          {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                        </button>
+                        <Lock className="w-3 h-3 ink-text-muted flex-none" />
+                        {renamingPinned ? (
+                          <input
+                            autoFocus
+                            value={pinnedDraft}
+                            onChange={(e) => setPinnedDraft(e.target.value)}
+                            onBlur={commitPinnedName}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') commitPinnedName();
+                              if (e.key === 'Escape') setRenamingPinned(false);
+                            }}
+                            className="flex-1 min-w-0 text-[11px] tracking-wider uppercase font-bold ink-text bg-white dark:bg-paper rounded border border-black/10 dark:border-white/[0.2] px-1.5 py-0.5 outline-none focus:border-amber-400"
+                          />
+                        ) : (
+                          <button
+                            onClick={() => toggleCollapse(PINNED)}
+                            onDoubleClick={() => {
+                              setPinnedDraft(pinnedName);
+                              setRenamingPinned(true);
+                            }}
+                            className="flex-1 min-w-0 text-left text-[11px] tracking-wider uppercase font-bold ink-text-muted truncate"
+                            title="Double-click to rename"
+                          >
+                            {pinnedName}
+                          </button>
                         )}
+                        {!renamingPinned && (
+                          <button
+                            onClick={() => {
+                              setPinnedDraft(pinnedName);
+                              setRenamingPinned(true);
+                            }}
+                            className="p-1 rounded-md ink-text-muted hover:ink-text opacity-0 group-hover:opacity-100 transition flex-none"
+                            title="Rename section"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleAdd(PINNED)}
+                          className="p-1 rounded-md ink-text-muted hover:ink-text hover:bg-white/70 dark:hover:bg-paper/70 transition flex-none"
+                          title={`New page in ${pinnedName}`}
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                      <button
-                        onClick={() => handleAdd(m)}
-                        className="p-1 rounded-md ink-text-muted hover:ink-text hover:bg-white/70 dark:hover:bg-paper/70 transition flex-none"
-                        title={`New doc in ${monthLabel(m)}`}
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
 
-                    {list.length === 0 ? (
-                      <button
-                        onClick={() => handleAdd(m)}
-                        className="w-full text-left text-[12px] ink-text-muted/70 hover:ink-text px-2.5 py-1.5 rounded-lg hover:bg-white/60 dark:hover:bg-paper/60 transition"
-                      >
-                        + Add the first doc
-                      </button>
-                    ) : (
-                      list.map((d, i) => renderRow(d, list, i, dragActiveHere))
-                    )}
-                  </div>
-                );
-              })
+                      {open &&
+                        (pinnedDocs.length === 0 ? (
+                          <button
+                            onClick={() => handleAdd(PINNED)}
+                            className="w-full text-left text-[12px] ink-text-muted/70 hover:ink-text px-2.5 py-1.5 rounded-lg hover:bg-white/60 dark:hover:bg-paper/60 transition"
+                          >
+                            + Add a page
+                          </button>
+                        ) : (
+                          pinnedDocs.map((d, i) => renderRow(d, pinnedDocs, i, dragActiveHere))
+                        ))}
+                    </div>
+                  );
+                })()}
+
+                {months.map((m) => {
+                  const list = docsByMonth.get(m) ?? [];
+                  const open = !isCollapsed(m);
+                  const dragActiveHere = !!dragDoc && bookOf(dragDoc) === PLANNER && dragDoc.month === m;
+                  return (
+                    <div key={m} className="px-2 mb-1">
+                      <div className="group flex items-center gap-1 px-2 py-1.5">
+                        <button
+                          onClick={() => toggleCollapse(m)}
+                          className="p-0.5 rounded ink-text-muted hover:ink-text flex-none"
+                          title={open ? 'Collapse' : 'Expand'}
+                        >
+                          {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                        </button>
+                        <button
+                          onClick={() => toggleCollapse(m)}
+                          className="flex-1 min-w-0 flex items-baseline gap-1.5 text-left"
+                        >
+                          <span className="text-[11px] tracking-wider uppercase font-bold ink-text-muted truncate">
+                            {monthLabel(m)}
+                          </span>
+                          {m === currentMonth && (
+                            <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-400/20 rounded-full px-1.5 py-0.5 leading-none flex-none">
+                              NOW
+                            </span>
+                          )}
+                          {!open && list.length > 0 && (
+                            <span className="text-[10px] ink-text-muted/70 font-semibold flex-none">{list.length}</span>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleAdd(m)}
+                          className="p-1 rounded-md ink-text-muted hover:ink-text hover:bg-white/70 dark:hover:bg-paper/70 transition flex-none"
+                          title={`New doc in ${monthLabel(m)}`}
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {open &&
+                        (list.length === 0 ? (
+                          <button
+                            onClick={() => handleAdd(m)}
+                            className="w-full text-left text-[12px] ink-text-muted/70 hover:ink-text px-2.5 py-1.5 rounded-lg hover:bg-white/60 dark:hover:bg-paper/60 transition"
+                          >
+                            + Add the first doc
+                          </button>
+                        ) : (
+                          list.map((d, i) => renderRow(d, list, i, dragActiveHere))
+                        ))}
+                    </div>
+                  );
+                })}
+              </>
             ) : (
               <div className="px-2">
                 <div className="flex items-center justify-between px-2 py-1.5">
