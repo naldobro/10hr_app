@@ -72,8 +72,20 @@ const FONT_SIZES: { label: string; size: string; px: string }[] = [
   { label: 'Large', size: '5', px: '20px' },
   { label: 'Huge', size: '7', px: '28px' },
 ];
-const TEXT_COLORS = ['#1c1917', '#78716c', '#e11d48', '#d97706', '#059669', '#2563eb', '#7c3aed'];
-const HILITE_COLORS = ['#fef08a', '#bbf7d0', '#bfdbfe', '#fbcfe8', '#fed7aa', '#e9d5ff'];
+const TEXT_COLORS = [
+  '#1c1917', '#44403c', '#78716c', '#a8a29e', // neutrals
+  '#e11d48', '#f43f5e', '#ec4899', '#d946ef', // reds / pinks
+  '#a855f7', '#8b5cf6', '#6366f1', '#3b82f6', // purples / blues
+  '#2563eb', '#0ea5e9', '#06b6d4', '#14b8a6', // blues / cyans
+  '#10b981', '#22c55e', '#84cc16', '#eab308', // greens / lime
+  '#f59e0b', '#f97316', '#ea580c', '#dc2626', // ambers / oranges / red
+];
+const HILITE_COLORS = [
+  '#fef08a', '#fde68a', '#fed7aa', '#fecaca',
+  '#fbcfe8', '#f5d0fe', '#e9d5ff', '#ddd6fe',
+  '#c7d2fe', '#bfdbfe', '#bae6fd', '#a5f3fc',
+  '#99f6e4', '#bbf7d0', '#d9f99d', '#e2e8f0',
+];
 
 // Images are embedded as data URLs inside the doc HTML so they persist through the
 // normal save path — no separate storage bucket, no broken links, works offline.
