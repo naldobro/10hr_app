@@ -18,6 +18,7 @@ import {
 } from '../lib/visionUtils';
 import GoalDrawer from './GoalDrawer';
 import FocusCard from './FocusCard';
+import DiaryCard from './DiaryCard';
 import ReflectionsPanel from './ReflectionsPanel';
 import BackupModal from './BackupModal';
 import PlannerPanel from './PlannerPanel';
@@ -103,6 +104,13 @@ export default function VisionTab() {
   // Last-committed focus text, so an edit lands as a single before/after undo step.
   const focusBaselineRef = useRef(
     typeof localStorage !== 'undefined' ? localStorage.getItem('vision_focus_note') || '' : ''
+  );
+  // Paper Diary note (goals & progression), shown under Focus. Mirrored to localStorage.
+  const [diaryNote, setDiaryNote] = useState(() =>
+    typeof localStorage !== 'undefined' ? localStorage.getItem('vision_diary_note') || '' : ''
+  );
+  const diaryBaselineRef = useRef(
+    typeof localStorage !== 'undefined' ? localStorage.getItem('vision_diary_note') || '' : ''
   );
   const [ppd, setPpd] = useState<number>(() => {
     const saved = Number(localStorage.getItem('vision_ppd'));
@@ -200,6 +208,18 @@ export default function VisionTab() {
     }
   }, []);
 
+  const reloadDiary = useCallback(async () => {
+    try {
+      const s = await db.visionSettings.get();
+      const note = s?.diary_note ?? '';
+      setDiaryNote(note);
+      localStorage.setItem('vision_diary_note', note);
+      diaryBaselineRef.current = note;
+    } catch {
+      /* column may be absent until the diary migration runs */
+    }
+  }, []);
+
   const reloadTopics = useCallback(async () => {
     try {
       const rows = await db.visionTopics.getAll();
@@ -244,6 +264,11 @@ export default function VisionTab() {
             if (s.focus_note != null) {
               setFocusNote(s.focus_note);
               focusBaselineRef.current = s.focus_note;
+            }
+            if (s.diary_note != null) {
+              setDiaryNote(s.diary_note);
+              diaryBaselineRef.current = s.diary_note;
+              localStorage.setItem('vision_diary_note', s.diary_note);
             }
           }
         })
@@ -294,20 +319,20 @@ export default function VisionTab() {
   const handleUndo = useCallback(async () => {
     if (!undoManager.canUndo()) return;
     await undoManager.undo();
-    await Promise.all([reloadGoals(), reloadTopics(), reloadDocs(), reloadFocus()]);
+    await Promise.all([reloadGoals(), reloadTopics(), reloadDocs(), reloadFocus(), reloadDiary()]);
     refreshUndo();
     setToast('Undone');
     window.setTimeout(() => setToast(null), 1600);
-  }, [reloadGoals, reloadTopics, reloadDocs, reloadFocus, refreshUndo]);
+  }, [reloadGoals, reloadTopics, reloadDocs, reloadFocus, reloadDiary, refreshUndo]);
 
   const handleRedo = useCallback(async () => {
     if (!undoManager.canRedo()) return;
     await undoManager.redo();
-    await Promise.all([reloadGoals(), reloadTopics(), reloadDocs(), reloadFocus()]);
+    await Promise.all([reloadGoals(), reloadTopics(), reloadDocs(), reloadFocus(), reloadDiary()]);
     refreshUndo();
     setToast('Redone');
     window.setTimeout(() => setToast(null), 1600);
-  }, [reloadGoals, reloadTopics, reloadDocs, reloadFocus, refreshUndo]);
+  }, [reloadGoals, reloadTopics, reloadDocs, reloadFocus, reloadDiary, refreshUndo]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -613,6 +638,29 @@ export default function VisionTab() {
         db.visionSettings
           .upsert({ focus_note: text })
           .catch(() => flash('Could not save — run the vision_settings focus migration'));
+      }
+    }
+  };
+
+  const updateDiaryNote = (text: string, persist: boolean) => {
+    setDiaryNote(text);
+    localStorage.setItem('vision_diary_note', text);
+    if (persist) {
+      if (text !== diaryBaselineRef.current) {
+        undoManager.addToUndoHistory({
+          type: 'focus_update',
+          scope: 'diary',
+          before: diaryBaselineRef.current,
+          after: text,
+          timestamp: Date.now(),
+        });
+        diaryBaselineRef.current = text;
+        refreshUndo();
+      }
+      if (!dbDown) {
+        db.visionSettings
+          .upsert({ diary_note: text })
+          .catch(() => flash('Could not save — run the vision_settings diary migration'));
       }
     }
   };
@@ -1251,8 +1299,14 @@ export default function VisionTab() {
         </div>
       </div>
 
-      {/* focus note — top-right, hidden while a goal drawer is open */}
-      <FocusCard text={focusNote} onChange={updateFocusNote} hidden={!!selectedGoal} />
+      {/* focus + diary — floating, collapsible overlay boxes pinned top-right.
+          The container is click-through so only the cards capture events. */}
+      {!selectedGoal && (
+        <div className="absolute top-2 right-2 z-20 flex flex-col gap-3 items-end pointer-events-none">
+          <FocusCard text={focusNote} onChange={updateFocusNote} />
+          <DiaryCard text={diaryNote} onChange={updateDiaryNote} />
+        </div>
+      )}
 
       {/* floating ghost while dragging from tray */}
       {drag?.mode === 'tray' && (

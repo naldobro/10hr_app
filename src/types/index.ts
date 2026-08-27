@@ -115,6 +115,8 @@ export interface VisionSettings {
   reflections_subtitle: string;
   /** Free-text "what I'm focusing on right now" note, shown in the Vision Focus card. */
   focus_note: string;
+  /** Free-text diary — goals & progression — shown under the Focus card. Paper-styled. */
+  diary_note: string;
   /** Separate global Focus note for the Track tab, day-independent. Distinct from focus_note. */
   track_focus_note: string;
   /** The 3 focus pillars shown in the Vision nav bar. Always normalised to length 3 in the UI. */

@@ -16,7 +16,9 @@ type UndoAction =
   // note (vision_settings.track_focus_note). Committed once per edit (Done/blur), not per keystroke.
   | { type: 'focus_update'; scope: 'day'; date: string; before: string; after: string; timestamp: number }
   | { type: 'focus_update'; scope: 'global'; before: string; after: string; timestamp: number }
-  | { type: 'focus_update'; scope: 'track'; before: string; after: string; timestamp: number };
+  | { type: 'focus_update'; scope: 'track'; before: string; after: string; timestamp: number }
+  // The Vision Diary note (vision_settings.diary_note).
+  | { type: 'focus_update'; scope: 'diary'; before: string; after: string; timestamp: number };
 
 const visionFields = (g: VisionGoal) => ({
   kind: g.kind,
@@ -103,6 +105,8 @@ export const undoManager = {
         await db.summaries.setFocus(action.date, action.before);
       } else if (action.scope === 'track') {
         await db.visionSettings.upsert({ track_focus_note: action.before });
+      } else if (action.scope === 'diary') {
+        await db.visionSettings.upsert({ diary_note: action.before });
       } else {
         await db.visionSettings.upsert({ focus_note: action.before });
       }
@@ -152,6 +156,8 @@ export const undoManager = {
         await db.summaries.setFocus(action.date, action.after);
       } else if (action.scope === 'track') {
         await db.visionSettings.upsert({ track_focus_note: action.after });
+      } else if (action.scope === 'diary') {
+        await db.visionSettings.upsert({ diary_note: action.after });
       } else {
         await db.visionSettings.upsert({ focus_note: action.after });
       }
