@@ -28,6 +28,7 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronLeft,
+  Pencil,
   GripVertical,
   BookOpen,
   CalendarDays,
@@ -40,6 +41,9 @@ interface PlannerPanelProps {
   docs: VisionDoc[];
   /** Soft-deleted docs, available to restore or remove for good. */
   trashDocs: VisionDoc[];
+  /** Per-notebook accent colour + sort order for the gallery, keyed by name. */
+  notebookMeta: Record<string, { color?: string; order?: number }>;
+  onNotebookMetaChange: (next: Record<string, { color?: string; order?: number }>) => void;
   /** Create a doc in the given notebook + month; resolves with the new id (or null on failure). */
   onAdd: (notebook: string, month: string) => Promise<string | null>;
   onUpdate: (id: string, patch: Partial<VisionDoc>, persist: boolean) => void;
@@ -132,6 +136,8 @@ async function compressImage(file: File): Promise<{ blob: Blob; type: string }> 
 export default function PlannerPanel({
   docs,
   trashDocs,
+  notebookMeta,
+  onNotebookMetaChange,
   onAdd,
   onUpdate,
   onDelete,
@@ -154,6 +160,12 @@ export default function PlannerPanel({
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [confirmDelNb, setConfirmDelNb] = useState<string | null>(null);
+  // Gallery: drag-to-reorder + per-notebook colour menu + inline rename.
+  const [dragNb, setDragNb] = useState<string | null>(null);
+  const [dragOverNb, setDragOverNb] = useState<string | null>(null);
+  const [colorMenuNb, setColorMenuNb] = useState<string | null>(null);
+  const [renamingNb, setRenamingNb] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -163,19 +175,35 @@ export default function PlannerPanel({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  // Close the notebook colour menu on an outside click.
+  useEffect(() => {
+    if (!colorMenuNb) return;
+    const onDown = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('[data-color-menu]')) setColorMenuNb(null);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [colorMenuNb]);
+
   const isMonthly = notebook === PLANNER;
 
   // Pages in the active notebook (a missing notebook value means the built-in Planner).
   const nbDocs = useMemo(() => docs.filter((d) => bookOf(d) === notebook), [docs, notebook]);
 
-  // Notebooks the user has: the built-in Planner (pinned first) + any they've made.
+  // Notebooks the user has: the built-in Planner + any they've made. Ordered by the
+  // saved manual order (falling back to Planner-first, then alphabetical).
   const notebooks = useMemo(() => {
     const set = new Set<string>();
     docs.forEach((d) => set.add(bookOf(d)));
-    return [PLANNER, ...[...set].filter((n) => n !== PLANNER).sort((a, b) => a.localeCompare(b))];
-  }, [docs]);
+    const base = [PLANNER, ...[...set].filter((n) => n !== PLANNER).sort((a, b) => a.localeCompare(b))];
+    const baseIndex = new Map(base.map((n, i) => [n, i]));
+    return base
+      .slice()
+      .sort((a, b) => (notebookMeta[a]?.order ?? baseIndex.get(a)!) - (notebookMeta[b]?.order ?? baseIndex.get(b)!));
+  }, [docs, notebookMeta]);
 
-  // Notebook cards for the gallery: page count + an accent colour for each.
+  // Notebook cards for the gallery: page count + accent colour (saved colour, else
+  // derived from the first coloured page).
   const notebookCards = useMemo(
     () =>
       notebooks.map((n) => {
@@ -183,12 +211,57 @@ export default function PlannerPanel({
         return {
           name: n,
           count: pages.length,
-          color: pages.find((p) => p.color)?.color || '#0ea5e9',
+          color: notebookMeta[n]?.color || pages.find((p) => p.color)?.color || '#0ea5e9',
           isPlanner: n === PLANNER,
         };
       }),
-    [notebooks, docs]
+    [notebooks, docs, notebookMeta]
   );
+
+  // Persist a manual order across all notebooks after a drag reorder.
+  const reorderNotebook = (targetName: string) => {
+    const from = dragNb;
+    setDragNb(null);
+    setDragOverNb(null);
+    if (!from || from === targetName) return;
+    const list = notebooks.slice();
+    const fi = list.indexOf(from);
+    const ti = list.indexOf(targetName);
+    if (fi < 0 || ti < 0) return;
+    const [moved] = list.splice(fi, 1);
+    list.splice(ti, 0, moved);
+    const next = { ...notebookMeta };
+    list.forEach((n, i) => {
+      next[n] = { ...next[n], order: i };
+    });
+    onNotebookMetaChange(next);
+  };
+
+  const setNotebookColor = (name: string, color: string) => {
+    onNotebookMetaChange({ ...notebookMeta, [name]: { ...notebookMeta[name], color } });
+    setColorMenuNb(null);
+  };
+
+  // Rename a user notebook: move every page onto the new name and carry its
+  // colour/order metadata across. The built-in Planner can't be renamed.
+  const commitRename = () => {
+    const oldName = renamingNb;
+    const newName = renameValue.trim();
+    setRenamingNb(null);
+    setRenameValue('');
+    if (!oldName || oldName === PLANNER || !newName || newName === oldName) return;
+    if (notebooks.some((n) => n !== oldName && n.toLowerCase() === newName.toLowerCase())) {
+      return; // name already taken — keep the old one
+    }
+    docs.filter((d) => bookOf(d) === oldName).forEach((d) => onUpdate(d.id, { notebook: newName }, true));
+    const next = { ...notebookMeta };
+    if (next[oldName]) {
+      next[newName] = next[oldName];
+      delete next[oldName];
+      onNotebookMetaChange(next);
+    }
+    if (notebook === oldName) setNotebook(newName);
+  };
 
   // Planner is grouped by month; other notebooks are one flat, ordered list.
   const months = useMemo(() => {
@@ -429,49 +502,137 @@ export default function PlannerPanel({
               {notebookCards.map((nb) => (
                 <div
                   key={nb.name}
-                  className="group relative"
+                  draggable={renamingNb !== nb.name}
+                  onDragStart={() => setDragNb(nb.name)}
+                  onDragEnd={() => {
+                    setDragNb(null);
+                    setDragOverNb(null);
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (nb.name !== dragOverNb) setDragOverNb(nb.name);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    reorderNotebook(nb.name);
+                  }}
+                  className={`group relative rounded-2xl transition ${
+                    dragNb === nb.name ? 'opacity-40' : ''
+                  } ${dragOverNb === nb.name && dragNb && dragNb !== nb.name ? 'ring-2 ring-amber-400' : ''}`}
                 >
-                  <button
-                    onClick={() => openNotebook(nb.name)}
-                    className="w-full text-left paper-card rounded-2xl border border-black/10 dark:border-white/[0.15] p-4 hover:shadow-lg hover:-translate-y-0.5 transition-all overflow-hidden"
-                  >
-                    <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: nb.color }} />
-                    <span
-                      className="grid place-items-center w-9 h-9 rounded-xl mb-3"
-                      style={{ background: `${nb.color}1e`, color: nb.color }}
-                    >
-                      {nb.isPlanner ? <CalendarDays className="w-5 h-5" /> : <BookOpen className="w-5 h-5" />}
-                    </span>
-                    <div className="font-bold text-[15px] ink-text leading-tight truncate">{nb.name}</div>
-                    <div className="text-[12px] ink-text-muted mt-1">
-                      {nb.isPlanner ? 'Month-by-month' : 'Ideas & notes'} · {nb.count} page{nb.count === 1 ? '' : 's'}
-                    </div>
-                  </button>
-                  {!nb.isPlanner &&
-                    (confirmDelNb === nb.name ? (
-                      <div className="absolute top-2 right-2 flex items-center gap-1 paper-card rounded-lg border border-black/10 dark:border-white/[0.2] shadow px-1 py-0.5">
-                        <button
-                          onClick={() => deleteNotebook(nb.name)}
-                          className="text-[11px] font-bold text-red-600 px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-400/10"
-                        >
-                          Delete
-                        </button>
-                        <button
-                          onClick={() => setConfirmDelNb(null)}
-                          className="text-[11px] ink-text-muted px-1 py-0.5 rounded hover:bg-stone-100"
-                        >
-                          No
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setConfirmDelNb(nb.name)}
-                        title="Delete notebook"
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg ink-text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-400/10 transition"
+                  {renamingNb === nb.name ? (
+                    <div className="paper-card rounded-2xl border border-black/10 dark:border-white/[0.15] p-4 overflow-hidden">
+                      <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: nb.color }} />
+                      <span
+                        className="grid place-items-center w-9 h-9 rounded-xl mb-3"
+                        style={{ background: `${nb.color}1e`, color: nb.color }}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        {nb.isPlanner ? <CalendarDays className="w-5 h-5" /> : <BookOpen className="w-5 h-5" />}
+                      </span>
+                      <input
+                        autoFocus
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitRename();
+                          if (e.key === 'Escape') {
+                            setRenamingNb(null);
+                            setRenameValue('');
+                          }
+                        }}
+                        onBlur={commitRename}
+                        placeholder="Notebook name…"
+                        className="w-full font-bold text-[15px] ink-text bg-white dark:bg-paper rounded-lg border border-black/10 dark:border-white/[0.2] px-2 py-1 outline-none focus:border-amber-400"
+                      />
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => openNotebook(nb.name)}
+                      className="w-full text-left paper-card rounded-2xl border border-black/10 dark:border-white/[0.15] p-4 hover:shadow-lg hover:-translate-y-0.5 transition-all overflow-hidden cursor-grab active:cursor-grabbing"
+                    >
+                      <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: nb.color }} />
+                      <span
+                        className="grid place-items-center w-9 h-9 rounded-xl mb-3"
+                        style={{ background: `${nb.color}1e`, color: nb.color }}
+                      >
+                        {nb.isPlanner ? <CalendarDays className="w-5 h-5" /> : <BookOpen className="w-5 h-5" />}
+                      </span>
+                      <div className="font-bold text-[15px] ink-text leading-tight truncate pr-8">{nb.name}</div>
+                      <div className="text-[12px] ink-text-muted mt-1">
+                        {nb.isPlanner ? 'Month-by-month' : 'Ideas & notes'} · {nb.count} page{nb.count === 1 ? '' : 's'}
+                      </div>
+                    </button>
+                  )}
+
+                  {/* top-right controls: colour + rename/delete (non-Planner) */}
+                  <div className={`absolute top-2 right-2 flex items-center gap-0.5 ${renamingNb === nb.name ? 'hidden' : ''}`}>
+                    <div className="relative">
+                      <button
+                        onClick={() => setColorMenuNb(colorMenuNb === nb.name ? null : nb.name)}
+                        title="Set colour"
+                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg ink-text-muted hover:bg-stone-100 dark:hover:bg-white/10 transition"
+                      >
+                        <span className="block w-3.5 h-3.5 rounded-full border border-black/20" style={{ background: nb.color }} />
                       </button>
-                    ))}
+                      {colorMenuNb === nb.name && (
+                        <div
+                          data-color-menu
+                          className="absolute right-0 top-full mt-1 z-30 paper-card rounded-xl border border-black/10 dark:border-white/[0.2] shadow-xl p-2 grid grid-cols-4 gap-1.5"
+                        >
+                          {GOAL_COLORS.map((c) => (
+                            <button
+                              key={c}
+                              onClick={() => setNotebookColor(nb.name, c)}
+                              className="w-6 h-6 rounded-md border border-black/10 dark:border-white/[0.2] transition-transform hover:scale-110"
+                              style={{
+                                background: c,
+                                boxShadow: c === nb.color ? `0 0 0 2px #fff, 0 0 0 3.5px ${c}` : undefined,
+                              }}
+                              title={c}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {!nb.isPlanner && confirmDelNb !== nb.name && (
+                      <button
+                        onClick={() => {
+                          setRenamingNb(nb.name);
+                          setRenameValue(nb.name);
+                          setColorMenuNb(null);
+                        }}
+                        title="Rename notebook"
+                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg ink-text-muted hover:ink-text hover:bg-stone-100 dark:hover:bg-white/10 transition"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    )}
+                    {!nb.isPlanner &&
+                      (confirmDelNb === nb.name ? (
+                        <div className="flex items-center gap-1 paper-card rounded-lg border border-black/10 dark:border-white/[0.2] shadow px-1 py-0.5">
+                          <button
+                            onClick={() => deleteNotebook(nb.name)}
+                            className="text-[11px] font-bold text-red-600 px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-400/10"
+                          >
+                            Delete
+                          </button>
+                          <button
+                            onClick={() => setConfirmDelNb(null)}
+                            className="text-[11px] ink-text-muted px-1 py-0.5 rounded hover:bg-stone-100"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDelNb(nb.name)}
+                          title="Delete notebook"
+                          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg ink-text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-400/10 transition"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      ))}
+                  </div>
                 </div>
               ))}
 

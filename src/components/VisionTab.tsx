@@ -112,6 +112,14 @@ export default function VisionTab() {
   const diaryBaselineRef = useRef(
     typeof localStorage !== 'undefined' ? localStorage.getItem('vision_diary_note') || '' : ''
   );
+  // Planner notebook display metadata (accent colour + sort order), keyed by name.
+  const [notebookMeta, setNotebookMeta] = useState<Record<string, { color?: string; order?: number }>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('vision_planner_notebooks') || '{}');
+    } catch {
+      return {};
+    }
+  });
   const [ppd, setPpd] = useState<number>(() => {
     const saved = Number(localStorage.getItem('vision_ppd'));
     return saved >= PPD_MIN && saved <= PPD_MAX ? saved : PPD_DEFAULT;
@@ -269,6 +277,10 @@ export default function VisionTab() {
               setDiaryNote(s.diary_note);
               diaryBaselineRef.current = s.diary_note;
               localStorage.setItem('vision_diary_note', s.diary_note);
+            }
+            if (s.planner_notebooks && typeof s.planner_notebooks === 'object') {
+              setNotebookMeta(s.planner_notebooks);
+              localStorage.setItem('vision_planner_notebooks', JSON.stringify(s.planner_notebooks));
             }
           }
         })
@@ -662,6 +674,16 @@ export default function VisionTab() {
           .upsert({ diary_note: text })
           .catch(() => flash('Could not save — run the vision_settings diary migration'));
       }
+    }
+  };
+
+  const updateNotebookMeta = (next: Record<string, { color?: string; order?: number }>) => {
+    setNotebookMeta(next);
+    localStorage.setItem('vision_planner_notebooks', JSON.stringify(next));
+    if (!dbDown) {
+      db.visionSettings
+        .upsert({ planner_notebooks: next })
+        .catch(() => flash('Could not save — run the planner_notebooks migration'));
     }
   };
 
@@ -1354,6 +1376,8 @@ export default function VisionTab() {
         <PlannerPanel
           docs={docs}
           trashDocs={trashDocs}
+          notebookMeta={notebookMeta}
+          onNotebookMetaChange={updateNotebookMeta}
           onAdd={addDoc}
           onUpdate={updateDoc}
           onDelete={deleteDoc}
