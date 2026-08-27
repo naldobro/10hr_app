@@ -27,6 +27,7 @@ import {
   AlignRight,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
   GripVertical,
   BookOpen,
   CalendarDays,
@@ -148,7 +149,8 @@ export default function PlannerPanel({
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [notebook, setNotebook] = useState(PLANNER);
-  const [nbMenu, setNbMenu] = useState(false);
+  // 'gallery' = the notebook picker shown on open; 'notebook' = rail + editor.
+  const [view, setView] = useState<'gallery' | 'notebook'>('gallery');
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [confirmDelNb, setConfirmDelNb] = useState<string | null>(null);
@@ -172,6 +174,21 @@ export default function PlannerPanel({
     docs.forEach((d) => set.add(bookOf(d)));
     return [PLANNER, ...[...set].filter((n) => n !== PLANNER).sort((a, b) => a.localeCompare(b))];
   }, [docs]);
+
+  // Notebook cards for the gallery: page count + an accent colour for each.
+  const notebookCards = useMemo(
+    () =>
+      notebooks.map((n) => {
+        const pages = docs.filter((d) => bookOf(d) === n);
+        return {
+          name: n,
+          count: pages.length,
+          color: pages.find((p) => p.color)?.color || '#0ea5e9',
+          isPlanner: n === PLANNER,
+        };
+      }),
+    [notebooks, docs]
+  );
 
   // Planner is grouped by month; other notebooks are one flat, ordered list.
   const months = useMemo(() => {
@@ -205,19 +222,13 @@ export default function PlannerPanel({
     if (notebook !== PLANNER && !notebooks.includes(notebook)) setNotebook(PLANNER);
   }, [notebooks, notebook]);
 
-  // Close the notebook switcher on an outside click.
-  useEffect(() => {
-    if (!nbMenu) return;
-    const onDown = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest('[data-nb-root]')) {
-        setNbMenu(false);
-        setCreating(false);
-        setConfirmDelNb(null);
-      }
-    };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [nbMenu]);
+  // Open a notebook from the gallery into the rail + editor view.
+  const openNotebook = (n: string) => {
+    setNotebook(n);
+    setView('notebook');
+    setShowTrash(false);
+    setMobilePane('rail');
+  };
 
   // Open a page and, on mobile, slide over to the editor pane.
   const openDoc = (id: string) => {
@@ -236,23 +247,21 @@ export default function PlannerPanel({
     if (!name) return;
     const existing = notebooks.find((n) => n.toLowerCase() === name.toLowerCase());
     if (existing) {
-      setNotebook(existing);
+      openNotebook(existing);
     } else {
       const id = await onAdd(name, ''); // seed one page so the notebook exists
       if (!id) return; // failed (e.g. migration not applied yet)
-      setNotebook(name);
       setSelectedId(id);
+      openNotebook(name);
     }
     setNewName('');
     setCreating(false);
-    setNbMenu(false);
   };
 
   const deleteNotebook = (name: string) => {
     docs.filter((d) => bookOf(d) === name).forEach((d) => onDelete(d.id));
     setConfirmDelNb(null);
-    setNbMenu(false);
-    setNotebook(PLANNER);
+    if (notebook === name) setNotebook(PLANNER);
   };
 
   // Pages a page can be reordered against: same notebook (and, for Planner, same month).
@@ -390,120 +399,179 @@ export default function PlannerPanel({
         className="relative paper-card rounded-2xl border border-black/10 dark:border-white/[0.2] shadow-2xl w-[min(1100px,96vw)] h-[820px] max-h-full flex overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
+      {view === 'gallery' ? (
+        /* ---------- notebook gallery (shown on open) ---------- */
+        <div className="flex-1 min-w-0 flex flex-col">
+          <div className="flex items-center justify-between px-6 sm:px-8 pt-6 pb-4 border-b border-black/5 dark:border-white/[0.13]">
+            <div className="flex items-center gap-3 min-w-0">
+              <span
+                className="grid place-items-center w-10 h-10 rounded-xl flex-none"
+                style={{ background: 'linear-gradient(135deg, #d97706, #b45309)' }}
+              >
+                <NotebookPen className="w-5 h-5 text-white" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-xl font-bold ink-text leading-tight">Planner</h2>
+                <p className="text-[12px] ink-text-muted">Pick a notebook to open</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg ink-text-muted hover:bg-stone-100 transition flex-none"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 sm:px-8 py-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+              {notebookCards.map((nb) => (
+                <div
+                  key={nb.name}
+                  className="group relative"
+                >
+                  <button
+                    onClick={() => openNotebook(nb.name)}
+                    className="w-full text-left paper-card rounded-2xl border border-black/10 dark:border-white/[0.15] p-4 hover:shadow-lg hover:-translate-y-0.5 transition-all overflow-hidden"
+                  >
+                    <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: nb.color }} />
+                    <span
+                      className="grid place-items-center w-9 h-9 rounded-xl mb-3"
+                      style={{ background: `${nb.color}1e`, color: nb.color }}
+                    >
+                      {nb.isPlanner ? <CalendarDays className="w-5 h-5" /> : <BookOpen className="w-5 h-5" />}
+                    </span>
+                    <div className="font-bold text-[15px] ink-text leading-tight truncate">{nb.name}</div>
+                    <div className="text-[12px] ink-text-muted mt-1">
+                      {nb.isPlanner ? 'Month-by-month' : 'Ideas & notes'} · {nb.count} page{nb.count === 1 ? '' : 's'}
+                    </div>
+                  </button>
+                  {!nb.isPlanner &&
+                    (confirmDelNb === nb.name ? (
+                      <div className="absolute top-2 right-2 flex items-center gap-1 paper-card rounded-lg border border-black/10 dark:border-white/[0.2] shadow px-1 py-0.5">
+                        <button
+                          onClick={() => deleteNotebook(nb.name)}
+                          className="text-[11px] font-bold text-red-600 px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-400/10"
+                        >
+                          Delete
+                        </button>
+                        <button
+                          onClick={() => setConfirmDelNb(null)}
+                          className="text-[11px] ink-text-muted px-1 py-0.5 rounded hover:bg-stone-100"
+                        >
+                          No
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDelNb(nb.name)}
+                        title="Delete notebook"
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg ink-text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-400/10 transition"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    ))}
+                </div>
+              ))}
+
+              {/* new notebook card */}
+              {creating ? (
+                <div className="paper-card rounded-2xl border-2 border-dashed border-amber-400/60 p-4 flex flex-col justify-center gap-2">
+                  <input
+                    autoFocus
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') createNotebook();
+                      if (e.key === 'Escape') {
+                        setCreating(false);
+                        setNewName('');
+                      }
+                    }}
+                    placeholder="Notebook name…"
+                    className="w-full text-[13px] px-2.5 py-2 rounded-lg border border-black/10 dark:border-white/[0.2] bg-white dark:bg-paper outline-none focus:border-amber-400"
+                  />
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={createNotebook}
+                      className="flex-1 text-[12px] font-semibold text-white bg-stone-800 hover:bg-stone-900 px-2.5 py-1.5 rounded-lg"
+                    >
+                      Create
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCreating(false);
+                        setNewName('');
+                      }}
+                      className="text-[12px] ink-text-muted px-2 py-1.5 rounded-lg hover:bg-stone-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setCreating(true)}
+                  className="rounded-2xl border-2 border-dashed border-black/15 dark:border-white/15 p-4 flex flex-col items-center justify-center gap-2 min-h-[116px] ink-text-muted hover:ink-text hover:border-amber-400/60 hover:bg-amber-50/40 dark:hover:bg-amber-400/10 transition"
+                >
+                  <Plus className="w-6 h-6" />
+                  <span className="text-[13px] font-semibold">New notebook</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* trash entry */}
+          <button
+            onClick={() => {
+              setView('notebook');
+              setNotebook(PLANNER);
+              setShowTrash(true);
+              setMobilePane('editor');
+            }}
+            className="flex items-center justify-between gap-2 px-6 sm:px-8 py-3 border-t border-black/5 dark:border-white/[0.13] text-[13px] ink-text-muted hover:ink-text hover:bg-white/50 dark:hover:bg-paper/50 transition"
+          >
+            <span className="flex items-center gap-2">
+              <Trash2 className="w-4 h-4" /> Trash
+            </span>
+            {trashDocs.length > 0 && (
+              <span className="text-[11px] font-bold bg-stone-200 ink-text rounded-full px-1.5 py-0.5 leading-none">
+                {trashDocs.length}
+              </span>
+            )}
+          </button>
+        </div>
+      ) : (
+       <>
         {/* ---------- notebook rail ---------- */}
         <aside
           className={`w-full md:w-[248px] flex-none flex-col border-r border-black/5 dark:border-white/[0.13] bg-amber-50/40 dark:bg-amber-400/10 ${
             mobilePane === 'editor' ? 'hidden md:flex' : 'flex'
           }`}
         >
-          {/* notebook switcher */}
-          <div className="relative border-b border-black/5 dark:border-white/[0.13]" data-nb-root>
+          {/* notebook header — back to the gallery */}
+          <div className="border-b border-black/5 dark:border-white/[0.13]">
             <button
-              onClick={() => setNbMenu((v) => !v)}
-              className="w-full flex items-center gap-2 px-4 pt-4 pb-3 text-left hover:bg-white/40 dark:hover:bg-paper/40 transition"
-              title="Switch notebook"
+              onClick={() => setView('gallery')}
+              className="w-full flex items-center gap-1.5 px-3 pt-3 pb-1.5 text-left ink-text-muted hover:ink-text transition text-[12px] font-semibold"
+              title="All notebooks"
             >
-              <NotebookPen className="w-5 h-5 ink-text flex-none" />
+              <ChevronLeft className="w-4 h-4 flex-none" /> Notebooks
+            </button>
+            <div className="flex items-center gap-2 px-4 pb-3">
+              {isMonthly ? (
+                <CalendarDays className="w-5 h-5 ink-text flex-none" />
+              ) : (
+                <BookOpen className="w-5 h-5 ink-text flex-none" />
+              )}
               <div className="min-w-0 flex-1">
                 <h3 className="text-[15px] font-bold ink-text leading-none truncate">{notebook}</h3>
                 <p className="text-[11px] ink-text-muted mt-1 leading-none truncate">
                   {isMonthly ? 'Month-by-month notes & plans' : 'Ideas & notes'}
                 </p>
               </div>
-              <ChevronDown
-                className={`w-4 h-4 flex-none ink-text-muted transition-transform ${nbMenu ? 'rotate-180' : ''}`}
-              />
-            </button>
-
-            {nbMenu && (
-              <div className="absolute left-2 right-2 top-full -mt-1 z-30 paper-card rounded-xl border border-black/10 dark:border-white/[0.2] shadow-xl p-1.5">
-                {notebooks.map((n) => {
-                  const active = n === notebook;
-                  const isPlanner = n === PLANNER;
-                  return (
-                    <div
-                      key={n}
-                      className={`group flex items-center gap-1 rounded-lg ${active ? 'bg-amber-100/70 dark:bg-amber-400/20' : 'hover:bg-stone-100'}`}
-                    >
-                      <button
-                        onClick={() => {
-                          setNotebook(n);
-                          setNbMenu(false);
-                          setConfirmDelNb(null);
-                        }}
-                        className="flex-1 min-w-0 flex items-center gap-2 px-2.5 py-1.5 text-left"
-                      >
-                        {isPlanner ? (
-                          <CalendarDays className="w-3.5 h-3.5 flex-none ink-text-muted" />
-                        ) : (
-                          <BookOpen className="w-3.5 h-3.5 flex-none ink-text-muted" />
-                        )}
-                        <span className="text-[13px] ink-text truncate">{n}</span>
-                      </button>
-                      {!isPlanner &&
-                        (confirmDelNb === n ? (
-                          <div className="flex items-center gap-1 pr-1.5 flex-none">
-                            <button
-                              onClick={() => deleteNotebook(n)}
-                              className="text-[11px] font-bold text-red-600 px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-400/10"
-                            >
-                              Delete
-                            </button>
-                            <button
-                              onClick={() => setConfirmDelNb(null)}
-                              className="text-[11px] ink-text-muted px-1 py-0.5 rounded hover:bg-stone-100"
-                            >
-                              No
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setConfirmDelNb(n)}
-                            title="Delete notebook"
-                            className="flex-none opacity-0 group-hover:opacity-100 p-1 mr-1 rounded ink-text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-400/10 transition"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        ))}
-                    </div>
-                  );
-                })}
-
-                <div className="border-t border-black/5 dark:border-white/[0.13] mt-1 pt-1">
-                  {creating ? (
-                    <div className="flex items-center gap-1 px-1">
-                      <input
-                        autoFocus
-                        value={newName}
-                        onChange={(e) => setNewName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') createNotebook();
-                          if (e.key === 'Escape') {
-                            setCreating(false);
-                            setNewName('');
-                          }
-                        }}
-                        placeholder="Notebook name…"
-                        className="flex-1 min-w-0 text-[13px] px-2 py-1.5 rounded-lg border border-black/10 dark:border-white/[0.2] bg-white dark:bg-paper outline-none focus:border-amber-400"
-                      />
-                      <button
-                        onClick={createNotebook}
-                        className="flex-none text-[12px] font-semibold text-white bg-stone-800 hover:bg-stone-900 px-2.5 py-1.5 rounded-lg"
-                      >
-                        Add
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setCreating(true)}
-                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg ink-text-muted hover:ink-text hover:bg-stone-100 transition text-[13px]"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> New notebook
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto py-2">
@@ -713,6 +781,8 @@ export default function PlannerPanel({
             </div>
           )}
         </div>
+       </>
+      )}
       </div>
       </div>
     </div>
