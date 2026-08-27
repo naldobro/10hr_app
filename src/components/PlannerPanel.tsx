@@ -72,6 +72,12 @@ const FONT_SIZES: { label: string; size: string; px: string }[] = [
   { label: 'Large', size: '5', px: '20px' },
   { label: 'Huge', size: '7', px: '28px' },
 ];
+// Accent colours offered for notebook cards in the gallery.
+const NOTEBOOK_COLORS = [
+  '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e',
+  '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1',
+  '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#78716c',
+];
 const TEXT_COLORS = [
   '#1c1917', '#44403c', '#78716c', '#a8a29e', // neutrals
   '#e11d48', '#f43f5e', '#ec4899', '#d946ef', // reds / pinks
@@ -589,9 +595,9 @@ export default function PlannerPanel({
                       {colorMenuNb === nb.name && (
                         <div
                           data-color-menu
-                          className="absolute right-0 top-full mt-1 z-30 paper-card rounded-xl border border-black/10 dark:border-white/[0.2] shadow-xl p-2 grid grid-cols-4 gap-1.5"
+                          className="absolute right-0 top-full mt-1 z-30 w-[204px] paper-card rounded-xl border border-black/10 dark:border-white/[0.2] shadow-xl p-2 grid grid-cols-6 gap-1.5"
                         >
-                          {GOAL_COLORS.map((c) => (
+                          {NOTEBOOK_COLORS.map((c) => (
                             <button
                               key={c}
                               onClick={() => setNotebookColor(nb.name, c)}
