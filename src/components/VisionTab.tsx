@@ -1321,11 +1321,15 @@ export default function VisionTab() {
         </div>
       </div>
 
-      {/* focus + diary — floating, collapsible overlay boxes pinned top-right.
-          The container is click-through so only the cards capture events. */}
+      {/* diary — floating, collapsible overlay box pinned top-right.
+          The container is click-through so only the card captures events.
+          FocusCard is kept wired up but hidden for now (too much clutter);
+          remove the `hidden` class to bring it back. */}
       {!selectedGoal && (
         <div className="absolute top-2 right-2 z-20 flex flex-col gap-3 items-end pointer-events-none">
-          <FocusCard text={focusNote} onChange={updateFocusNote} />
+          <div className="hidden">
+            <FocusCard text={focusNote} onChange={updateFocusNote} />
+          </div>
           <DiaryCard text={diaryNote} onChange={updateDiaryNote} />
         </div>
       )}
