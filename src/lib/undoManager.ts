@@ -18,7 +18,16 @@ type UndoAction =
   | { type: 'focus_update'; scope: 'global'; before: string; after: string; timestamp: number }
   | { type: 'focus_update'; scope: 'track'; before: string; after: string; timestamp: number }
   // The Vision Diary note (vision_settings.diary_note).
-  | { type: 'focus_update'; scope: 'diary'; before: string; after: string; timestamp: number };
+  | { type: 'focus_update'; scope: 'diary'; before: string; after: string; timestamp: number }
+  // Notebook gallery metadata (colour / order / pinned-section name), keyed by
+  // notebook name and stored whole in vision_settings.planner_notebooks. Covers
+  // recolour, reorder, rename and pinned-section rename in one action.
+  | {
+      type: 'notebook_meta';
+      before: Record<string, { color?: string; order?: number; pinnedName?: string }>;
+      after: Record<string, { color?: string; order?: number; pinnedName?: string }>;
+      timestamp: number;
+    };
 
 const visionFields = (g: VisionGoal) => ({
   kind: g.kind,
@@ -110,6 +119,8 @@ export const undoManager = {
       } else {
         await db.visionSettings.upsert({ focus_note: action.before });
       }
+    } else if (action.type === 'notebook_meta') {
+      await db.visionSettings.upsert({ planner_notebooks: action.before });
     }
 
     const redoHistory = undoManager.getRedoHistory();
@@ -161,6 +172,8 @@ export const undoManager = {
       } else {
         await db.visionSettings.upsert({ focus_note: action.after });
       }
+    } else if (action.type === 'notebook_meta') {
+      await db.visionSettings.upsert({ planner_notebooks: action.after });
     }
 
     const undoHistory = undoManager.getUndoHistory();

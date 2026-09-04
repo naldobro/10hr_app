@@ -147,6 +147,9 @@ export default function VisionTab() {
   const goalsRef = useRef<VisionGoal[]>([]);
   const topicsRef = useRef<VisionTopic[]>([]);
   const docsRef = useRef<VisionDoc[]>([]);
+  // Mirror of notebookMeta so undo can read the pre-change value without a stale closure.
+  const notebookMetaRef = useRef(notebookMeta);
+  notebookMetaRef.current = notebookMeta;
   const dimsRef = useRef({ w: 0, h: 0 });
   const particlesRef = useRef<Particle[]>([]);
   const burstsRef = useRef<Burst[]>([]);
@@ -225,6 +228,18 @@ export default function VisionTab() {
       diaryBaselineRef.current = note;
     } catch {
       /* column may be absent until the diary migration runs */
+    }
+  }, []);
+
+  const reloadNotebookMeta = useCallback(async () => {
+    try {
+      const s = await db.visionSettings.get();
+      const meta = s?.planner_notebooks ?? {};
+      setNotebookMeta(meta);
+      notebookMetaRef.current = meta;
+      localStorage.setItem('vision_planner_notebooks', JSON.stringify(meta));
+    } catch {
+      /* table may be absent until the planner_notebooks migration runs */
     }
   }, []);
 
@@ -331,20 +346,20 @@ export default function VisionTab() {
   const handleUndo = useCallback(async () => {
     if (!undoManager.canUndo()) return;
     await undoManager.undo();
-    await Promise.all([reloadGoals(), reloadTopics(), reloadDocs(), reloadFocus(), reloadDiary()]);
+    await Promise.all([reloadGoals(), reloadTopics(), reloadDocs(), reloadFocus(), reloadDiary(), reloadNotebookMeta()]);
     refreshUndo();
     setToast('Undone');
     window.setTimeout(() => setToast(null), 1600);
-  }, [reloadGoals, reloadTopics, reloadDocs, reloadFocus, reloadDiary, refreshUndo]);
+  }, [reloadGoals, reloadTopics, reloadDocs, reloadFocus, reloadDiary, reloadNotebookMeta, refreshUndo]);
 
   const handleRedo = useCallback(async () => {
     if (!undoManager.canRedo()) return;
     await undoManager.redo();
-    await Promise.all([reloadGoals(), reloadTopics(), reloadDocs(), reloadFocus(), reloadDiary()]);
+    await Promise.all([reloadGoals(), reloadTopics(), reloadDocs(), reloadFocus(), reloadDiary(), reloadNotebookMeta()]);
     refreshUndo();
     setToast('Redone');
     window.setTimeout(() => setToast(null), 1600);
-  }, [reloadGoals, reloadTopics, reloadDocs, reloadFocus, reloadDiary, refreshUndo]);
+  }, [reloadGoals, reloadTopics, reloadDocs, reloadFocus, reloadDiary, reloadNotebookMeta, refreshUndo]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -678,8 +693,14 @@ export default function VisionTab() {
   };
 
   const updateNotebookMeta = (next: Record<string, { color?: string; order?: number; pinnedName?: string }>) => {
+    // Each commit (recolour / reorder / rename / pin) is one undo step. onChange
+    // previews aren't routed here, so this only fires on discrete, final changes.
+    const before = notebookMetaRef.current;
     setNotebookMeta(next);
+    notebookMetaRef.current = next;
     localStorage.setItem('vision_planner_notebooks', JSON.stringify(next));
+    undoManager.addToUndoHistory({ type: 'notebook_meta', before, after: next, timestamp: Date.now() });
+    refreshUndo();
     if (!dbDown) {
       db.visionSettings
         .upsert({ planner_notebooks: next })
