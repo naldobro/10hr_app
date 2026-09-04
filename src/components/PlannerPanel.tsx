@@ -85,12 +85,21 @@ const NOTEBOOK_COLORS = [
   '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#78716c',
 ];
 const TEXT_COLORS = [
-  '#1c1917', '#44403c', '#78716c', '#a8a29e', // neutrals
-  '#e11d48', '#f43f5e', '#ec4899', '#d946ef', // reds / pinks
-  '#a855f7', '#8b5cf6', '#6366f1', '#3b82f6', // purples / blues
-  '#2563eb', '#0ea5e9', '#06b6d4', '#14b8a6', // blues / cyans
-  '#10b981', '#22c55e', '#84cc16', '#eab308', // greens / lime
-  '#f59e0b', '#f97316', '#ea580c', '#dc2626', // ambers / oranges / red
+  // neutrals (incl. pure black + white for dark mode)
+  '#000000', '#1c1917', '#44403c', '#57534e', '#78716c', '#a8a29e', '#d6d3d1', '#ffffff',
+  // reds / pinks
+  '#7f1d1d', '#b91c1c', '#dc2626', '#ef4444', '#e11d48', '#f43f5e', '#ec4899', '#f472b6',
+  // purples / violets
+  '#701a75', '#a21caf', '#c026d3', '#d946ef', '#7c3aed', '#8b5cf6', '#a855f7', '#c084fc',
+  // blues / indigos
+  '#312e81', '#4338ca', '#4f46e5', '#6366f1', '#1d4ed8', '#2563eb', '#3b82f6', '#60a5fa',
+  // cyans / teals
+  '#075985', '#0369a1', '#0ea5e9', '#38bdf8', '#0f766e', '#0d9488', '#14b8a6', '#2dd4bf',
+  // greens / limes
+  '#166534', '#15803d', '#16a34a', '#22c55e', '#4d7c0f', '#65a30d', '#84cc16', '#a3e635',
+  // yellows / ambers / oranges
+  '#a16207', '#ca8a04', '#eab308', '#facc15', '#b45309', '#d97706', '#f59e0b', '#fbbf24',
+  '#9a3412', '#c2410c', '#ea580c', '#f97316',
 ];
 const HILITE_COLORS = [
   '#fef08a', '#fde68a', '#fed7aa', '#fecaca',
@@ -1158,6 +1167,11 @@ function DocEditor({
   const meta = useRef({ title: doc.title, color: doc.color || '#0ea5e9' });
   const saveTimer = useRef<number | undefined>(undefined);
   const savedTimer = useRef<number | undefined>(undefined);
+  // Last caret/selection that lived inside one of the editors. Toolbar buttons can
+  // briefly move focus/selection, and some browsers collapse the live selection once
+  // focus leaves a contenteditable — so we remember the range and restore it before
+  // every toolbar action. This is what keeps formatting + table controls reliable.
+  const savedRange = useRef<Range | null>(null);
 
   // Empty only when there's no text AND no block content (table/list/rule/image).
   const setEmpty = (el: HTMLDivElement | null) => {
@@ -1227,9 +1241,13 @@ function DocEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Track whether the caret sits inside a table, to enable row/column controls.
+  // Track whether the caret sits inside a table, to enable row/column controls,
+  // and remember the live selection while it's inside an editor.
   useEffect(() => {
-    const onSel = () => setInTable(!!getCell());
+    const onSel = () => {
+      rememberSelection();
+      setInTable(!!getCell());
+    };
     document.addEventListener('selectionchange', onSel);
     return () => document.removeEventListener('selectionchange', onSel);
   }, []);
@@ -1283,12 +1301,45 @@ function DocEditor({
   };
 
   // ---- selection helpers (shared by summary + body via the live selection) ----
+  const hostOf = (n: Node | null): HTMLDivElement | null => {
+    if (!n) return null;
+    if (summaryRef.current?.contains(n)) return summaryRef.current;
+    if (bodyRef.current?.contains(n)) return bodyRef.current;
+    return null;
+  };
   const inEditors = () => {
     const n = window.getSelection()?.anchorNode ?? null;
-    return !!n && (!!summaryRef.current?.contains(n) || !!bodyRef.current?.contains(n));
+    return !!hostOf(n);
+  };
+  // Snapshot the live selection whenever it sits inside an editor.
+  const rememberSelection = () => {
+    const s = window.getSelection();
+    if (!s || s.rangeCount === 0) return;
+    const r = s.getRangeAt(0);
+    if (hostOf(r.commonAncestorContainer)) savedRange.current = r.cloneRange();
+  };
+  // Put the remembered range back into the live selection. Returns false if we no
+  // longer have a valid range that still lives inside an editor (e.g. its node was
+  // deleted), so callers can fall back.
+  const restoreSelection = (): boolean => {
+    const r = savedRange.current;
+    if (!r) return false;
+    const c = r.commonAncestorContainer;
+    if (!c.isConnected) { savedRange.current = null; return false; }
+    const host = hostOf(c);
+    if (!host) { savedRange.current = null; return false; }
+    host.focus();
+    const s = window.getSelection();
+    s?.removeAllRanges();
+    s?.addRange(r);
+    return true;
   };
   const ensureFocus = () => {
-    if (inEditors()) return;
+    // Prefer the live selection if it's already inside an editor…
+    if (inEditors()) { rememberSelection(); return; }
+    // …otherwise restore the last remembered caret…
+    if (restoreSelection()) return;
+    // …and only as a last resort drop the caret at the end of the body.
     const el = bodyRef.current;
     if (!el) return;
     el.focus();
@@ -1298,11 +1349,14 @@ function DocEditor({
     const s = window.getSelection();
     s?.removeAllRanges();
     s?.addRange(r);
+    savedRange.current = r.cloneRange();
   };
   const getCell = (): HTMLTableCellElement | null => {
-    const n = window.getSelection()?.anchorNode ?? null;
-    if (!n) return null;
-    if (!summaryRef.current?.contains(n) && !bodyRef.current?.contains(n)) return null;
+    // Prefer the live caret, but fall back to the remembered range so the row/column
+    // controls keep working even after focus briefly left the editor.
+    let n: Node | null = window.getSelection()?.anchorNode ?? null;
+    if (!hostOf(n)) n = savedRange.current?.commonAncestorContainer ?? null;
+    if (!n || !n.isConnected || !hostOf(n)) return null;
     let cur: Node | null = n;
     while (cur && cur !== document) {
       if (cur instanceof HTMLTableCellElement) return cur;
@@ -1445,7 +1499,30 @@ function DocEditor({
   };
 
   // Table row/column edits, relative to the cell holding the caret.
-  const tableOp = (op: 'addRow' | 'addCol' | 'delRow' | 'delCol') => {
+  // Drop the caret into a cell (or after the table once it's gone) so the next
+  // edit lands somewhere sane and the selection is never left detached.
+  const caretInto = (target: Node | null) => {
+    if (!target || !target.isConnected) { ensureFocus(); return; }
+    const host = hostOf(target);
+    if (host) host.focus();
+    const r = document.createRange();
+    r.selectNodeContents(target);
+    r.collapse(true);
+    const s = window.getSelection();
+    s?.removeAllRanges();
+    s?.addRange(r);
+    savedRange.current = r.cloneRange();
+  };
+
+  // The block to move the caret to once a whole table is removed — the paragraph
+  // right after it (insertTable leaves one), else the one before, else the host.
+  const tableSibling = (table: Element): Node | null =>
+    (table.nextElementSibling as HTMLElement | null) ??
+    (table.previousElementSibling as HTMLElement | null) ??
+    hostOf(table);
+
+  const tableOp = (op: 'addRow' | 'addCol' | 'delRow' | 'delCol' | 'delTable') => {
+    ensureFocus(); // restore the caret into the table if focus drifted to the toolbar
     const cell = getCell();
     if (!cell) return;
     const row = cell.parentElement as HTMLTableRowElement | null;
@@ -1462,7 +1539,9 @@ function DocEditor({
         nr.appendChild(td);
       });
       row.after(nr);
+      caretInto(nr.children[colIdx] ?? nr.children[0] ?? cell);
     } else if (op === 'addCol') {
+      let created: Element | null = null;
       rows.forEach((tr) => {
         const ref = tr.children[colIdx];
         const tag = ref?.tagName === 'TH' ? 'th' : 'td';
@@ -1470,16 +1549,32 @@ function DocEditor({
         c.innerHTML = '<br>';
         if (ref) ref.after(c);
         else tr.appendChild(c);
+        if (tr === row) created = c;
       });
+      caretInto(created ?? cell);
+    } else if (op === 'delTable') {
+      const anchor = tableSibling(table);
+      table.remove();
+      caretInto(anchor);
     } else if (op === 'delRow') {
-      if (rows.length <= 1) table.remove();
-      else row.remove();
+      if (rows.length <= 1) {
+        const anchor = tableSibling(table);
+        table.remove();
+        caretInto(anchor);
+      } else {
+        const fallback = (row.nextElementSibling ?? row.previousElementSibling) as HTMLElement | null;
+        row.remove();
+        caretInto(fallback?.children[colIdx] ?? fallback?.children[0] ?? null);
+      }
     } else if (op === 'delCol') {
       const cols = row.children.length;
       if (cols <= 1) {
+        const anchor = tableSibling(table);
         table.remove();
+        caretInto(anchor);
       } else {
         rows.forEach((tr) => tr.children[colIdx]?.remove());
+        caretInto(row.children[colIdx] ?? row.children[row.children.length - 1] ?? null);
       }
     }
     afterEdit();
@@ -1563,9 +1658,11 @@ function DocEditor({
           onToggle={() => setMenu(menu === 'color' ? null : 'color')}
           title="Text color"
           icon={<Baseline className="w-4 h-4" />}
+          wide
         >
           <Swatches
             colors={TEXT_COLORS}
+            cols={8}
             onPick={(c) => {
               execStyled('foreColor', c);
               setMenu(null);
@@ -1647,6 +1744,7 @@ function DocEditor({
             <TextBtn onClick={() => tableOp('addCol')} title="Add column right">+ Col</TextBtn>
             <TextBtn onClick={() => tableOp('delRow')} title="Delete this row" danger>− Row</TextBtn>
             <TextBtn onClick={() => tableOp('delCol')} title="Delete this column" danger>− Col</TextBtn>
+            <TextBtn onClick={() => tableOp('delTable')} title="Delete the whole table" danger>✕ Table</TextBtn>
           </>
         )}
 
@@ -1854,9 +1952,9 @@ function Menu({
   );
 }
 
-function Swatches({ colors, onPick }: { colors: string[]; onPick: (c: string) => void }) {
+function Swatches({ colors, onPick, cols = 4 }: { colors: string[]; onPick: (c: string) => void; cols?: number }) {
   return (
-    <div className="grid grid-cols-4 gap-1.5 p-1">
+    <div className="grid gap-1.5 p-1" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
       {colors.map((c) => (
         <button
           key={c}
