@@ -35,6 +35,7 @@ import {
   BookOpen,
   CalendarDays,
   RotateCcw,
+  Link2,
 } from 'lucide-react';
 import { VisionDoc } from '../types';
 import { GOAL_COLORS } from '../lib/visionUtils';
@@ -70,6 +71,11 @@ const bookOf = (d: VisionDoc) => d.notebook || PLANNER;
 // Planner pages with an empty month live in the fixed "pinned" section at the top,
 // above every month. (Non-Planner notebooks also use '' but render as a flat list.)
 const PINNED = '';
+// Inline sub-pages created from *inside* another page carry this sentinel month so
+// they stay out of every notebook listing (rail, gallery count, link picker) — they
+// exist only through the chip that links to them. Still real docs, so still openable.
+const INLINE = '__inline__';
+const isInline = (d: VisionDoc) => d.month === INLINE;
 
 // Quick presets ------------------------------------------------------------
 const FONT_SIZES: { label: string; size: string; px: string }[] = [
@@ -181,6 +187,8 @@ export default function PlannerPanel({
 }: PlannerPanelProps) {
   const currentMonth = monthKey(new Date());
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // A linked page opened in a floating window over the editor (one level deep).
+  const [overlayDocId, setOverlayDocId] = useState<string | null>(null);
   // On phones the rail and editor can't sit side-by-side, so we show one at a time.
   const [mobilePane, setMobilePane] = useState<'rail' | 'editor'>('rail');
   const [showTrash, setShowTrash] = useState(false);
@@ -237,7 +245,8 @@ export default function PlannerPanel({
   const isMonthly = notebook === PLANNER;
 
   // Pages in the active notebook (a missing notebook value means the built-in Planner).
-  const nbDocs = useMemo(() => docs.filter((d) => bookOf(d) === notebook), [docs, notebook]);
+  // Inline sub-pages are excluded here so they never appear in the rail / month lists.
+  const nbDocs = useMemo(() => docs.filter((d) => bookOf(d) === notebook && !isInline(d)), [docs, notebook]);
 
   // Notebooks the user has: the built-in Planner + any they've made. Ordered by the
   // saved manual order (falling back to Planner-first, then alphabetical).
@@ -256,7 +265,7 @@ export default function PlannerPanel({
   const notebookCards = useMemo(
     () =>
       notebooks.map((n) => {
-        const pages = docs.filter((d) => bookOf(d) === n);
+        const pages = docs.filter((d) => bookOf(d) === n && !isInline(d));
         return {
           name: n,
           count: pages.length,
@@ -368,6 +377,13 @@ export default function PlannerPanel({
   const handleAdd = async (month: string) => {
     const id = await onAdd(notebook, isMonthly ? month : '');
     if (id) openDoc(id);
+  };
+
+  // Create a fresh *inline* page (hidden from the notebook listing) to link from
+  // inside the page being edited. Doesn't switch the open doc — the chip points at it.
+  const createInlinePage = async (): Promise<{ id: string; title: string } | null> => {
+    const id = await onAdd(notebook, INLINE);
+    return id ? { id, title: 'Untitled' } : null;
   };
 
   // Section collapse (per notebook + month), persisted locally.
@@ -518,6 +534,7 @@ export default function PlannerPanel({
   };
 
   return (
+    <>
     <div className="fixed inset-0 z-[80]" onClick={onClose}>
       <div className="absolute inset-0 bg-black/30" />
       <style>{`
@@ -545,6 +562,22 @@ export default function PlannerPanel({
         .doc-body ul.doc-tasks li.doc-task[data-checked="true"]::before { background: #059669; border-color: #059669; }
         .doc-body ul.doc-tasks li.doc-task[data-checked="true"]::after { content: ''; position: absolute; left: .35em; top: .28em; width: .28em; height: .55em; border: solid #fff; border-width: 0 .16em .16em 0; transform: rotate(45deg); pointer-events: none; }
         .doc-body ul.doc-tasks li.doc-task[data-checked="true"] { color: #a8a29e; text-decoration: line-through; }
+        /* linked-page reference chips (collapsed; click opens the page in a window) */
+        .doc-body a.doc-ref {
+          display: inline-flex; align-items: center; gap: .3em;
+          padding: .05em .5em; margin: 0 .1em; border-radius: .5em;
+          background: #eef2ff; border: 1px solid #c7d2fe; color: #4338ca;
+          font-size: .92em; font-weight: 600; text-decoration: none;
+          cursor: pointer; vertical-align: baseline; white-space: nowrap;
+          max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+        }
+        .doc-body a.doc-ref:hover { background: #e0e7ff; border-color: #a5b4fc; }
+        .doc-body a.doc-ref[data-missing="true"] {
+          background: #fef2f2; border-color: #fecaca; color: #b91c1c; cursor: default;
+        }
+        .dark .doc-body a.doc-ref { background: rgba(99,102,241,.18); border-color: rgba(129,140,248,.4); color: #c7d2fe; }
+        .dark .doc-body a.doc-ref:hover { background: rgba(99,102,241,.3); }
+        .dark .doc-body a.doc-ref[data-missing="true"] { background: rgba(239,68,68,.14); border-color: rgba(248,113,113,.4); color: #fca5a5; }
       `}</style>
       <div className="absolute inset-x-0 bottom-0 top-[calc(100px+env(safe-area-inset-top))] md:top-[calc(90px+env(safe-area-inset-top))] flex items-center justify-center p-2 sm:p-4">
       <div
@@ -1113,6 +1146,9 @@ export default function PlannerPanel({
               onChange={(patch, persist) => onUpdate(doc.id, patch, persist)}
               onDelete={() => onDelete(doc.id)}
               onUploadImage={onUploadImage}
+              allDocs={docs}
+              onOpenDoc={setOverlayDocId}
+              onCreateInlinePage={createInlinePage}
             />
           ) : (
             <div className="flex-1 grid place-items-center px-6 -mt-8">
@@ -1138,6 +1174,80 @@ export default function PlannerPanel({
       </div>
       </div>
     </div>
+    <LinkedDocWindow
+      docId={overlayDocId}
+      docs={docs}
+      onClose={() => setOverlayDocId(null)}
+      onChange={onUpdate}
+      onUploadImage={onUploadImage}
+    />
+    </>
+  );
+}
+
+// A single linked page shown in a floating window over the editor. It's one level
+// deep (no "link a page" control inside), reuses the same save path, and closes
+// itself if its page disappears (deleted elsewhere).
+function LinkedDocWindow({
+  docId,
+  docs,
+  onClose,
+  onChange,
+  onUploadImage,
+}: {
+  docId: string | null;
+  docs: VisionDoc[];
+  onClose: () => void;
+  onChange: (id: string, patch: Partial<VisionDoc>, persist: boolean) => void;
+  onUploadImage?: (blob: Blob, contentType: string) => Promise<string>;
+}) {
+  const doc = docId ? docs.find((d) => d.id === docId) || null : null;
+  // Close on Escape, and if the target page vanished.
+  useEffect(() => {
+    if (!docId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [docId, onClose]);
+  useEffect(() => {
+    if (docId && !doc) onClose();
+  }, [docId, doc, onClose]);
+
+  if (!docId || !doc) return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[95]" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
+      <div className="absolute inset-0 flex items-center justify-center p-2 sm:p-6">
+        <div
+          className="relative paper-card rounded-2xl border border-black/10 dark:border-white/[0.2] shadow-2xl w-[min(900px,96vw)] h-[min(760px,92vh)] flex flex-col overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-2 px-4 sm:px-6 pt-3 pb-2 border-b border-black/5 dark:border-white/[0.13]">
+            <Link2 className="w-4 h-4 ink-text-muted flex-none" />
+            <span className="text-[12px] font-semibold ink-text-muted truncate flex-1">Linked page</span>
+            <button
+              onClick={onClose}
+              title="Close (Esc)"
+              className="p-1.5 rounded-lg ink-text-muted hover:ink-text hover:bg-stone-100 dark:hover:bg-white/10 transition flex-none"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <DocEditor
+            key={doc.id}
+            doc={doc}
+            nested
+            allDocs={docs}
+            onChange={(patch, persist) => onChange(doc.id, patch, persist)}
+            onDelete={() => {}}
+            onUploadImage={onUploadImage}
+          />
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1146,11 +1256,23 @@ function DocEditor({
   onChange,
   onDelete,
   onUploadImage,
+  allDocs = [],
+  onOpenDoc,
+  onCreateInlinePage,
+  nested = false,
 }: {
   doc: VisionDoc;
   onChange: (patch: Partial<VisionDoc>, persist: boolean) => void;
   onDelete: () => void;
   onUploadImage?: (blob: Blob, contentType: string) => Promise<string>;
+  /** All active pages, used to resolve link-chip titles and populate the picker. */
+  allDocs?: VisionDoc[];
+  /** Open a linked page in a window. Absent ⇒ this editor can't open links (depth cap). */
+  onOpenDoc?: (id: string) => void;
+  /** Create a fresh inline (hidden) sub-page and return it. Absent ⇒ no "new page". */
+  onCreateInlinePage?: () => Promise<{ id: string; title: string } | null>;
+  /** True when shown inside a linked-page window — hides destructive + nesting controls. */
+  nested?: boolean;
 }) {
   const summaryRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -1164,7 +1286,7 @@ function DocEditor({
   const [color, setColor] = useState(doc.color || '#0ea5e9');
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [confirmDel, setConfirmDel] = useState(false);
-  const [menu, setMenu] = useState<null | 'size' | 'color' | 'hilite' | 'table'>(null);
+  const [menu, setMenu] = useState<null | 'size' | 'color' | 'hilite' | 'table' | 'link'>(null);
   const [inTable, setInTable] = useState(false);
   const meta = useRef({ title: doc.title, color: doc.color || '#0ea5e9' });
   const saveTimer = useRef<number | undefined>(undefined);
@@ -1232,6 +1354,7 @@ function DocEditor({
       bodyRef.current.innerHTML = doc.content || '';
       setEmpty(bodyRef.current);
     }
+    refreshDocRefs();
     return () => {
       // Flush any pending edit when leaving this doc.
       if (saveTimer.current) {
@@ -1242,6 +1365,12 @@ function DocEditor({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Re-resolve link-chip labels whenever the page list changes (title edits, deletes).
+  useEffect(() => {
+    refreshDocRefs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allDocs]);
 
   // Track whether the caret sits inside a table, to enable row/column controls,
   // and remember the live selection while it's inside an editor.
@@ -1395,6 +1524,56 @@ function DocEditor({
     document.execCommand('insertHTML', false, html);
     setMenu(null);
     afterEdit();
+  };
+
+  // ---- linked-page reference chips ----
+  const escapeHtml = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  // Insert a collapsed link chip at the caret. Non-editable so it acts as one atom;
+  // the title is a cache — refreshDocRefs() re-derives it from the live page list.
+  const insertDocRef = (id: string, title: string) => {
+    ensureFocus();
+    const label = escapeHtml(title || 'Untitled');
+    document.execCommand(
+      'insertHTML',
+      false,
+      `<a class="doc-ref" data-doc-id="${id}" contenteditable="false">📄 ${label}</a>&#8203;`
+    );
+    setMenu(null);
+    afterEdit();
+  };
+
+  const pickLinkedDoc = (id: string) => {
+    const d = allDocs.find((x) => x.id === id);
+    insertDocRef(id, d?.title || 'Untitled');
+  };
+
+  const createAndLinkInline = async () => {
+    if (!onCreateInlinePage) return;
+    const created = await onCreateInlinePage();
+    setMenu(null);
+    if (!created) return;
+    insertDocRef(created.id, created.title);
+    // Open the new inline page straight away so it can be filled in.
+    onOpenDoc?.(created.id);
+  };
+
+  // Keep every chip's label in sync with the current page title, and flag any whose
+  // target page is gone (deleted / purged) so a click can't open a dead link.
+  const refreshDocRefs = () => {
+    [summaryRef.current, bodyRef.current].forEach((host) => {
+      host?.querySelectorAll('a.doc-ref').forEach((el) => {
+        const a = el as HTMLAnchorElement;
+        a.setAttribute('contenteditable', 'false');
+        const id = a.getAttribute('data-doc-id');
+        const d = allDocs.find((x) => x.id === id);
+        const next = d ? `📄 ${d.title || 'Untitled'}` : '⚠ Page unavailable';
+        if (d) a.removeAttribute('data-missing');
+        else a.setAttribute('data-missing', 'true');
+        if (a.textContent !== next) a.textContent = next;
+      });
+    });
   };
 
   const insertChecklist = () => {
@@ -1598,7 +1777,7 @@ function DocEditor({
             <span className="text-[11px] ink-text-muted w-16 text-right">
               {status === 'saving' ? 'Saving…' : status === 'saved' ? 'Saved ✓' : ''}
             </span>
-            {confirmDel ? (
+            {nested ? null : confirmDel ? (
               <div className="flex items-center gap-1">
                 <button
                   onClick={onDelete}
@@ -1723,6 +1902,24 @@ function DocEditor({
         </Menu>
         <TB onClick={() => exec('insertHorizontalRule')} title="Divider line"><Minus className="w-4 h-4" /></TB>
         <TB onClick={pickImage} title="Insert image (or just paste / drop one)"><ImageIcon className="w-4 h-4" /></TB>
+
+        {/* add an inline sub-page, or link an existing page — hidden inside a linked window */}
+        {(onOpenDoc || onCreateInlinePage) && (
+          <Menu
+            open={menu === 'link'}
+            onToggle={() => setMenu(menu === 'link' ? null : 'link')}
+            title="Add / link a page"
+            icon={<Link2 className="w-4 h-4" />}
+            wide
+          >
+            <DocRefPicker
+              docs={allDocs}
+              currentId={doc.id}
+              onPick={pickLinkedDoc}
+              onNew={onCreateInlinePage ? createAndLinkInline : undefined}
+            />
+          </Menu>
+        )}
 
         <Sep />
         <TB onClick={() => exec('justifyLeft')} title="Align left"><AlignLeft className="w-4 h-4" /></TB>
@@ -1861,6 +2058,15 @@ function DocEditor({
   // select an image for resizing when the image itself is clicked.
   function onTaskClick(e: React.MouseEvent) {
     const target = e.target as HTMLElement;
+    // Linked-page chip: open it in a window (unless this editor is itself a linked
+    // window — depth cap — or the target page no longer exists).
+    const ref = target.closest?.('a.doc-ref') as HTMLElement | null;
+    if (ref) {
+      e.preventDefault();
+      const id = ref.getAttribute('data-doc-id');
+      if (id && onOpenDoc && ref.getAttribute('data-missing') !== 'true') onOpenDoc(id);
+      return;
+    }
     if (target.tagName === 'IMG') {
       selectImage(target as HTMLImageElement);
       return;
@@ -1914,6 +2120,78 @@ function TextBtn({
 
 function Sep() {
   return <span className="w-px h-5 bg-black/10 mx-1" />;
+}
+
+// Picker for the "Link a page" menu: optional "new page" action, a filter box, and
+// the notebook's pages grouped by book. Excludes the current page so you can't
+// self-link. onMouseDown is prevented on rows so the editor keeps its caret.
+function DocRefPicker({
+  docs,
+  currentId,
+  onPick,
+  onNew,
+}: {
+  docs: VisionDoc[];
+  currentId: string;
+  onPick: (id: string) => void;
+  onNew?: () => void;
+}) {
+  const [q, setQ] = useState('');
+  const query = q.trim().toLowerCase();
+  const matches = docs
+    .filter((d) => d.id !== currentId && !isInline(d))
+    .filter((d) => !query || (d.title || 'Untitled').toLowerCase().includes(query) || bookOf(d).toLowerCase().includes(query));
+  // Group by notebook, book names alphabetical, pages by sort order.
+  const byBook = new Map<string, VisionDoc[]>();
+  matches.forEach((d) => {
+    const b = bookOf(d);
+    (byBook.get(b) ?? byBook.set(b, []).get(b)!).push(d);
+  });
+  const books = Array.from(byBook.keys()).sort((a, b) => a.localeCompare(b));
+
+  return (
+    <div className="w-[260px] max-w-[calc(100vw-1.5rem)]">
+      {onNew && (
+        <button
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={onNew}
+          className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[13px] font-semibold text-indigo-600 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-400/10 transition text-left"
+        >
+          <Plus className="w-4 h-4 flex-none" /> New inline page
+        </button>
+      )}
+      {onNew && <div className="px-2.5 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider ink-text-muted/70">Or link an existing page</div>}
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        onMouseDown={(e) => e.stopPropagation()}
+        placeholder="Search pages…"
+        className="mt-1 mb-1 w-full text-[13px] ink-text bg-white dark:bg-paper rounded-lg border border-black/10 dark:border-white/[0.2] px-2.5 py-1.5 outline-none focus:border-amber-400"
+      />
+      <div className="max-h-[240px] overflow-y-auto pr-0.5">
+        {matches.length === 0 ? (
+          <div className="px-2.5 py-4 text-[12px] ink-text-muted/70 text-center">No pages found.</div>
+        ) : (
+          books.map((b) => (
+            <div key={b} className="mb-1">
+              <div className="px-2.5 pt-1.5 pb-0.5 text-[10px] font-bold uppercase tracking-wider ink-text-muted/70">{b}</div>
+              {byBook.get(b)!.map((d) => (
+                <button
+                  key={d.id}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => onPick(d.id)}
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] ink-text hover:bg-stone-100 dark:hover:bg-white/10 transition text-left"
+                >
+                  <span className="w-2 h-2 rounded-full flex-none" style={{ background: d.color || '#0ea5e9' }} />
+                  <span className="truncate">{d.title || 'Untitled'}</span>
+                </button>
+              ))}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
 }
 
 function Menu({
