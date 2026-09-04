@@ -1958,7 +1958,9 @@ function Menu({
 
 function Swatches({ colors, onPick, cols = 4 }: { colors: string[]; onPick: (c: string) => void; cols?: number }) {
   return (
-    <div className="grid gap-1.5 p-1" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+    // Fixed-size tracks (not 1fr) so swatches never squeeze together / overflow the
+    // popover. The grid sizes itself to the columns; the menu wraps around it.
+    <div className="grid gap-1.5 p-1 w-max" style={{ gridTemplateColumns: `repeat(${cols}, 1.5rem)` }}>
       {colors.map((c) => (
         <button
           key={c}
