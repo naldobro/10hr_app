@@ -379,6 +379,14 @@ export default function VisionTab() {
     return () => window.removeEventListener('keydown', onKey);
   }, [handleUndo, handleRedo]);
 
+  // Pillar edits are recorded from App (outside this component), so refresh the
+  // undo/redo button state when that happens.
+  useEffect(() => {
+    const onChanged = () => refreshUndo();
+    window.addEventListener('undostack:changed', onChanged);
+    return () => window.removeEventListener('undostack:changed', onChanged);
+  }, [refreshUndo]);
+
   // ---------- viewport measure ----------
   useEffect(() => {
     const el = scrollRef.current;

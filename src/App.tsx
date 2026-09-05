@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { db } from './lib/database';
+import { undoManager } from './lib/undoManager';
 import type { FocusPillar } from './types';
 import Navigation from './components/Navigation';
 import TrackTab from './components/TrackTab';
@@ -43,6 +44,21 @@ function App() {
       .catch(() => {});
   }, []);
 
+  // Undo/redo of a pillar edit runs through undoManager, which writes the DB and
+  // fires this event with the resulting array — mirror it into our live state +
+  // localStorage so the nav updates at once (no re-recording; this isn't an edit).
+  useEffect(() => {
+    const onSet = (e: Event) => {
+      const next = normalizePillars((e as CustomEvent).detail);
+      // Cancel any in-flight autosave so it can't overwrite the undone value.
+      if (pillarsSaveTimer.current) clearTimeout(pillarsSaveTimer.current);
+      setFocusPillars(next);
+      localStorage.setItem('vision_focus_pillars', JSON.stringify(next));
+    };
+    window.addEventListener('focuspillars:set', onSet);
+    return () => window.removeEventListener('focuspillars:set', onSet);
+  }, []);
+
   // Update immediately for a snappy UI + localStorage, and debounce the DB write.
   const updateFocusPillars = (next: FocusPillar[]) => {
     setFocusPillars(next);
@@ -53,6 +69,13 @@ function App() {
         .upsert({ focus_pillars: next })
         .catch(() => {});
     }, 600);
+  };
+
+  // Record one undo step per pillar edit session (fired when the popover closes on a
+  // real change). `undostack:changed` lets the Vision tab refresh its undo buttons.
+  const recordPillarUndo = (before: FocusPillar[], after: FocusPillar[]) => {
+    undoManager.addToUndoHistory({ type: 'pillar_update', before, after, timestamp: Date.now() });
+    window.dispatchEvent(new Event('undostack:changed'));
   };
 
   useEffect(() => {
@@ -125,6 +148,7 @@ function App() {
         canGoNext={canGoNext()}
         focusPillars={focusPillars}
         onFocusPillarsChange={updateFocusPillars}
+        onCommitPillars={recordPillarUndo}
       />
 
       {activeTab === 'vision' ? (

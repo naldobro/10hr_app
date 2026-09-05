@@ -1,4 +1,4 @@
-import { WorkSession, VisionGoal, VisionTopic } from '../types';
+import { WorkSession, VisionGoal, VisionTopic, FocusPillar } from '../types';
 import { db } from './database';
 
 // NOTE: Planner docs are deliberately NOT part of this undo stack. They use a Trash
@@ -27,7 +27,12 @@ type UndoAction =
       before: Record<string, { color?: string; order?: number; pinnedName?: string }>;
       after: Record<string, { color?: string; order?: number; pinnedName?: string }>;
       timestamp: number;
-    };
+    }
+  // The 3 Vision focus pillars (vision_settings.focus_pillars). Committed once per
+  // edit session — when the pillar popover closes — not per keystroke. Applying it
+  // also fires a `focuspillars:set` window event so App's live copy updates instantly
+  // (App owns the pillar state; the undo write here only touches the DB).
+  | { type: 'pillar_update'; before: FocusPillar[]; after: FocusPillar[]; timestamp: number };
 
 const visionFields = (g: VisionGoal) => ({
   kind: g.kind,
@@ -121,6 +126,9 @@ export const undoManager = {
       }
     } else if (action.type === 'notebook_meta') {
       await db.visionSettings.upsert({ planner_notebooks: action.before });
+    } else if (action.type === 'pillar_update') {
+      await db.visionSettings.upsert({ focus_pillars: action.before });
+      window.dispatchEvent(new CustomEvent('focuspillars:set', { detail: action.before }));
     }
 
     const redoHistory = undoManager.getRedoHistory();
@@ -174,6 +182,9 @@ export const undoManager = {
       }
     } else if (action.type === 'notebook_meta') {
       await db.visionSettings.upsert({ planner_notebooks: action.after });
+    } else if (action.type === 'pillar_update') {
+      await db.visionSettings.upsert({ focus_pillars: action.after });
+      window.dispatchEvent(new CustomEvent('focuspillars:set', { detail: action.after }));
     }
 
     const undoHistory = undoManager.getUndoHistory();

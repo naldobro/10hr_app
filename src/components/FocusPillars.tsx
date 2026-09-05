@@ -6,6 +6,8 @@ import type { FocusPillar } from '../types';
 interface FocusPillarsProps {
   pillars: FocusPillar[];
   onChange: (pillars: FocusPillar[]) => void;
+  /** Record one undo step for an edit session (before → after), fired when the popover closes. */
+  onCommit?: (before: FocusPillar[], after: FocusPillar[]) => void;
   /** Whether the Vision tab is active. When false the pills are inert and any open editor closes. */
   active: boolean;
   /** Compact variant used in the stacked mobile nav. */
@@ -24,18 +26,37 @@ const ACCENTS = ['#7c3aed', '#0ea5e9', '#10b981']; // violet, sky, emerald
 // opaque bar with its own stacking context, so an in-flow `absolute` popover would
 // get clipped / painted behind it and could run off a narrow phone's edge — the
 // portal sidesteps both.
-export default function FocusPillars({ pillars, onChange, active, compact }: FocusPillarsProps) {
+export default function FocusPillars({ pillars, onChange, onCommit, active, compact }: FocusPillarsProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [pos, setPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+  // Live mirror of pillars + the snapshot taken when the popover opened, so closing
+  // it can record a single before→after undo step (rather than one per keystroke).
+  const pillarsRef = useRef(pillars);
+  pillarsRef.current = pillars;
+  const baselineRef = useRef<FocusPillar[] | null>(null);
 
   // Close the editor whenever we leave the Vision tab.
   useEffect(() => {
     if (!active) setOpenIndex(null);
   }, [active]);
+
+  // Snapshot on open; on close, commit one undo step if anything actually changed.
+  useEffect(() => {
+    if (openIndex !== null) {
+      if (baselineRef.current === null) baselineRef.current = pillarsRef.current.map((p) => ({ ...p }));
+      return;
+    }
+    const before = baselineRef.current;
+    baselineRef.current = null;
+    if (before && onCommit) {
+      const after = pillarsRef.current;
+      if (JSON.stringify(before) !== JSON.stringify(after)) onCommit(before, after.map((p) => ({ ...p })));
+    }
+  }, [openIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Position the popover under the open pill, clamped to the viewport. Recomputed
   // while open on resize / scroll so it never drifts off-screen or under the nav.

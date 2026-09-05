@@ -14,6 +14,7 @@ interface NavigationProps {
   canGoNext: boolean;
   focusPillars: FocusPillar[];
   onFocusPillarsChange: (pillars: FocusPillar[]) => void;
+  onCommitPillars: (before: FocusPillar[], after: FocusPillar[]) => void;
 }
 
 export default function Navigation({
@@ -25,6 +26,7 @@ export default function Navigation({
   canGoNext,
   focusPillars,
   onFocusPillarsChange,
+  onCommitPillars,
 }: NavigationProps) {
   const { theme, toggleTheme } = useTheme();
   const ThemeIcon = theme === 'dark' ? Sun : Moon;
@@ -114,6 +116,7 @@ export default function Navigation({
               <FocusPillars
                 pillars={focusPillars}
                 onChange={onFocusPillarsChange}
+                onCommit={onCommitPillars}
                 active={isVision}
                 compact
               />
@@ -193,6 +196,7 @@ export default function Navigation({
               <FocusPillars
                 pillars={focusPillars}
                 onChange={onFocusPillarsChange}
+                onCommit={onCommitPillars}
                 active={isVision}
               />
             </div>
