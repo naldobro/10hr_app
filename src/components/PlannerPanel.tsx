@@ -2122,9 +2122,12 @@ function Sep() {
   return <span className="w-px h-5 bg-black/10 mx-1" />;
 }
 
-// Picker for the "Link a page" menu: optional "new page" action, a filter box, and
-// the notebook's pages grouped by book. Excludes the current page so you can't
-// self-link. onMouseDown is prevented on rows so the editor keeps its caret.
+// Picker for the "Link a page" menu. Two levels so long libraries stay navigable:
+//   1. a list of notebooks (with page counts + accent colour), then
+//   2. the pages inside the notebook you open — with a "Back to notebooks" row.
+// Typing in the search box cuts across every notebook at once (grouped results), so
+// you can still find a page without knowing which notebook it lives in. Excludes the
+// current page so you can't self-link; onMouseDown is prevented so the caret stays put.
 function DocRefPicker({
   docs,
   currentId,
@@ -2137,17 +2140,49 @@ function DocRefPicker({
   onNew?: () => void;
 }) {
   const [q, setQ] = useState('');
+  // Which notebook is open in the drill-down (null ⇒ showing the notebook list).
+  const [book, setBook] = useState<string | null>(null);
   const query = q.trim().toLowerCase();
-  const matches = docs
-    .filter((d) => d.id !== currentId && !isInline(d))
-    .filter((d) => !query || (d.title || 'Untitled').toLowerCase().includes(query) || bookOf(d).toLowerCase().includes(query));
-  // Group by notebook, book names alphabetical, pages by sort order.
+
+  // Every page you could link to, grouped by notebook.
+  const linkable = docs.filter((d) => d.id !== currentId && !isInline(d));
   const byBook = new Map<string, VisionDoc[]>();
-  matches.forEach((d) => {
+  linkable.forEach((d) => {
     const b = bookOf(d);
     (byBook.get(b) ?? byBook.set(b, []).get(b)!).push(d);
   });
-  const books = Array.from(byBook.keys()).sort((a, b) => a.localeCompare(b));
+  // Notebooks that actually hold a linkable page — Planner first, then alphabetical.
+  const books = Array.from(byBook.keys()).sort((a, b) =>
+    a === PLANNER ? -1 : b === PLANNER ? 1 : a.localeCompare(b)
+  );
+  const accentOf = (b: string) => byBook.get(b)?.find((d) => d.color)?.color || '#0ea5e9';
+
+  // Flat, cross-notebook matches while searching.
+  const searchHits = query
+    ? linkable.filter(
+        (d) => (d.title || 'Untitled').toLowerCase().includes(query) || bookOf(d).toLowerCase().includes(query)
+      )
+    : [];
+  const hitsByBook = new Map<string, VisionDoc[]>();
+  searchHits.forEach((d) => {
+    const b = bookOf(d);
+    (hitsByBook.get(b) ?? hitsByBook.set(b, []).get(b)!).push(d);
+  });
+  const hitBooks = Array.from(hitsByBook.keys()).sort((a, b) =>
+    a === PLANNER ? -1 : b === PLANNER ? 1 : a.localeCompare(b)
+  );
+
+  const pageRow = (d: VisionDoc) => (
+    <button
+      key={d.id}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => onPick(d.id)}
+      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] ink-text hover:bg-stone-100 dark:hover:bg-white/10 transition text-left"
+    >
+      <span className="w-2 h-2 rounded-full flex-none" style={{ background: d.color || '#0ea5e9' }} />
+      <span className="truncate">{d.title || 'Untitled'}</span>
+    </button>
+  );
 
   return (
     <div className="w-[260px] max-w-[calc(100vw-1.5rem)]">
@@ -2165,29 +2200,64 @@ function DocRefPicker({
         value={q}
         onChange={(e) => setQ(e.target.value)}
         onMouseDown={(e) => e.stopPropagation()}
-        placeholder="Search pages…"
+        placeholder="Search all pages…"
         className="mt-1 mb-1 w-full text-[13px] ink-text bg-white dark:bg-paper rounded-lg border border-black/10 dark:border-white/[0.2] px-2.5 py-1.5 outline-none focus:border-amber-400"
       />
       <div className="max-h-[240px] overflow-y-auto pr-0.5">
-        {matches.length === 0 ? (
-          <div className="px-2.5 py-4 text-[12px] ink-text-muted/70 text-center">No pages found.</div>
-        ) : (
-          books.map((b) => (
-            <div key={b} className="mb-1">
-              <div className="px-2.5 pt-1.5 pb-0.5 text-[10px] font-bold uppercase tracking-wider ink-text-muted/70">{b}</div>
-              {byBook.get(b)!.map((d) => (
+        {query ? (
+          /* ── Search: flat results across every notebook ── */
+          searchHits.length === 0 ? (
+            <div className="px-2.5 py-4 text-[12px] ink-text-muted/70 text-center">No pages found.</div>
+          ) : (
+            hitBooks.map((b) => (
+              <div key={b} className="mb-1">
+                <div className="px-2.5 pt-1.5 pb-0.5 text-[10px] font-bold uppercase tracking-wider ink-text-muted/70">{b}</div>
+                {hitsByBook.get(b)!.map(pageRow)}
+              </div>
+            ))
+          )
+        ) : book === null ? (
+          /* ── Level 1: choose a notebook ── */
+          books.length === 0 ? (
+            <div className="px-2.5 py-4 text-[12px] ink-text-muted/70 text-center">No other pages to link yet.</div>
+          ) : (
+            books.map((b) => {
+              const pages = byBook.get(b)!;
+              return (
                 <button
-                  key={d.id}
+                  key={b}
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => onPick(d.id)}
-                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] ink-text hover:bg-stone-100 dark:hover:bg-white/10 transition text-left"
+                  onClick={() => setBook(b)}
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[13px] ink-text hover:bg-stone-100 dark:hover:bg-white/10 transition text-left"
                 >
-                  <span className="w-2 h-2 rounded-full flex-none" style={{ background: d.color || '#0ea5e9' }} />
-                  <span className="truncate">{d.title || 'Untitled'}</span>
+                  <span className="w-2.5 h-2.5 rounded-sm flex-none" style={{ background: accentOf(b) }} />
+                  <span className="truncate flex-1 font-medium">{b}</span>
+                  <span className="text-[11px] ink-text-muted/70 flex-none tabular-nums">{pages.length}</span>
+                  <ChevronRight className="w-4 h-4 flex-none ink-text-muted/70" />
                 </button>
-              ))}
+              );
+            })
+          )
+        ) : (
+          /* ── Level 2: pages inside the chosen notebook ── */
+          <>
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setBook(null)}
+              className="w-full flex items-center gap-1.5 px-2.5 py-1.5 mb-0.5 rounded-lg text-[12px] font-semibold ink-text-muted hover:ink-text hover:bg-stone-100 dark:hover:bg-white/10 transition text-left"
+            >
+              <ChevronLeft className="w-4 h-4 flex-none" /> Notebooks
+            </button>
+            <div className="flex items-center gap-2 px-2.5 pt-1 pb-1">
+              <span className="w-2.5 h-2.5 rounded-sm flex-none" style={{ background: accentOf(book) }} />
+              <span className="truncate text-[13px] font-bold ink-text">{book}</span>
             </div>
-          ))
+            {(byBook.get(book) ?? []).length === 0 ? (
+              <div className="px-2.5 py-4 text-[12px] ink-text-muted/70 text-center">No pages in this notebook.</div>
+            ) : (
+              byBook.get(book)!.map(pageRow)
+            )}
+          </>
         )}
       </div>
     </div>
