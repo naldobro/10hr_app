@@ -154,7 +154,10 @@ function App() {
       {activeTab === 'vision' ? (
         <VisionTab />
       ) : (
-        <main className="relative pt-[calc(100px+env(safe-area-inset-top))] md:pt-[calc(90px+env(safe-area-inset-top))] pb-12 px-3 sm:px-6 lg:px-8 max-w-[1400px] mx-auto">
+        <main
+          className="relative pb-12 px-3 sm:px-6 lg:px-8 max-w-[1400px] mx-auto"
+          style={{ paddingTop: 'var(--nav-h, calc(100px + env(safe-area-inset-top)))' }}
+        >
           {activeTab === 'track' && <TrackTab currentMonth={currentMonth} />}
           {activeTab === 'statistics' && <StatisticsTab currentMonth={currentMonth} />}
         </main>

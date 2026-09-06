@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Flame, Sparkles, Moon, Sun } from 'lucide-react';
 import { useTheme } from '../lib/theme';
 import type { FocusPillar } from '../types';
@@ -32,8 +33,28 @@ export default function Navigation({
   const ThemeIcon = theme === 'dark' ? Sun : Moon;
   const themeLabel = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
   const isVision = activeTab === 'vision';
+
+  // Publish the nav's real height as --nav-h so page content can sit exactly below
+  // it. The nav grows/shrinks (the Vision pillars row, mobile vs desktop, a notch's
+  // safe-area), so measure it live rather than hard-coding an offset that goes stale.
+  const navRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const apply = () => document.documentElement.style.setProperty('--nav-h', `${el.offsetHeight}px`);
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    window.addEventListener('resize', apply);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', apply);
+    };
+  }, []);
+
   return (
     <nav
+      ref={navRef}
       className="fixed top-0 left-0 right-0 z-50 paper-card paper-border paper-shadow"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >

@@ -918,7 +918,10 @@ export default function VisionTab() {
   const today = todayMidnight();
 
   return (
-    <div className="fixed left-0 right-0 bottom-0 top-[calc(100px+env(safe-area-inset-top))] md:top-[calc(90px+env(safe-area-inset-top))] flex overflow-hidden bg-[var(--timeline-bg)]">
+    <div
+      className="fixed left-0 right-0 bottom-0 flex overflow-hidden bg-[var(--timeline-bg)]"
+      style={{ top: 'var(--nav-h, calc(100px + env(safe-area-inset-top)))' }}
+    >
       <style>{`
         .vision-range { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px; background: #e7e5e4; outline: none; }
         .vision-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #57534e; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); cursor: pointer; }
