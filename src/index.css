@@ -124,6 +124,19 @@
     box-shadow: var(--paper-shadow);
   }
 
+  /* Dark-mode only: a faint white top-down sheen so flat black surfaces read as
+     lit/dimensional instead of dead-flat. Applied globally to paper-cards, plus
+     the `.dyn-sheen` helper for surfaces that don't use paper-card (calendar
+     cells, the Stage Book page, tab chips). Layers over the element's own
+     background-color, so colours and inline backgrounds are preserved. */
+  .dark .paper-card {
+    background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0) 52%);
+  }
+
+  .dark .dyn-sheen {
+    background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.008) 55%);
+  }
+
   .paper-shadow {
     box-shadow: var(--paper-shadow);
   }

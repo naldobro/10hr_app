@@ -171,7 +171,7 @@ export default function StageBook({
         {active && (
           <div
             key={active.id}
-            className={`relative flex-1 min-w-0 flex flex-col rounded-2xl overflow-hidden bg-white dark:bg-black border border-black/10 dark:border-white/10 ${
+            className={`relative flex-1 min-w-0 flex flex-col rounded-2xl overflow-hidden bg-white dark:bg-black dyn-sheen border border-black/10 dark:border-white/10 ${
               turn === 'next' ? 'stage-page-next' : 'stage-page-prev'
             }`}
           >
@@ -451,7 +451,7 @@ export default function StageBook({
             <button
               key={s.id}
               onClick={() => goTo(s.id)}
-              className={`group relative flex items-center gap-2.5 rounded-lg pl-3.5 pr-2 py-2.5 text-left border transition-all ${
+              className={`group relative flex items-center gap-2.5 rounded-lg pl-3.5 pr-2 py-2.5 text-left border transition-all dyn-sheen ${
                 isActive ? '-ml-1' : 'hover:-ml-0.5'
               }`}
               style={{
