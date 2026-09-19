@@ -112,11 +112,10 @@ export default function MonthOverview({
                     onClick={() => !isFuture && handleDayClick(dayData.day)}
                     disabled={isFuture}
                     className={`
-                      relative rounded-lg sm:rounded-xl transition-all duration-200 paper-shadow
+                      relative rounded-lg sm:rounded-xl transition-all duration-200 paper-shadow cal-cell
                       aspect-square sm:aspect-[1/0.88]
                       ${isFuture ? 'cursor-not-allowed' : 'cursor-pointer hover:scale-[1.04] active:scale-[0.98]'}
                       ${getColorClass(dayData.color, isToday, isFuture)}
-                      ${!isAccentCell ? 'dyn-sheen' : ''}
                       ${isSelected ? 'ring-2 ring-amber-600 scale-[1.04] shadow-lg' : ''}
                       ${dayData.day === selectedDay && !panelOpen ? 'ring-1 ring-amber-400/50' : ''}
                       flex flex-col items-center justify-center sm:flex-row sm:items-stretch sm:justify-start p-1 sm:p-2 lg:p-3
