@@ -178,19 +178,47 @@ export default function StageBook({
             {/* thin accent line at the very top */}
             <div className="absolute top-0 left-0 right-0 h-[3px] pointer-events-none" style={{ background: active.color }} />
 
+            {/* giant faint stage-number watermark — pure graphic depth, no gradient */}
+            <div
+              className="absolute -bottom-8 right-2 pointer-events-none select-none font-mono font-black leading-none text-black/[0.035] dark:text-white/[0.05]"
+              style={{ fontSize: 'min(42vh, 360px)' }}
+            >
+              {String(activeIndex + 1).padStart(2, '0')}
+            </div>
+
             {/* header */}
-            <div className="relative px-6 sm:px-9 pt-6 sm:pt-8">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-[11px] font-mono font-bold tracking-widest uppercase" style={{ color: active.color }}>
+            <div className="relative px-6 sm:px-10 pt-7 sm:pt-9">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
                   <span
-                    className="grid place-items-center w-6 h-6 rounded-lg text-white text-xs"
-                    style={{ background: active.color }}
+                    className="font-mono font-black text-[40px] sm:text-[52px] leading-none tracking-tighter"
+                    style={{ color: active.color }}
                   >
-                    {activeIndex + 1}
+                    {String(activeIndex + 1).padStart(2, '0')}
                   </span>
-                  Stage {activeIndex + 1} of {stages.length}
+                  <div className="flex flex-col leading-none gap-1 pt-1">
+                    <span className="font-mono text-[10px] tracking-[0.3em] uppercase ink-text-muted">Stage</span>
+                    <span className="font-mono text-[10px] tracking-[0.3em] uppercase ink-text-muted">
+                      / {String(stages.length).padStart(2, '0')}
+                    </span>
+                  </div>
                 </div>
                 <StatusPill goal={active} />
+              </div>
+
+              {/* journey progress — one segment per stage */}
+              <div className="mt-5 flex items-center gap-1">
+                {stages.map((s, i) => (
+                  <span
+                    key={s.id}
+                    className="h-[3px] rounded-full transition-all duration-300"
+                    style={{
+                      width: i === activeIndex ? 36 : 14,
+                      background:
+                        i === activeIndex ? active.color : s.done ? `${active.color}80` : 'rgba(128,128,128,0.3)',
+                    }}
+                  />
+                ))}
               </div>
 
               {/* editable heading = the goal you're chasing */}
@@ -209,12 +237,12 @@ export default function StageBook({
                     (e.currentTarget as HTMLElement).blur();
                   }
                 }}
-                className="mt-3 text-3xl sm:text-[40px] leading-[1.1] font-black ink-text outline-none focus:bg-black/[0.03] dark:focus:bg-white/[0.05] rounded-lg -mx-1 px-1"
+                className="mt-4 text-3xl sm:text-[42px] leading-[1.05] font-black tracking-tight ink-text outline-none focus:bg-black/[0.03] dark:focus:bg-white/[0.05] rounded-lg -mx-1 px-1"
               >
                 {active.title}
               </h1>
 
-              <div className="mt-3 flex flex-wrap items-center gap-2.5">
+              <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
                 {active.target && (
                   <span
                     className="inline-flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1.5 rounded-lg"
@@ -406,8 +434,16 @@ export default function StageBook({
       {/* ---------------- Tab rail (right) ---------------- */}
       <div
         className="flex-none flex flex-col gap-2 py-6 pr-2 sm:pr-3 pl-1 overflow-y-auto"
-        style={{ width: narrow ? 60 : 152 }}
+        style={{ width: narrow ? 60 : 158 }}
       >
+        {!narrow && (
+          <div className="px-2 pb-1 flex items-center justify-between">
+            <span className="font-mono text-[10px] tracking-[0.3em] uppercase ink-text-muted">Stages</span>
+            <span className="font-mono text-[10px] tracking-widest ink-text-muted/70">
+              {String(stages.length).padStart(2, '0')}
+            </span>
+          </div>
+        )}
         {stages.map((s, i) => {
           const isActive = s.id === activeId;
           const isCurrent = s.id === nextId;
@@ -415,32 +451,36 @@ export default function StageBook({
             <button
               key={s.id}
               onClick={() => goTo(s.id)}
-              className={`group relative flex items-center gap-2 rounded-l-xl rounded-r-md pl-2.5 pr-2 py-2.5 text-left transition-all ${
-                isActive ? 'shadow-lg -ml-1' : 'hover:-ml-0.5'
+              className={`group relative flex items-center gap-2.5 rounded-lg pl-3.5 pr-2 py-2.5 text-left border transition-all ${
+                isActive ? '-ml-1' : 'hover:-ml-0.5'
               }`}
               style={{
-                background: isActive ? s.color : 'rgb(var(--surface))',
-                border: `1px solid ${isActive ? s.color : 'var(--paper-border)'}`,
-                borderRight: isActive ? `4px solid ${s.color}` : `4px solid ${s.color}`,
+                background: isActive ? 'rgba(127,127,127,0.10)' : 'rgb(var(--surface))',
+                borderColor: isActive ? s.color : 'var(--paper-border)',
               }}
               title={s.title}
             >
+              {/* left accent bar */}
               <span
-                className="grid place-items-center w-6 h-6 rounded-lg text-xs font-bold flex-none"
-                style={{
-                  background: isActive ? 'rgba(255,255,255,0.25)' : `${s.color}1e`,
-                  color: isActive ? '#fff' : s.color,
-                }}
+                className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full"
+                style={{ background: s.color, opacity: isActive ? 1 : 0.45 }}
+              />
+              <span
+                className="grid place-items-center w-6 h-6 rounded-md text-[11px] font-mono font-bold flex-none"
+                style={
+                  isActive
+                    ? { background: s.color, color: '#000' }
+                    : { background: `${s.color}22`, color: s.color }
+                }
               >
-                {s.done ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : i + 1}
+                {s.done ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : String(i + 1).padStart(2, '0')}
               </span>
               {!narrow && (
                 <span
-                  className={`text-xs font-semibold leading-tight line-clamp-2 ${
-                    isActive ? 'text-white' : 'ink-text'
-                  }`}
+                  className="text-xs font-semibold leading-tight line-clamp-2"
+                  style={isActive ? { color: s.color } : undefined}
                 >
-                  {s.title}
+                  <span className={isActive ? '' : 'ink-text'}>{s.title}</span>
                 </span>
               )}
               {isCurrent && !isActive && (

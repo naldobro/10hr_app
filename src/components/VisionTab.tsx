@@ -497,13 +497,15 @@ export default function VisionTab() {
         const { w, h } = dimsRef.current;
         ctx.clearRect(0, 0, w, h);
         const cx = w / 2;
+        // Pure white specks in dark (black/white only); the cyan/violet hues in light.
+        const isDark = document.documentElement.classList.contains('dark');
         particlesRef.current.forEach((p) => {
           p.y += p.vy;
           p.drift += 0.02;
           const x = cx + Math.sin(p.drift) * p.amp;
           if (p.y < -10) Object.assign(p, spawn(h, false));
           ctx.beginPath();
-          ctx.fillStyle = `rgba(${p.hue},${p.a})`;
+          ctx.fillStyle = isDark ? `rgba(235,235,235,${p.a})` : `rgba(${p.hue},${p.a})`;
           ctx.arc(x, p.y, p.r, 0, Math.PI * 2);
           ctx.fill();
         });
@@ -1251,7 +1253,7 @@ export default function VisionTab() {
         <div ref={canvasRef} className="relative min-h-full" style={{ height: layoutH }}>
           <div
             className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[280px] pointer-events-none"
-            style={{ background: 'radial-gradient(closest-side, rgba(124,58,237,0.05), transparent)' }}
+            style={{ background: 'var(--spine-radial)' }}
           />
           <canvas ref={pCanvasRef} className="absolute left-0 top-0 pointer-events-none" style={{ zIndex: 1 }} />
 
@@ -1278,9 +1280,8 @@ export default function VisionTab() {
             className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-1 rounded"
             style={{
               zIndex: 2,
-              background:
-                'linear-gradient(to top, rgba(6,182,212,0.15), #06b6d4 18%, #7c3aed 82%, rgba(124,58,237,0.12))',
-              boxShadow: '0 0 12px rgba(6,182,212,0.5), 0 0 30px rgba(124,58,237,0.32)',
+              background: 'var(--spine-bg)',
+              boxShadow: 'var(--spine-glow)',
             }}
           />
 
@@ -1469,8 +1470,8 @@ export default function VisionTab() {
             <div
               className="relative w-[14px] h-[14px] rounded-full"
               style={{
-                background: 'radial-gradient(circle at 35% 30%, #fff, #f59e0b 55%, #d97706)',
-                boxShadow: '0 0 0 2.5px var(--timeline-bg), 0 0 0 3px #f59e0b, 0 0 12px 2px rgba(245,158,11,0.5)',
+                background: '#f59e0b',
+                boxShadow: '0 0 0 2.5px var(--timeline-bg), 0 0 0 3px #f59e0b',
               }}
             >
               <span className="absolute inset-[-5px] rounded-full border-2 border-amber-400 animate-ping opacity-40" />
