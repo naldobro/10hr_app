@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Check, Flag, CalendarClock, Target, Settings2, X, Sparkles } from 'lucide-react';
 import { VisionGoal, StageBubble } from '../types';
 import { daysUntil, fmtDayMonth, urgency, Urgency } from '../lib/visionUtils';
@@ -62,7 +62,11 @@ export default function StageBook({
   const [dragPos, setDragPos] = useState<{ id: string; x: number; y: number } | null>(null);
   const [turn, setTurn] = useState<'next' | 'prev'>('next');
   const canvasRef = useRef<HTMLDivElement>(null);
+  const scrollWrapRef = useRef<HTMLDivElement>(null);
   const prevIndexRef = useRef(0);
+  // Size of one "page" (the visible canvas). Bubble x/y are fractions of this, so
+  // the default view is unchanged; the surface itself grows past it for scrolling.
+  const [base, setBase] = useState({ w: 0, h: 0 });
 
   const activeIndex = Math.max(0, stages.findIndex((s) => s.id === activeId));
 
@@ -91,6 +95,40 @@ export default function StageBook({
     () => (activeId ? milestones.filter((m) => m.goal_id === activeId) : []),
     [milestones, activeId]
   );
+
+  // Measure the visible canvas ("one page") so bubbles keep their relative spots.
+  // Re-runs per stage because the page subtree remounts (keyed by active.id).
+  useLayoutEffect(() => {
+    const el = scrollWrapRef.current;
+    if (!el) return;
+    const measure = () => setBase({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [activeId]);
+
+  // The scrollable surface: at least 1.5 pages each way (so bars always show and
+  // there's room to drag into), and it keeps ~half a page of empty space past the
+  // furthest bubble so you can always scroll out for more room.
+  const surface = useMemo(() => {
+    let maxX = 1;
+    let maxY = 1;
+    for (const b of pageBubbles) {
+      if (b.x > maxX) maxX = b.x;
+      if (b.y > maxY) maxY = b.y;
+    }
+    return {
+      w: Math.max(base.w * 1.5, (maxX + 0.5) * base.w),
+      h: Math.max(base.h * 1.5, (maxY + 0.6) * base.h),
+    };
+  }, [pageBubbles, base]);
+
+  const growTextarea = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  };
 
   const commit = (next: StageBubble[]) => activeId && onBubblesChange(activeId, next);
 
@@ -123,9 +161,13 @@ export default function StageBook({
       if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 4) return;
       moved = true;
       const rect = canvasRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const x = Math.min(0.97, Math.max(0.03, (ev.clientX - rect.left) / rect.width));
-      const y = Math.min(0.95, Math.max(0.05, (ev.clientY - rect.top) / rect.height));
+      if (!rect || base.w === 0 || base.h === 0) return;
+      // Fractions are relative to one page (base), so 1.0 = a page edge. rect.left
+      // shifts with scroll, so this stays correct wherever the surface is scrolled.
+      const maxFX = surface.w / base.w - 0.03;
+      const maxFY = surface.h / base.h - 0.04;
+      const x = Math.min(maxFX, Math.max(0.02, (ev.clientX - rect.left) / base.w));
+      const y = Math.min(maxFY, Math.max(0.03, (ev.clientY - rect.top) / base.h));
       setDragPos({ id: b.id, x, y });
     };
     const up = () => {
@@ -164,6 +206,13 @@ export default function StageBook({
         @keyframes stage-in-prev { from { opacity: 0; transform: translateX(-26px) rotateY(6deg) scale(.985); } to { opacity: 1; transform: none; } }
         .stage-page-next { animation: stage-in-next .28s cubic-bezier(.22,.7,.3,1) both; }
         .stage-page-prev { animation: stage-in-prev .28s cubic-bezier(.22,.7,.3,1) both; }
+        /* Always-visible, reliable scrollbars on the bubble canvas (both axes). */
+        .stage-scroll { scrollbar-width: thin; scrollbar-color: rgba(160,160,160,0.45) transparent; }
+        .stage-scroll::-webkit-scrollbar { width: 12px; height: 12px; }
+        .stage-scroll::-webkit-scrollbar-track { background: transparent; }
+        .stage-scroll::-webkit-scrollbar-thumb { background: rgba(160,160,160,0.4); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+        .stage-scroll::-webkit-scrollbar-thumb:hover { background: rgba(190,190,190,0.65); background-clip: content-box; }
+        .stage-scroll::-webkit-scrollbar-corner { background: transparent; }
       `}</style>
 
       {/* ---------------- Page ---------------- */}
@@ -263,7 +312,7 @@ export default function StageBook({
 
             {/* ---- focus-bubble canvas ---- */}
             <div className="relative flex-1 min-h-0 mx-3 sm:mx-5 mt-4 mb-2">
-              <div className="absolute left-2 top-0 z-10 flex flex-wrap gap-2">
+              <div className="absolute left-2 top-0 z-20 flex flex-wrap gap-2">
                 <button
                   onClick={() => addBubble('focus')}
                   className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition ${KIND.focus.add}`}
@@ -284,9 +333,17 @@ export default function StageBook({
                 </button>
               </div>
 
-              <div ref={canvasRef} className="absolute inset-0">
-                {pageBubbles.length === 0 && (
-                  <div className="absolute inset-0 grid place-items-center pointer-events-none">
+              <div ref={scrollWrapRef} className="absolute inset-0 overflow-auto stage-scroll">
+                <div
+                  ref={canvasRef}
+                  className="relative"
+                  style={{ width: surface.w || '100%', height: surface.h || '100%' }}
+                >
+                {pageBubbles.length === 0 && base.w > 0 && (
+                  <div
+                    className="absolute left-0 top-0 grid place-items-center pointer-events-none"
+                    style={{ width: base.w, height: base.h }}
+                  >
                     <p className="text-sm ink-text-muted/70 text-center max-w-xs">
                       Add what to <span className="text-emerald-600 dark:text-emerald-400 font-semibold">focus</span> on,
                       what to <span className="text-rose-600 dark:text-rose-400 font-semibold">avoid</span>, or a plain{' '}
@@ -307,8 +364,8 @@ export default function StageBook({
                       onPointerDown={(e) => onBubblePointerDown(e, b)}
                       className="group absolute select-none"
                       style={{
-                        left: `${x * 100}%`,
-                        top: `${y * 100}%`,
+                        left: x * base.w,
+                        top: y * base.h,
                         zIndex: isEditing || dp ? 40 : 20,
                         touchAction: 'none',
                         transform: 'translate(-50%,-50%)',
@@ -337,14 +394,18 @@ export default function StageBook({
                             <textarea
                               autoFocus
                               rows={1}
+                              ref={growTextarea}
                               value={editingBubble!.text}
-                              onChange={(e) => setEditingBubble({ id: b.id, text: e.target.value })}
+                              onChange={(e) => {
+                                setEditingBubble({ id: b.id, text: e.target.value });
+                                growTextarea(e.currentTarget);
+                              }}
                               onBlur={() => commitText(b.id, editingBubble!.text)}
                               onKeyDown={(e) => {
                                 if (e.key === 'Escape') commitText(b.id, b.text);
                               }}
                               placeholder="type a note…"
-                              className="bg-transparent outline-none resize-none text-[15px] font-medium leading-snug w-[13rem] max-w-[46vw] ink-text placeholder:ink-text-muted/50"
+                              className="block bg-transparent outline-none resize-none overflow-hidden text-[15px] font-medium leading-relaxed w-[22rem] max-w-[62vw] ink-text placeholder:ink-text-muted/50"
                             />
                           ) : (
                             <input
@@ -383,6 +444,7 @@ export default function StageBook({
                     </div>
                   );
                 })}
+                </div>
               </div>
             </div>
 
