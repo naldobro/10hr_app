@@ -101,6 +101,19 @@ export interface VisionTopic {
   updated_at: string;
 }
 
+/**
+ * A free-floating reminder bubble on a Stage Book page. `kind` drives the colour:
+ * `focus` = what to lean into (green), `avoid` = what to steer clear of (red).
+ * `x`/`y` are fractions (0..1) of the page canvas so bubbles stay put on resize.
+ */
+export interface StageBubble {
+  id: string;
+  text: string;
+  kind: 'focus' | 'avoid';
+  x: number;
+  y: number;
+}
+
 /** One of the three "focus things" pinned to the Vision nav bar. */
 export interface FocusPillar {
   /** Short heading shown on the pill (the topic). */
@@ -119,6 +132,8 @@ export interface VisionSettings {
   diary_note: string;
   /** Per-notebook display metadata for the Planner gallery, keyed by notebook name. */
   planner_notebooks: Record<string, { color?: string; order?: number; pinnedName?: string }>;
+  /** Stage Book focus bubbles, keyed by goal (stage) id. */
+  stage_bubbles: Record<string, StageBubble[]>;
   /** Separate global Focus note for the Track tab, day-independent. Distinct from focus_note. */
   track_focus_note: string;
   /** The 3 focus pillars shown in the Vision nav bar. Always normalised to length 3 in the UI. */

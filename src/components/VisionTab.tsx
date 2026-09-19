@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Flag, CalendarClock, X, Check, Minus, Undo2, Redo2, History, RotateCcw, Save, Heart, ShieldCheck, Menu, NotebookPen } from 'lucide-react';
+import { Plus, Flag, CalendarClock, X, Check, Minus, Undo2, Redo2, History, RotateCcw, Save, Heart, ShieldCheck, Menu, NotebookPen, BookOpen, Rows3 } from 'lucide-react';
 import { db } from '../lib/database';
 import { undoManager } from '../lib/undoManager';
-import { VisionGoal, VisionSnapshot, VisionTopic, VisionDoc } from '../types';
+import { VisionGoal, VisionSnapshot, VisionTopic, VisionDoc, StageBubble } from '../types';
 import {
   DAY,
   GOAL_COLORS,
@@ -17,6 +17,7 @@ import {
   Urgency,
 } from '../lib/visionUtils';
 import GoalDrawer from './GoalDrawer';
+import StageBook from './StageBook';
 import FocusCard from './FocusCard';
 import DiaryCard from './DiaryCard';
 import ReflectionsPanel from './ReflectionsPanel';
@@ -120,6 +121,25 @@ export default function VisionTab() {
       return {};
     }
   });
+  // Book (stage pages) vs the original scrolling timeline. Book is the default view.
+  const [viewMode, setViewMode] = useState<'book' | 'timeline'>(() =>
+    typeof localStorage !== 'undefined' && localStorage.getItem('vision_view_mode') === 'timeline' ? 'timeline' : 'book'
+  );
+  useEffect(() => {
+    localStorage.setItem('vision_view_mode', viewMode);
+  }, [viewMode]);
+  // Stage Book focus bubbles, keyed by goal id. Mirrored to localStorage so they
+  // survive before the stage_bubbles migration runs (same pattern as notebookMeta).
+  const [stageBubbles, setStageBubbles] = useState<Record<string, StageBubble[]>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('vision_stage_bubbles') || '{}');
+    } catch {
+      return {};
+    }
+  });
+  const stageBubblesRef = useRef(stageBubbles);
+  stageBubblesRef.current = stageBubbles;
+
   const [ppd, setPpd] = useState<number>(() => {
     const saved = Number(localStorage.getItem('vision_ppd'));
     return saved >= PPD_MIN && saved <= PPD_MAX ? saved : PPD_DEFAULT;
@@ -243,6 +263,18 @@ export default function VisionTab() {
     }
   }, []);
 
+  const reloadStageBubbles = useCallback(async () => {
+    try {
+      const s = await db.visionSettings.get();
+      const sb = s?.stage_bubbles ?? {};
+      setStageBubbles(sb);
+      stageBubblesRef.current = sb;
+      localStorage.setItem('vision_stage_bubbles', JSON.stringify(sb));
+    } catch {
+      /* column may be absent until the stage_bubbles migration runs */
+    }
+  }, []);
+
   const reloadTopics = useCallback(async () => {
     try {
       const rows = await db.visionTopics.getAll();
@@ -297,6 +329,11 @@ export default function VisionTab() {
               setNotebookMeta(s.planner_notebooks);
               localStorage.setItem('vision_planner_notebooks', JSON.stringify(s.planner_notebooks));
             }
+            if (s.stage_bubbles && typeof s.stage_bubbles === 'object') {
+              setStageBubbles(s.stage_bubbles);
+              stageBubblesRef.current = s.stage_bubbles;
+              localStorage.setItem('vision_stage_bubbles', JSON.stringify(s.stage_bubbles));
+            }
           }
         })
         .catch(() => {});
@@ -346,20 +383,20 @@ export default function VisionTab() {
   const handleUndo = useCallback(async () => {
     if (!undoManager.canUndo()) return;
     await undoManager.undo();
-    await Promise.all([reloadGoals(), reloadTopics(), reloadDocs(), reloadFocus(), reloadDiary(), reloadNotebookMeta()]);
+    await Promise.all([reloadGoals(), reloadTopics(), reloadDocs(), reloadFocus(), reloadDiary(), reloadNotebookMeta(), reloadStageBubbles()]);
     refreshUndo();
     setToast('Undone');
     window.setTimeout(() => setToast(null), 1600);
-  }, [reloadGoals, reloadTopics, reloadDocs, reloadFocus, reloadDiary, reloadNotebookMeta, refreshUndo]);
+  }, [reloadGoals, reloadTopics, reloadDocs, reloadFocus, reloadDiary, reloadNotebookMeta, reloadStageBubbles, refreshUndo]);
 
   const handleRedo = useCallback(async () => {
     if (!undoManager.canRedo()) return;
     await undoManager.redo();
-    await Promise.all([reloadGoals(), reloadTopics(), reloadDocs(), reloadFocus(), reloadDiary(), reloadNotebookMeta()]);
+    await Promise.all([reloadGoals(), reloadTopics(), reloadDocs(), reloadFocus(), reloadDiary(), reloadNotebookMeta(), reloadStageBubbles()]);
     refreshUndo();
     setToast('Redone');
     window.setTimeout(() => setToast(null), 1600);
-  }, [reloadGoals, reloadTopics, reloadDocs, reloadFocus, reloadDiary, reloadNotebookMeta, refreshUndo]);
+  }, [reloadGoals, reloadTopics, reloadDocs, reloadFocus, reloadDiary, reloadNotebookMeta, reloadStageBubbles, refreshUndo]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -596,6 +633,45 @@ export default function VisionTab() {
     }
   };
 
+  // Add a milestone already attached to a stage (goal). Opens the drawer so it can
+  // be named right away. Used by the Stage Book's per-page "Add milestone".
+  const addMilestoneForGoal = async (goalId: string) => {
+    const sort_order = goals.reduce((m, g) => Math.max(m, g.sort_order), 0) + 1;
+    const draft = {
+      kind: 'milestone' as const,
+      goal_id: goalId,
+      title: 'New milestone',
+      target: '',
+      note: '',
+      color: MILESTONE_NEUTRAL,
+      deadline: null,
+      done: false,
+      sort_order,
+    };
+    if (dbDown) {
+      const local: VisionGoal = {
+        id: 'local-' + Date.now(),
+        user_id: 'single-user',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        ...draft,
+      };
+      setGoals((p) => [...p, local]);
+      setSelectedId(local.id);
+      return;
+    }
+    try {
+      const row = await db.visionGoals.add(draft);
+      const norm = { ...row, kind: row.kind ?? 'milestone', done: row.done ?? false, goal_id: row.goal_id ?? goalId };
+      setGoals((p) => [...p, norm]);
+      setSelectedId(row.id);
+      undoManager.addToUndoHistory({ type: 'vision_add', row: norm, timestamp: Date.now() });
+      refreshUndo();
+    } catch {
+      flash('Could not create — run the latest vision_goals migration');
+    }
+  };
+
   // ---------- topics (Reflections) ----------
   const persistTopic = (t: VisionTopic) => {
     if (dbDown) return;
@@ -713,6 +789,23 @@ export default function VisionTab() {
       db.visionSettings
         .upsert({ planner_notebooks: next })
         .catch(() => flash('Could not save — run the planner_notebooks migration'));
+    }
+  };
+
+  const updateStageBubbles = (goalId: string, next: StageBubble[]) => {
+    // Each committed change (add / edit / move / delete) is one undo step. Stored
+    // whole in vision_settings.stage_bubbles, mirroring the notebook-meta pattern.
+    const before = stageBubblesRef.current;
+    const after = { ...before, [goalId]: next };
+    setStageBubbles(after);
+    stageBubblesRef.current = after;
+    localStorage.setItem('vision_stage_bubbles', JSON.stringify(after));
+    undoManager.addToUndoHistory({ type: 'stage_bubbles', before, after, timestamp: Date.now() });
+    refreshUndo();
+    if (!dbDown) {
+      db.visionSettings
+        .upsert({ stage_bubbles: after })
+        .catch(() => flash('Could not save — run the stage_bubbles migration'));
     }
   };
 
@@ -945,6 +1038,28 @@ export default function VisionTab() {
       {/* phone: backdrop */}
       {trayOpen && <div className="sm:hidden absolute inset-0 z-30 bg-black/25" onClick={() => setTrayOpen(false)} />}
 
+      {/* Book ⇄ Timeline switch (floating, centred top) */}
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-0.5 p-1 rounded-xl bg-white/90 dark:bg-paper/90 backdrop-blur border border-black/10 dark:border-white/[0.15] shadow-md">
+        <button
+          onClick={() => setViewMode('book')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+            viewMode === 'book' ? 'bg-stone-800 text-white shadow' : 'ink-text-muted hover:ink-text'
+          }`}
+          title="Stage pages you flip through"
+        >
+          <BookOpen className="w-3.5 h-3.5" /> Book
+        </button>
+        <button
+          onClick={() => setViewMode('timeline')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+            viewMode === 'timeline' ? 'bg-stone-800 text-white shadow' : 'ink-text-muted hover:ink-text'
+          }`}
+          title="The scrolling timeline"
+        >
+          <Rows3 className="w-3.5 h-3.5" /> Timeline
+        </button>
+      </div>
+
       {/* ---------------- Tray ---------------- */}
       <aside
         className={`w-[264px] max-w-[82vw] flex-shrink-0 flex flex-col gap-3 p-4 overflow-y-auto border-r border-black/5 dark:border-white/[0.13] bg-amber-50 dark:bg-amber-400/10 sm:bg-amber-50/40 dark:sm:bg-amber-400/10 absolute sm:relative inset-y-0 left-0 z-40 transition-transform duration-300 sm:transition-none ${
@@ -1114,7 +1229,21 @@ export default function VisionTab() {
         </div>
       </aside>
 
-      {/* ---------------- Timeline ---------------- */}
+      {/* ---------------- Timeline / Book ---------------- */}
+      {viewMode === 'book' ? (
+        <StageBook
+          stages={placedGoals}
+          milestones={goals.filter((g) => g.kind === 'milestone')}
+          nextId={nextId}
+          bubbles={stageBubbles}
+          onBubblesChange={updateStageBubbles}
+          onEditGoal={updateGoal}
+          onOpenGoal={setSelectedId}
+          onAddMilestone={addMilestoneForGoal}
+          onToggleMilestone={(id, done) => updateGoal(id, { done }, true)}
+          viewportW={viewportW}
+        />
+      ) : (
       <div
         ref={scrollRef}
         className={`flex-1 overflow-auto relative ${drag?.mode === 'tray' ? 'ring-2 ring-inset ring-stone-300/70' : ''}`}
@@ -1352,12 +1481,14 @@ export default function VisionTab() {
           </div>
         </div>
       </div>
+      )}
 
       {/* diary — floating, collapsible overlay box pinned top-right.
           The container is click-through so only the card captures events.
           FocusCard is kept wired up but hidden for now (too much clutter);
-          remove the `hidden` class to bring it back. */}
-      {!selectedGoal && (
+          remove the `hidden` class to bring it back. Timeline-only — the Book view
+          has its own per-stage focus bubbles and the diary would cover the tab rail. */}
+      {!selectedGoal && viewMode === 'timeline' && (
         <div className="absolute top-2 right-2 z-20 flex flex-col gap-3 items-end pointer-events-none">
           <div className="hidden">
             <FocusCard text={focusNote} onChange={updateFocusNote} />

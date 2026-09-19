@@ -1,4 +1,4 @@
-import { WorkSession, VisionGoal, VisionTopic, FocusPillar } from '../types';
+import { WorkSession, VisionGoal, VisionTopic, FocusPillar, StageBubble } from '../types';
 import { db } from './database';
 
 // NOTE: Planner docs are deliberately NOT part of this undo stack. They use a Trash
@@ -32,7 +32,15 @@ type UndoAction =
   // edit session — when the pillar popover closes — not per keystroke. Applying it
   // also fires a `focuspillars:set` window event so App's live copy updates instantly
   // (App owns the pillar state; the undo write here only touches the DB).
-  | { type: 'pillar_update'; before: FocusPillar[]; after: FocusPillar[]; timestamp: number };
+  | { type: 'pillar_update'; before: FocusPillar[]; after: FocusPillar[]; timestamp: number }
+  // Stage Book focus bubbles (vision_settings.stage_bubbles). Stored whole (all
+  // stages' bubbles) so one action covers add / edit / move / delete on a page.
+  | {
+      type: 'stage_bubbles';
+      before: Record<string, StageBubble[]>;
+      after: Record<string, StageBubble[]>;
+      timestamp: number;
+    };
 
 const visionFields = (g: VisionGoal) => ({
   kind: g.kind,
@@ -126,6 +134,8 @@ export const undoManager = {
       }
     } else if (action.type === 'notebook_meta') {
       await db.visionSettings.upsert({ planner_notebooks: action.before });
+    } else if (action.type === 'stage_bubbles') {
+      await db.visionSettings.upsert({ stage_bubbles: action.before });
     } else if (action.type === 'pillar_update') {
       await db.visionSettings.upsert({ focus_pillars: action.before });
       window.dispatchEvent(new CustomEvent('focuspillars:set', { detail: action.before }));
@@ -182,6 +192,8 @@ export const undoManager = {
       }
     } else if (action.type === 'notebook_meta') {
       await db.visionSettings.upsert({ planner_notebooks: action.after });
+    } else if (action.type === 'stage_bubbles') {
+      await db.visionSettings.upsert({ stage_bubbles: action.after });
     } else if (action.type === 'pillar_update') {
       await db.visionSettings.upsert({ focus_pillars: action.after });
       window.dispatchEvent(new CustomEvent('focuspillars:set', { detail: action.after }));
