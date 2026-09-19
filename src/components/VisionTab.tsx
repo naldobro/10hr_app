@@ -1031,7 +1031,7 @@ export default function VisionTab() {
       {!trayOpen && (
         <button
           onClick={() => setTrayOpen(true)}
-          className="sm:hidden absolute top-3 left-3 z-30 w-10 h-10 rounded-xl bg-white dark:bg-paper border border-black/10 dark:border-white/[0.2] shadow-md flex items-center justify-center ink-text"
+          className="sm:hidden absolute top-3 left-3 z-30 w-10 h-10 rounded-xl bg-white dark:bg-paper dyn-sheen border border-black/10 dark:border-white/[0.2] shadow-md flex items-center justify-center ink-text"
           title="Menu"
         >
           <Menu className="w-5 h-5" />
@@ -1041,7 +1041,7 @@ export default function VisionTab() {
       {trayOpen && <div className="sm:hidden absolute inset-0 z-30 bg-black/25" onClick={() => setTrayOpen(false)} />}
 
       {/* Book ⇄ Timeline switch (floating, centred top) */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-0.5 p-1 rounded-xl bg-white/90 dark:bg-paper/90 backdrop-blur border border-black/10 dark:border-white/[0.15] shadow-md">
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-0.5 p-1 rounded-xl bg-white/90 dark:bg-paper/90 dyn-sheen backdrop-blur border border-black/10 dark:border-white/[0.15] shadow-md">
         <button
           onClick={() => setViewMode('book')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
@@ -1064,7 +1064,7 @@ export default function VisionTab() {
 
       {/* ---------------- Tray ---------------- */}
       <aside
-        className={`w-[264px] max-w-[82vw] flex-shrink-0 flex flex-col gap-3 p-4 overflow-y-auto border-r border-black/5 dark:border-white/[0.13] bg-amber-50 dark:bg-amber-400/10 sm:bg-amber-50/40 dark:sm:bg-amber-400/10 absolute sm:relative inset-y-0 left-0 z-40 transition-transform duration-300 sm:transition-none ${
+        className={`w-[264px] max-w-[82vw] flex-shrink-0 flex flex-col gap-3 p-4 overflow-y-auto border-r border-black/5 dark:border-white/[0.13] bg-amber-50 dark:bg-amber-400/10 sm:bg-amber-50/40 dark:sm:bg-amber-400/10 dyn-sheen absolute sm:relative inset-y-0 left-0 z-40 transition-transform duration-300 sm:transition-none ${
           trayOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full sm:translate-x-0 sm:shadow-none'
         }`}
       >
@@ -1079,7 +1079,7 @@ export default function VisionTab() {
           <button
             onClick={handleUndo}
             disabled={!canUndo}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white dark:bg-paper border border-black/10 dark:border-white/[0.2] ink-text text-sm font-semibold hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white dark:bg-paper dyn-sheen border border-black/10 dark:border-white/[0.2] ink-text text-sm font-semibold hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
             title="Undo (Ctrl/Cmd+Z)"
           >
             <Undo2 className="w-4 h-4" /> Undo
@@ -1087,7 +1087,7 @@ export default function VisionTab() {
           <button
             onClick={handleRedo}
             disabled={!canRedo}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white dark:bg-paper border border-black/10 dark:border-white/[0.2] ink-text text-sm font-semibold hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white dark:bg-paper dyn-sheen border border-black/10 dark:border-white/[0.2] ink-text text-sm font-semibold hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
             title="Redo (Ctrl/Cmd+Shift+Z)"
           >
             <Redo2 className="w-4 h-4" /> Redo
@@ -1101,7 +1101,7 @@ export default function VisionTab() {
         </button>
         <button
           onClick={() => addItem('milestone')}
-          className="bg-white dark:bg-paper border border-black/10 dark:border-white/[0.2] ink-text font-semibold text-sm rounded-xl py-2.5 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
+          className="bg-white dark:bg-paper dyn-sheen border border-black/10 dark:border-white/[0.2] ink-text font-semibold text-sm rounded-xl py-2.5 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
         >
           <Flag className="w-3.5 h-3.5" /> New milestone
         </button>
@@ -1110,7 +1110,7 @@ export default function VisionTab() {
             setTrayOpen(false);
             setShowReflections(true);
           }}
-          className="bg-white dark:bg-paper border border-black/10 dark:border-white/[0.2] ink-text-muted hover:ink-text font-semibold text-sm rounded-xl py-2 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
+          className="bg-white dark:bg-paper dyn-sheen border border-black/10 dark:border-white/[0.2] ink-text-muted hover:ink-text font-semibold text-sm rounded-xl py-2 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
           title="Important points to keep in mind"
         >
           <Heart className="w-3.5 h-3.5 text-rose-500" /> Reflections
@@ -1120,7 +1120,7 @@ export default function VisionTab() {
             setTrayOpen(false);
             setShowPlanner(true);
           }}
-          className="bg-white dark:bg-paper border border-black/10 dark:border-white/[0.2] ink-text-muted hover:ink-text font-semibold text-sm rounded-xl py-2 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
+          className="bg-white dark:bg-paper dyn-sheen border border-black/10 dark:border-white/[0.2] ink-text-muted hover:ink-text font-semibold text-sm rounded-xl py-2 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
           title="Month-by-month planning docs"
         >
           <NotebookPen className="w-3.5 h-3.5 text-sky-600" /> Planner
@@ -1130,7 +1130,7 @@ export default function VisionTab() {
             setTrayOpen(false);
             openVersions();
           }}
-          className="bg-white dark:bg-paper border border-black/10 dark:border-white/[0.2] ink-text-muted hover:ink-text font-semibold text-sm rounded-xl py-2 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
+          className="bg-white dark:bg-paper dyn-sheen border border-black/10 dark:border-white/[0.2] ink-text-muted hover:ink-text font-semibold text-sm rounded-xl py-2 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
           title="Daily version history"
         >
           <History className="w-3.5 h-3.5" /> Versions
@@ -1140,7 +1140,7 @@ export default function VisionTab() {
             setTrayOpen(false);
             setShowBackup(true);
           }}
-          className="bg-white dark:bg-paper border border-black/10 dark:border-white/[0.2] ink-text-muted hover:ink-text font-semibold text-sm rounded-xl py-2 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
+          className="bg-white dark:bg-paper dyn-sheen border border-black/10 dark:border-white/[0.2] ink-text-muted hover:ink-text font-semibold text-sm rounded-xl py-2 px-3.5 flex items-center justify-center gap-2 hover:bg-stone-50 transition-colors"
           title="Back up or restore all your data"
         >
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Backup
@@ -1161,7 +1161,7 @@ export default function VisionTab() {
           <button
             onClick={() => stepPpd(-2)}
             disabled={ppd <= PPD_MIN}
-            className="w-8 h-8 flex-none rounded-lg bg-white dark:bg-paper border border-black/10 dark:border-white/[0.2] ink-text flex items-center justify-center hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="w-8 h-8 flex-none rounded-lg bg-white dark:bg-paper dyn-sheen border border-black/10 dark:border-white/[0.2] ink-text flex items-center justify-center hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
             title="Tighter"
           >
             <Minus className="w-4 h-4" />
@@ -1193,7 +1193,7 @@ export default function VisionTab() {
           <button
             onClick={() => stepPpd(2)}
             disabled={ppd >= PPD_MAX}
-            className="w-8 h-8 flex-none rounded-lg bg-white dark:bg-paper border border-black/10 dark:border-white/[0.2] ink-text flex items-center justify-center hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="w-8 h-8 flex-none rounded-lg bg-white dark:bg-paper dyn-sheen border border-black/10 dark:border-white/[0.2] ink-text flex items-center justify-center hover:bg-stone-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
             title="Spread out"
           >
             <Plus className="w-4 h-4" />
@@ -1476,7 +1476,7 @@ export default function VisionTab() {
             >
               <span className="absolute inset-[-5px] rounded-full border-2 border-amber-400 animate-ping opacity-40" />
             </div>
-            <div className="font-mono text-[10px] tracking-widest font-bold text-amber-700 dark:text-amber-300 bg-white dark:bg-paper border border-black/10 dark:border-white/[0.2] px-2.5 py-0.5 rounded-full shadow-sm">
+            <div className="font-mono text-[10px] tracking-widest font-bold text-amber-700 dark:text-amber-300 bg-white dark:bg-paper dyn-sheen border border-black/10 dark:border-white/[0.2] px-2.5 py-0.5 rounded-full shadow-sm">
               {today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase()} · TODAY
             </div>
           </div>

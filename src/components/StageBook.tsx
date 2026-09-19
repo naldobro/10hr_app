@@ -171,7 +171,7 @@ export default function StageBook({
         {active && (
           <div
             key={active.id}
-            className={`relative flex-1 min-w-0 flex flex-col rounded-2xl overflow-hidden bg-white dark:bg-black dyn-sheen border border-black/10 dark:border-white/10 ${
+            className={`relative flex-1 min-w-0 flex flex-col rounded-2xl overflow-hidden bg-white dark:bg-black dyn-glow border border-black/10 dark:border-white/10 ${
               turn === 'next' ? 'stage-page-next' : 'stage-page-prev'
             }`}
           >
@@ -320,7 +320,7 @@ export default function StageBook({
                         className={
                           isNote
                             ? 'relative flex items-start gap-1.5'
-                            : `relative flex items-center gap-2 rounded-lg px-3 py-1.5 border ${k!.chip}`
+                            : `relative flex items-center gap-2 rounded-lg px-3 py-1.5 border dyn-sheen ${k!.chip}`
                         }
                       >
                         {!isNote && (
@@ -404,7 +404,7 @@ export default function StageBook({
                 {stageMs.map((m) => (
                   <div
                     key={m.id}
-                    className="inline-flex items-center gap-2 rounded-xl border border-black/8 dark:border-white/[0.12] bg-white dark:bg-paper px-2.5 py-1.5"
+                    className="inline-flex items-center gap-2 rounded-xl border border-black/8 dark:border-white/[0.12] bg-white dark:bg-paper dyn-sheen px-2.5 py-1.5"
                   >
                     <button
                       onClick={() => onToggleMilestone(m.id, !m.done)}
