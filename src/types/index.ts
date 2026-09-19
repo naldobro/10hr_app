@@ -102,14 +102,15 @@ export interface VisionTopic {
 }
 
 /**
- * A free-floating reminder bubble on a Stage Book page. `kind` drives the colour:
- * `focus` = what to lean into (green), `avoid` = what to steer clear of (red).
- * `x`/`y` are fractions (0..1) of the page canvas so bubbles stay put on resize.
+ * A free-floating item on a Stage Book page. `kind` drives the look:
+ * `focus` = what to lean into (green), `avoid` = what to steer clear of (red),
+ * `note` = a plain draggable text note (no chip). `x`/`y` are fractions (0..1)
+ * of the page canvas so items stay put on resize.
  */
 export interface StageBubble {
   id: string;
   text: string;
-  kind: 'focus' | 'avoid';
+  kind: 'focus' | 'avoid' | 'note';
   x: number;
   y: number;
 }

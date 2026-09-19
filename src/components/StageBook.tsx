@@ -10,10 +10,22 @@ const URGENCY_COLOR: Record<Urgency, string> = {
   far: '#57534e',
 };
 
-// Emerald for "lean in", rose for "steer clear".
-const BUBBLE = {
-  focus: { ring: '#10b981', text: '#065f46', darkText: '#6ee7b7', bg: 'rgba(16,185,129,0.14)', glow: 'rgba(16,185,129,0.35)' },
-  avoid: { ring: '#f43f5e', text: '#9f1239', darkText: '#fda4af', bg: 'rgba(244,63,94,0.13)', glow: 'rgba(244,63,94,0.32)' },
+// Flat, modern chip styling. Emerald = lean in, rose = steer clear. Static Tailwind
+// classes (no gradients / blur) so light stays crisp white and dark goes pitch black
+// with coloured text.
+const KIND = {
+  focus: {
+    dot: '#10b981',
+    add: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10',
+    chip: 'bg-white dark:bg-black border-emerald-500/40',
+    text: 'text-stone-800 dark:text-emerald-300',
+  },
+  avoid: {
+    dot: '#f43f5e',
+    add: 'text-rose-600 dark:text-rose-400 border-rose-500/40 hover:bg-rose-500/10',
+    chip: 'bg-white dark:bg-black border-rose-500/40',
+    text: 'text-stone-800 dark:text-rose-300',
+  },
 } as const;
 
 const uid = () =>
@@ -82,7 +94,7 @@ export default function StageBook({
 
   const commit = (next: StageBubble[]) => activeId && onBubblesChange(activeId, next);
 
-  const addBubble = (kind: 'focus' | 'avoid') => {
+  const addBubble = (kind: StageBubble['kind']) => {
     const b: StageBubble = { id: uid(), text: '', kind, x: 0.28 + Math.random() * 0.44, y: 0.3 + Math.random() * 0.4 };
     commit([...pageBubbles, b]);
     setEditingBubble({ id: b.id, text: '' });
@@ -96,7 +108,9 @@ export default function StageBook({
   };
 
   const flipKind = (id: string) =>
-    commit(pageBubbles.map((b) => (b.id === id ? { ...b, kind: b.kind === 'focus' ? 'avoid' : 'focus' } : b)));
+    commit(
+      pageBubbles.map((b) => (b.id === id && b.kind !== 'note' ? { ...b, kind: b.kind === 'focus' ? 'avoid' : 'focus' } : b))
+    );
 
   const removeBubble = (id: string) => commit(pageBubbles.filter((b) => b.id !== id));
 
@@ -148,34 +162,21 @@ export default function StageBook({
       <style>{`
         @keyframes stage-in-next { from { opacity: 0; transform: translateX(26px) rotateY(-6deg) scale(.985); } to { opacity: 1; transform: none; } }
         @keyframes stage-in-prev { from { opacity: 0; transform: translateX(-26px) rotateY(6deg) scale(.985); } to { opacity: 1; transform: none; } }
-        .stage-page-next { animation: stage-in-next .32s cubic-bezier(.22,.7,.3,1) both; }
-        .stage-page-prev { animation: stage-in-prev .32s cubic-bezier(.22,.7,.3,1) both; }
-        @keyframes bubble-float { 0%,100% { transform: translate(-50%,-50%); } 50% { transform: translate(-50%,calc(-50% - 5px)); } }
+        .stage-page-next { animation: stage-in-next .28s cubic-bezier(.22,.7,.3,1) both; }
+        .stage-page-prev { animation: stage-in-prev .28s cubic-bezier(.22,.7,.3,1) both; }
       `}</style>
 
       {/* ---------------- Page ---------------- */}
       <div className="flex-1 min-w-0 relative flex items-stretch p-4 sm:p-6" style={{ perspective: 1400 }}>
-        {/* stacked paper behind, to hint at pages you can flip through */}
-        <div className="absolute inset-4 sm:inset-6 rounded-3xl bg-white/40 dark:bg-paper/40 border border-black/5 dark:border-white/[0.08] translate-x-2 translate-y-2 pointer-events-none" />
-        <div className="absolute inset-4 sm:inset-6 rounded-3xl bg-white/60 dark:bg-paper/60 border border-black/5 dark:border-white/[0.1] translate-x-1 translate-y-1 pointer-events-none" />
-
         {active && (
           <div
             key={active.id}
-            className={`relative flex-1 min-w-0 flex flex-col rounded-3xl paper-card paper-shadow overflow-hidden ${
+            className={`relative flex-1 min-w-0 flex flex-col rounded-2xl overflow-hidden bg-white dark:bg-black border border-black/10 dark:border-white/10 ${
               turn === 'next' ? 'stage-page-next' : 'stage-page-prev'
             }`}
-            style={{ border: `1px solid ${active.color}44` }}
           >
-            {/* lined-paper texture + top colour wash */}
-            <div
-              className="absolute inset-0 pointer-events-none opacity-[0.5] dark:opacity-[0.25]"
-              style={{ background: `repeating-linear-gradient(transparent, transparent 37px, ${active.color}0f 37px, ${active.color}0f 38px)` }}
-            />
-            <div
-              className="absolute top-0 left-0 right-0 h-40 pointer-events-none"
-              style={{ background: `radial-gradient(120% 100% at 50% 0, ${active.color}22, transparent 70%)` }}
-            />
+            {/* thin accent line at the very top */}
+            <div className="absolute top-0 left-0 right-0 h-[3px] pointer-events-none" style={{ background: active.color }} />
 
             {/* header */}
             <div className="relative px-6 sm:px-9 pt-6 sm:pt-8">
@@ -234,18 +235,24 @@ export default function StageBook({
 
             {/* ---- focus-bubble canvas ---- */}
             <div className="relative flex-1 min-h-0 mx-3 sm:mx-5 mt-4 mb-2">
-              <div className="absolute left-2 top-0 z-10 flex gap-2">
+              <div className="absolute left-2 top-0 z-10 flex flex-wrap gap-2">
                 <button
                   onClick={() => addBubble('focus')}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full text-emerald-700 dark:text-emerald-300 bg-emerald-500/12 border border-emerald-500/30 hover:bg-emerald-500/20 transition"
+                  className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition ${KIND.focus.add}`}
                 >
                   <Plus className="w-3.5 h-3.5" /> Focus
                 </button>
                 <button
                   onClick={() => addBubble('avoid')}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full text-rose-700 dark:text-rose-300 bg-rose-500/12 border border-rose-500/30 hover:bg-rose-500/20 transition"
+                  className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition ${KIND.avoid.add}`}
                 >
                   <Plus className="w-3.5 h-3.5" /> Avoid
+                </button>
+                <button
+                  onClick={() => addBubble('note')}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-black/15 dark:border-white/20 ink-text-muted hover:ink-text hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Text
                 </button>
               </div>
 
@@ -253,8 +260,9 @@ export default function StageBook({
                 {pageBubbles.length === 0 && (
                   <div className="absolute inset-0 grid place-items-center pointer-events-none">
                     <p className="text-sm ink-text-muted/70 text-center max-w-xs">
-                      Drop a bubble for what to <span className="text-emerald-600 dark:text-emerald-400 font-semibold">focus</span> on
-                      and what to <span className="text-rose-600 dark:text-rose-400 font-semibold">avoid</span>. Drag them anywhere.
+                      Add what to <span className="text-emerald-600 dark:text-emerald-400 font-semibold">focus</span> on,
+                      what to <span className="text-rose-600 dark:text-rose-400 font-semibold">avoid</span>, or a plain{' '}
+                      <span className="ink-text font-semibold">note</span>. Drag anything anywhere.
                     </p>
                   </div>
                 )}
@@ -262,8 +270,9 @@ export default function StageBook({
                   const dp = dragPos?.id === b.id ? dragPos : null;
                   const x = dp ? dp.x : b.x;
                   const y = dp ? dp.y : b.y;
-                  const c = BUBBLE[b.kind];
                   const isEditing = editingBubble?.id === b.id;
+                  const isNote = b.kind === 'note';
+                  const k = b.kind === 'note' ? null : KIND[b.kind];
                   return (
                     <div
                       key={b.id}
@@ -274,45 +283,70 @@ export default function StageBook({
                         top: `${y * 100}%`,
                         zIndex: isEditing || dp ? 40 : 20,
                         touchAction: 'none',
-                        animation: isEditing || dp ? 'none' : `bubble-float ${5 + (b.id.charCodeAt(0) % 4)}s ease-in-out infinite`,
                         transform: 'translate(-50%,-50%)',
                         cursor: isEditing ? 'text' : 'grab',
+                        willChange: dp ? 'left, top' : undefined,
                       }}
                     >
                       <div
-                        className="relative flex items-center gap-1.5 rounded-2xl px-3.5 py-2 backdrop-blur-sm shadow-lg"
-                        style={{ background: c.bg, border: `1.5px solid ${c.ring}`, boxShadow: `0 6px 20px -6px ${c.glow}` }}
+                        className={
+                          isNote
+                            ? 'relative flex items-start gap-1.5'
+                            : `relative flex items-center gap-2 rounded-lg px-3 py-1.5 border ${k!.chip}`
+                        }
                       >
-                        <button
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={() => flipKind(b.id)}
-                          className="w-2.5 h-2.5 rounded-full flex-none"
-                          style={{ background: c.ring }}
-                          title={b.kind === 'focus' ? 'Focus — click to flip to Avoid' : 'Avoid — click to flip to Focus'}
-                        />
-                        {isEditing ? (
-                          <input
-                            autoFocus
-                            value={editingBubble!.text}
-                            onChange={(e) => setEditingBubble({ id: b.id, text: e.target.value })}
-                            onBlur={() => commitText(b.id, editingBubble!.text)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') commitText(b.id, editingBubble!.text);
-                              if (e.key === 'Escape') commitText(b.id, b.text);
-                            }}
-                            placeholder="type…"
-                            className="bg-transparent outline-none text-sm font-semibold w-[7.5rem] max-w-[40vw] ink-text placeholder:ink-text-muted/50"
+                        {!isNote && (
+                          <button
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={() => flipKind(b.id)}
+                            className="w-2 h-2 rounded-full flex-none"
+                            style={{ background: k!.dot }}
+                            title={b.kind === 'focus' ? 'Focus — click to flip to Avoid' : 'Avoid — click to flip to Focus'}
                           />
+                        )}
+                        {isEditing ? (
+                          isNote ? (
+                            <textarea
+                              autoFocus
+                              rows={1}
+                              value={editingBubble!.text}
+                              onChange={(e) => setEditingBubble({ id: b.id, text: e.target.value })}
+                              onBlur={() => commitText(b.id, editingBubble!.text)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Escape') commitText(b.id, b.text);
+                              }}
+                              placeholder="type a note…"
+                              className="bg-transparent outline-none resize-none text-[15px] font-medium leading-snug w-[13rem] max-w-[46vw] ink-text placeholder:ink-text-muted/50"
+                            />
+                          ) : (
+                            <input
+                              autoFocus
+                              value={editingBubble!.text}
+                              onChange={(e) => setEditingBubble({ id: b.id, text: e.target.value })}
+                              onBlur={() => commitText(b.id, editingBubble!.text)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') commitText(b.id, editingBubble!.text);
+                                if (e.key === 'Escape') commitText(b.id, b.text);
+                              }}
+                              placeholder="type…"
+                              className="bg-transparent outline-none text-sm font-semibold w-[7.5rem] max-w-[40vw] ink-text placeholder:ink-text-muted/50"
+                            />
+                          )
                         ) : (
-                          <span className="text-sm font-semibold whitespace-pre-wrap max-w-[42vw] break-words">
-                            <span className="dark:hidden" style={{ color: c.text }}>{b.text}</span>
-                            <span className="hidden dark:inline" style={{ color: c.darkText }}>{b.text}</span>
+                          <span
+                            className={
+                              isNote
+                                ? 'text-[15px] font-medium leading-snug whitespace-pre-wrap max-w-[46vw] break-words ink-text'
+                                : `text-sm font-semibold whitespace-pre-wrap max-w-[42vw] break-words ${k!.text}`
+                            }
+                          >
+                            {b.text || (isNote ? 'note' : '')}
                           </span>
                         )}
                         <button
                           onPointerDown={(e) => e.stopPropagation()}
                           onClick={() => removeBubble(b.id)}
-                          className="opacity-0 group-hover:opacity-100 ink-text-muted hover:ink-text transition flex-none"
+                          className="opacity-0 group-hover:opacity-100 ink-text-muted hover:ink-text transition flex-none mt-[1px]"
                           title="Remove"
                         >
                           <X className="w-3.5 h-3.5" />
