@@ -33,6 +33,10 @@ type UndoAction =
   // also fires a `focuspillars:set` window event so App's live copy updates instantly
   // (App owns the pillar state; the undo write here only touches the DB).
   | { type: 'pillar_update'; before: FocusPillar[]; after: FocusPillar[]; timestamp: number }
+  // A single habit checkbox (Pray/Gym/Out/Learn) toggled on a given day. `prev` is
+  // the value before the toggle; undo restores it, redo flips it back. The row is
+  // guaranteed to exist by the time undo runs, so a one-field upsert is enough.
+  | { type: 'habit_toggle'; date: string; field: string; prev: boolean; timestamp: number }
   // Stage Book focus bubbles (vision_settings.stage_bubbles). Stored whole (all
   // stages' bubbles) so one action covers add / edit / move / delete on a page.
   | {
@@ -136,6 +140,8 @@ export const undoManager = {
       await db.visionSettings.upsert({ planner_notebooks: action.before });
     } else if (action.type === 'stage_bubbles') {
       await db.visionSettings.upsert({ stage_bubbles: action.before });
+    } else if (action.type === 'habit_toggle') {
+      await db.habits.upsert({ date: action.date, [action.field]: action.prev });
     } else if (action.type === 'pillar_update') {
       await db.visionSettings.upsert({ focus_pillars: action.before });
       window.dispatchEvent(new CustomEvent('focuspillars:set', { detail: action.before }));
@@ -194,6 +200,8 @@ export const undoManager = {
       await db.visionSettings.upsert({ planner_notebooks: action.after });
     } else if (action.type === 'stage_bubbles') {
       await db.visionSettings.upsert({ stage_bubbles: action.after });
+    } else if (action.type === 'habit_toggle') {
+      await db.habits.upsert({ date: action.date, [action.field]: !action.prev });
     } else if (action.type === 'pillar_update') {
       await db.visionSettings.upsert({ focus_pillars: action.after });
       window.dispatchEvent(new CustomEvent('focuspillars:set', { detail: action.after }));

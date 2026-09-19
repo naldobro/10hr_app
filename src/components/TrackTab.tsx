@@ -78,6 +78,8 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
       await loadSessions();
       await loadMonthData();
       await loadFocus();
+      await loadCurrentHabit();
+      await loadHabitData();
       updateUndoRedoState();
       showFeedback('success', 'Undone');
     }
@@ -89,6 +91,8 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
       await loadSessions();
       await loadMonthData();
       await loadFocus();
+      await loadCurrentHabit();
+      await loadHabitData();
       updateUndoRedoState();
       showFeedback('success', 'Redone');
     }
@@ -221,6 +225,15 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
       });
       setCurrentHabit(updated);
       setHabitMap(prev => new Map(prev).set(currentDayString, updated));
+      // Record one undo step per toggle so habit ticks join the undo/redo stack.
+      undoManager.addToUndoHistory({
+        type: 'habit_toggle',
+        date: currentDayString,
+        field: field as string,
+        prev: !newValue,
+        timestamp: Date.now(),
+      });
+      updateUndoRedoState();
     } catch (err) {
       console.error('Error toggling habit:', err);
     }
