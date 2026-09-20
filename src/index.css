@@ -169,9 +169,9 @@
     box-shadow:
       0 0 0 2px rgb(var(--glow-rgb) / 1),
       inset 0 1px 0 0 rgb(var(--glow-rgb) / 0.9),
-      0 0 26px 0 rgb(var(--glow-rgb) / 0.88),
-      0 0 66px 6px rgb(var(--glow-rgb) / 0.55),
-      0 0 130px 16px rgb(var(--glow-rgb) / 0.3),
+      0 0 24px 0 rgb(var(--glow-rgb) / 0.85),
+      0 0 60px 6px rgb(var(--glow-rgb) / 0.5),
+      0 0 96px 10px rgb(var(--glow-rgb) / 0.26),
       0 18px 40px -24px rgba(0, 0, 0, 0.95);
   }
 
@@ -236,29 +236,32 @@
   /* App-wide ambient wash (see App.tsx). A single composited fixed layer that
      fades in when a mode runs — this carries the big, soft bloom cheaply so the
      per-card halos can stay lighter and the whole thing animates smoothly. */
+  /* On-top edge vignette (pointer-events off). Sits ABOVE page content but below
+     the nav/modals (z-30), and is transparent through the middle so content
+     stays readable — only the screen edges pick up the mode color. This makes
+     the ignition visible on every tab, including the packed calendar. */
   .mode-ambient {
     position: fixed;
     inset: 0;
-    z-index: -1;
+    z-index: 30;
     pointer-events: none;
     opacity: 0;
-    /* Promote to its own compositor layer so the fade is pure GPU (no repaint). */
-    will-change: opacity, transform;
+    /* Promote to its own compositor layer so opacity animates purely on the GPU. */
+    will-change: opacity;
     transform: translateZ(0);
-    transition: opacity 0.55s ease-out;
+    transition: opacity 0.6s ease-out;
     background:
-      radial-gradient(78% 62% at 50% 0%, rgb(var(--glow-rgb) / 0.42), transparent 70%),
-      radial-gradient(98% 72% at 50% 100%, rgb(var(--glow-rgb) / 0.32), transparent 72%),
-      radial-gradient(135% 105% at 50% 50%, rgb(var(--glow-rgb) / 0.14), transparent 66%);
+      radial-gradient(115% 85% at 50% 0%, rgb(var(--glow-rgb) / 0.24), transparent 55%),
+      radial-gradient(115% 85% at 50% 100%, rgb(var(--glow-rgb) / 0.20), transparent 55%),
+      radial-gradient(100% 100% at 50% 50%, transparent 42%, rgb(var(--glow-rgb) / 0.14) 100%);
   }
 
   /* Ignition: an engine-crank sequence — glow / off / glow / off, then a smooth
-     gradient ramp up to the resting glow (BMW start feel). Per-keyframe timing
-     functions keep the flickers crisp and the final rise silky. Composited
-     (opacity + brightness), so it stays cheap. */
+     gradient ramp up to the resting glow (BMW start feel). OPACITY ONLY, so it's
+     fully GPU-composited with zero repaint (no filter/scale — those were the lag). */
   .dark.mode-active .mode-ambient {
-    opacity: 0.8;
-    animation: mode-ignite 1.8s both;
+    opacity: 1;
+    animation: mode-ignite 1.6s both;
   }
 
   /* Cohesion: the timeline "now" line adopts the running mode's color. */
@@ -271,16 +274,16 @@
 
   @keyframes mode-ignite {
     /* crank 1: quick flick on… */
-    0%   { opacity: 0;    filter: brightness(1.8); animation-timing-function: ease-out; }
-    6%   { opacity: 0.85; filter: brightness(1.8); animation-timing-function: ease-in; }
+    0%   { opacity: 0;    animation-timing-function: ease-out; }
+    6%   { opacity: 0.9;  animation-timing-function: ease-in; }
     /* …and off */
-    13%  { opacity: 0.02; filter: brightness(1);   animation-timing-function: ease-out; }
-    /* crank 2: flick on harder… */
-    21%  { opacity: 1;    filter: brightness(2);   animation-timing-function: ease-in; }
+    13%  { opacity: 0.04; animation-timing-function: ease-out; }
+    /* crank 2: flick on… */
+    21%  { opacity: 1;    animation-timing-function: ease-in; }
     /* …and off */
-    30%  { opacity: 0.03; filter: brightness(1);   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+    30%  { opacity: 0.04; animation-timing-function: cubic-bezier(0.33, 0, 0.15, 1); }
     /* engine catches: smooth gradient ramp up to the resting glow */
-    100% { opacity: 0.8;  filter: brightness(1); }
+    100% { opacity: 1; }
   }
 
   /* Respect users who ask for less motion: keep the color, drop the animation. */
