@@ -3,6 +3,11 @@ import { Plus, Check, Flag, CalendarClock, Target, Settings2, X, Sparkles } from
 import { VisionGoal, StageBubble } from '../types';
 import { daysUntil, fmtDayMonth, urgency, Urgency } from '../lib/visionUtils';
 
+// The free-form canvas uses a logical page at least this big, so a layout authored
+// on a wide screen isn't crushed into a narrow column on a phone (you scroll instead).
+const MIN_PAGE_W = 1280;
+const MIN_PAGE_H = 640;
+
 const URGENCY_COLOR: Record<Urgency, string> = {
   past: '#e11d48',
   now: '#e11d48',
@@ -101,7 +106,8 @@ export default function StageBook({
   useLayoutEffect(() => {
     const el = scrollWrapRef.current;
     if (!el) return;
-    const measure = () => setBase({ w: el.clientWidth, h: el.clientHeight });
+    const measure = () =>
+      setBase({ w: Math.max(el.clientWidth, MIN_PAGE_W), h: Math.max(el.clientHeight, MIN_PAGE_H) });
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
@@ -153,6 +159,8 @@ export default function StageBook({
   const removeBubble = (id: string) => commit(pageBubbles.filter((b) => b.id !== id));
 
   const onBubblePointerDown = (e: React.PointerEvent, b: StageBubble) => {
+    // Phones: canvas is read-only (view + scroll) so nothing moves by accident.
+    if (narrow) return;
     if (e.button !== 0 || editingBubble?.id === b.id) return;
     const startX = e.clientX;
     const startY = e.clientY;
@@ -312,6 +320,7 @@ export default function StageBook({
 
             {/* ---- focus-bubble canvas ---- */}
             <div className="relative flex-1 min-h-0 mx-3 sm:mx-5 mt-4 mb-2">
+              {!narrow && (
               <div className="absolute left-2 top-0 z-20 flex flex-wrap gap-2">
                 <button
                   onClick={() => addBubble('focus')}
@@ -332,6 +341,7 @@ export default function StageBook({
                   <Plus className="w-3.5 h-3.5" /> Text
                 </button>
               </div>
+              )}
 
               <div ref={scrollWrapRef} className="absolute inset-0 overflow-auto stage-scroll">
                 <div
@@ -344,10 +354,16 @@ export default function StageBook({
                     className="absolute left-0 top-0 grid place-items-center pointer-events-none"
                     style={{ width: base.w, height: base.h }}
                   >
-                    <p className="text-sm ink-text-muted/70 text-center max-w-xs">
-                      Add what to <span className="text-emerald-600 dark:text-emerald-400 font-semibold">focus</span> on,
-                      what to <span className="text-rose-600 dark:text-rose-400 font-semibold">avoid</span>, or a plain{' '}
-                      <span className="ink-text font-semibold">note</span>. Drag anything anywhere.
+                    <p className="text-sm ink-text-muted/70 text-center max-w-xs px-6">
+                      {narrow ? (
+                        'Nothing here yet. Add focus points, things to avoid, and notes from a computer.'
+                      ) : (
+                        <>
+                          Add what to <span className="text-emerald-600 dark:text-emerald-400 font-semibold">focus</span> on,
+                          what to <span className="text-rose-600 dark:text-rose-400 font-semibold">avoid</span>, or a plain{' '}
+                          <span className="ink-text font-semibold">note</span>. Drag anything anywhere.
+                        </>
+                      )}
                     </p>
                   </div>
                 )}
@@ -367,9 +383,9 @@ export default function StageBook({
                         left: x * base.w,
                         top: y * base.h,
                         zIndex: isEditing || dp ? 40 : 20,
-                        touchAction: 'none',
+                        touchAction: narrow ? 'auto' : 'none',
                         transform: 'translate(-50%,-50%)',
-                        cursor: isEditing ? 'text' : 'grab',
+                        cursor: narrow ? 'default' : isEditing ? 'text' : 'grab',
                         willChange: dp ? 'left, top' : undefined,
                       }}
                     >
@@ -432,14 +448,16 @@ export default function StageBook({
                             {b.text || (isNote ? 'note' : '')}
                           </span>
                         )}
-                        <button
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={() => removeBubble(b.id)}
-                          className="opacity-0 group-hover:opacity-100 ink-text-muted hover:ink-text transition flex-none mt-[1px]"
-                          title="Remove"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                        {!narrow && (
+                          <button
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={() => removeBubble(b.id)}
+                            className="opacity-0 group-hover:opacity-100 ink-text-muted hover:ink-text transition flex-none mt-[1px]"
+                            title="Remove"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   );

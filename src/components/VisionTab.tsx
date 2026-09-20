@@ -341,6 +341,31 @@ export default function VisionTab() {
     })();
   }, [refreshUndo, reloadTopics, reloadDocs]);
 
+  // Cross-device freshness: when the tab regains focus/visibility, refetch so
+  // e.g. a Planner page added on the phone shows up here without a manual reload.
+  // Skipped while an input/textarea/contenteditable is focused so it can't clobber
+  // an in-progress edit.
+  useEffect(() => {
+    const refetch = () => {
+      if (document.visibilityState !== 'visible') return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      reloadGoals();
+      reloadDocs();
+      reloadTopics();
+      reloadFocus();
+      reloadDiary();
+      reloadNotebookMeta();
+      reloadStageBubbles();
+    };
+    document.addEventListener('visibilitychange', refetch);
+    window.addEventListener('focus', refetch);
+    return () => {
+      document.removeEventListener('visibilitychange', refetch);
+      window.removeEventListener('focus', refetch);
+    };
+  }, [reloadGoals, reloadDocs, reloadTopics, reloadFocus, reloadDiary, reloadNotebookMeta, reloadStageBubbles]);
+
   const openVersions = async () => {
     setShowVersions(true);
     try {
