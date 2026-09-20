@@ -139,6 +139,11 @@ function App() {
 
   return (
     <div className="min-h-screen paper-texture">
+      {/* App-wide ambient wash — tints the whole canvas to the running Track
+          mode's color. Fixed + composited so it fades smoothly. Sits behind all
+          content (z-index:-1) so it only shows in the black gaps between cards. */}
+      <div className="mode-ambient" aria-hidden="true" />
+
       <Navigation
         activeTab={activeTab}
         onTabChange={setActiveTab}

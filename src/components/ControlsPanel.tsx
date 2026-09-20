@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Play, Square, Plus } from 'lucide-react';
 import { WorkSession } from '../types';
 import { MODES, MODE_MAP } from '../lib/modes';
+import { applyModeGlow } from '../lib/modeGlow';
 
 const TIMER_STORAGE_KEY = 'active_timer';
 const MODE_STORAGE_KEY = 'selected_mode';
@@ -27,12 +28,9 @@ interface ControlsPanelProps {
   isLoading?: boolean;
   sessions: WorkSession[];
   currentDay: string;
-  /** Notifies the parent which mode is currently RUNNING (null when idle) so it
-      can shift the tab's glow. Selecting a mode alone does not fire this. */
-  onRunningModeChange?: (modeKey: string | null) => void;
 }
 
-export default function ControlsPanel({ onAddSession, isLoading = false, sessions, onRunningModeChange }: ControlsPanelProps) {
+export default function ControlsPanel({ onAddSession, isLoading = false, sessions }: ControlsPanelProps) {
   const [selectedMode, setSelectedMode] = useState<string | null>(() =>
     typeof localStorage !== 'undefined' ? localStorage.getItem(MODE_STORAGE_KEY) : null
   );
@@ -52,10 +50,11 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
 
   const activeMode = selectedMode ? MODE_MAP[selectedMode] : null;
 
-  // Only a RUNNING timer tints the tab — selecting a mode keeps the default glow.
+  // Only a RUNNING timer tints the app — selecting a mode keeps the default glow.
+  // Written to <html> so it persists across tab switches / this unmounting.
   useEffect(() => {
-    onRunningModeChange?.(isTimerRunning ? selectedMode : null);
-  }, [isTimerRunning, selectedMode, onRunningModeChange]);
+    applyModeGlow(isTimerRunning ? selectedMode : null);
+  }, [isTimerRunning, selectedMode]);
 
   // Restore an in-progress timer (survives reloads), including which mode it belongs to.
   useEffect(() => {

@@ -47,12 +47,12 @@
   --canvas: #000000;
   --surface: 13 13 13;
   --surface-solid: #0d0d0d;
-  --paper-border: rgba(255, 255, 255, 0.6);
-  /* The glow color, as an "R G B" triple. Defaults to white; the Track tab
-     overrides this on its root to the running mode's color, and because the
-     dark halo below is painted DIRECTLY on each `.paper-card` element (not via
-     an inherited variable), every card re-substitutes this per-element and the
-     whole tab re-tints together. */
+  /* Borders follow the glow color: white by default, the running mode's color
+     while a Track timer runs (--glow-rgb is set on <html> by applyModeGlow). */
+  --paper-border: rgb(var(--glow-rgb) / 0.6);
+  /* The glow color, as an "R G B" triple. Defaults to white; applyModeGlow
+     overrides this on <html> to the running mode's color, and because the dark
+     halo/border below read it live, the whole app re-tints together. */
   --glow-rgb: 255 255 255;
   /* Fallback white halo for any element that reads `var(--paper-shadow)`
      directly. The visible card glow is painted element-level (see
@@ -158,16 +158,32 @@
       0 20px 44px -24px rgba(0, 0, 0, 0.95);
   }
 
+  /* While a mode runs, crank the rim + halo way up so the color really reads
+     (colored light looks dimmer than white at the same alpha). Same 6-layer
+     shape as the idle rule so box-shadow interpolates smoothly between them. */
+  .dark.mode-active .paper-card,
+  .dark.mode-active .paper-shadow {
+    box-shadow:
+      0 0 0 1.5px rgb(var(--glow-rgb) / 0.95),
+      inset 0 1px 0 0 rgb(var(--glow-rgb) / 0.75),
+      0 0 24px 0 rgb(var(--glow-rgb) / 0.7),
+      0 0 60px 4px rgb(var(--glow-rgb) / 0.42),
+      0 0 120px 14px rgb(var(--glow-rgb) / 0.24),
+      0 20px 44px -24px rgba(0, 0, 0, 0.95);
+  }
+
   .dark .paper-card {
     background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0) 52%);
   }
 
-  /* Smoothly cross-fade the halo when the Track mode (and thus --glow-rgb) flips. */
+  /* Smoothly cross-fade the halo + border when the Track mode flips. */
   .dark .paper-card,
   .dark .paper-shadow,
   .dark .dyn-sheen,
-  .dark .dyn-glow {
-    transition: box-shadow 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+  .dark .dyn-glow,
+  .dark .paper-border {
+    transition: box-shadow 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+                border-color 0.55s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .dark .dyn-sheen {
@@ -182,6 +198,17 @@
 
   /* Stronger version for hero surfaces (the Stage page, nav) — brighter top edge
      and a wider ambient glow bleeding outward. */
+  .dark.mode-active .dyn-sheen {
+    box-shadow:
+      0 0 0 1.5px rgb(var(--glow-rgb) / 0.95),
+      inset 0 1px 0 0 rgb(var(--glow-rgb) / 0.75),
+      0 0 22px 0 rgb(var(--glow-rgb) / 0.65),
+      0 0 55px 4px rgb(var(--glow-rgb) / 0.38),
+      0 0 110px 12px rgb(var(--glow-rgb) / 0.2);
+  }
+
+  /* Stronger version for hero surfaces (the Stage page, nav) — brighter top edge
+     and a wider ambient glow bleeding outward. */
   .dark .dyn-glow {
     background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.012) 55%);
     box-shadow:
@@ -192,10 +219,39 @@
       0 0 96px 8px rgb(var(--glow-rgb) / 0.14);
   }
 
+  .dark.mode-active .dyn-glow {
+    box-shadow:
+      0 0 0 1.5px rgb(var(--glow-rgb) / 1),
+      inset 0 1px 0 0 rgb(var(--glow-rgb) / 0.9),
+      0 0 26px 0 rgb(var(--glow-rgb) / 0.75),
+      0 0 70px 4px rgb(var(--glow-rgb) / 0.45),
+      0 0 140px 16px rgb(var(--glow-rgb) / 0.26);
+  }
+
   /* Calendar day cells opt OUT of the glow entirely in dark (keep the light-mode
      shadow, kill the dark rim/halo). */
   .dark .cal-cell {
     box-shadow: none;
+  }
+
+  /* App-wide ambient wash (see App.tsx). A single composited fixed layer that
+     fades in when a mode runs — this carries the big, soft bloom cheaply so the
+     per-card halos can stay lighter and the whole thing animates smoothly. */
+  .mode-ambient {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    background:
+      radial-gradient(70% 55% at 50% 0%, rgb(var(--glow-rgb) / 0.22), transparent 72%),
+      radial-gradient(90% 65% at 50% 100%, rgb(var(--glow-rgb) / 0.16), transparent 72%),
+      radial-gradient(120% 90% at 50% 50%, rgb(var(--glow-rgb) / 0.06), transparent 70%);
+  }
+
+  .dark.mode-active .mode-ambient {
+    opacity: 1;
   }
 
   .paper-shadow {

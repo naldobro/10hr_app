@@ -11,9 +11,7 @@ import TimelineGraph from './TimelineGraph';
 import TodayFocus from './TodayFocus';
 import ControlsPanel from './ControlsPanel';
 import MilestoneQuote from './MilestoneQuote';
-import { MODE_MAP, hexToRgbTriple } from '../lib/modes';
 import { Undo2, Redo2, ChevronRight, ChevronLeft, Settings, X } from 'lucide-react';
-import type { CSSProperties } from 'react';
 
 interface TrackTabProps {
   currentMonth: Date;
@@ -36,12 +34,6 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
   const [habitViewOpen, setHabitViewOpen] = useState(false);
   const [habitSchedules, setHabitSchedules] = useState<Record<string, number[]>>({});
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
-  // Which Track mode ("basket") is currently RUNNING — drives the tab's accent
-  // glow. Null (idle/just-selected) = the default white glow.
-  const [runningMode, setRunningMode] = useState<string | null>(null);
-  const glowStyle: CSSProperties | undefined = runningMode
-    ? ({ '--glow-rgb': hexToRgbTriple(MODE_MAP[runningMode].color) } as CSSProperties)
-    : undefined;
   // The Track tab's own single global Focus note — day-independent, and entirely
   // separate from the Vision tab's Focus (that one lives in vision_settings.focus_note).
   // Stored in vision_settings.track_focus_note; seeded from localStorage so it shows
@@ -397,7 +389,7 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
   const todayDay = new Date().getDate();
 
   return (
-    <div className="space-y-4 sm:space-y-6" style={glowStyle}>
+    <div className="space-y-4 sm:space-y-6">
       {/* Toast notification */}
       {feedback && (
         <div className={`fixed bottom-6 right-6 z-[60] ${feedbackVisible ? 'animate-toast-in' : 'opacity-0 pointer-events-none'} transition-opacity duration-300`}>
@@ -515,7 +507,6 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
         isLoading={isAdding}
         sessions={sessions}
         currentDay={currentDayString}
-        onRunningModeChange={setRunningMode}
       />
 
       <MilestoneQuote quote={milestoneQuote} show={showQuote} />
