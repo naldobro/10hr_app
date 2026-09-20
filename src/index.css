@@ -252,12 +252,13 @@
       radial-gradient(135% 105% at 50% 50%, rgb(var(--glow-rgb) / 0.14), transparent 66%);
   }
 
-  /* Ignition: when a mode engages, the wash blooms in with a subtle scale
-     overshoot then settles — the "engine fires" moment. Composited (opacity +
-     transform only), so it's free. */
+  /* Ignition: when a mode engages, the wash SURGES bright then settles back —
+     the "engine fires" moment. Resting opacity is 0.8 while the surge peaks at
+     1.0 + a brightness pop, so the flash is clearly visible. Composited
+     (opacity + transform + filter), so it stays cheap. */
   .dark.mode-active .mode-ambient {
-    opacity: 1;
-    animation: mode-ignite 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity: 0.8;
+    animation: mode-ignite 0.75s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   /* Cohesion: the timeline "now" line adopts the running mode's color. */
@@ -269,9 +270,9 @@
   }
 
   @keyframes mode-ignite {
-    0% { opacity: 0; transform: translateZ(0) scale(1.06); }
-    45% { opacity: 1; }
-    100% { opacity: 1; transform: translateZ(0) scale(1); }
+    0%   { opacity: 0;   filter: brightness(1.9); transform: translateZ(0) scale(1.12); }
+    22%  { opacity: 1;   filter: brightness(1.6); transform: translateZ(0) scale(1.03); }
+    100% { opacity: 0.8; filter: brightness(1);   transform: translateZ(0) scale(1); }
   }
 
   /* Respect users who ask for less motion: keep the color, drop the animation. */
