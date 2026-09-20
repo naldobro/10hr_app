@@ -10,12 +10,14 @@ export interface Mode {
   color: string; // hex, used for the timeline block + accent glow (dark mode)
 }
 
+// Aggressive, high-chroma "BMW-M" palette — these read as vivid neon glows on
+// the OLED-black dark surface.
 export const MODES: Mode[] = [
-  { key: 'work', label: 'Work', color: '#2563eb' },
-  { key: 'content', label: 'Content', color: '#7c3aed' },
-  { key: 'outreach', label: 'Outreach', color: '#d97706' },
-  { key: 'learning', label: 'Learning', color: '#059669' },
-  { key: 'variable', label: 'Variable Efforts', color: '#e11d48' },
+  { key: 'work', label: 'Work', color: '#ff2a2a' },        // racing red
+  { key: 'content', label: 'Content', color: '#b026ff' },   // electric violet
+  { key: 'outreach', label: 'Outreach', color: '#ff7a00' }, // vivid orange
+  { key: 'learning', label: 'Learning', color: '#00e676' }, // electric green
+  { key: 'variable', label: 'Variable Efforts', color: '#00b4ff' }, // electric cyan
 ];
 
 export const MODE_MAP: Record<string, Mode> = Object.fromEntries(
