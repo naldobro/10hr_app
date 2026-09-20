@@ -151,27 +151,29 @@
      rule below), so its blur size costs nothing per frame — the smooth motion
      comes from the composited .mode-ambient layer instead. That's why we can go
      big here without reintroducing lag. */
+  /* Two blur layers max (a tight rim-halo + one wider bloom). Big multi-layer
+     blurs are the most expensive thing to paint; keeping it lean is what holds
+     the frame rate when the whole tab re-tints. Brightness comes from alpha, not
+     from more/larger layers. */
   .dark .paper-card,
   .dark .paper-shadow {
     box-shadow:
       0 0 0 1px rgb(var(--glow-rgb) / 0.85),
       inset 0 1px 0 0 rgb(var(--glow-rgb) / 0.7),
-      0 0 16px 0 rgb(var(--glow-rgb) / 0.5),
-      0 0 40px 3px rgb(var(--glow-rgb) / 0.28),
-      0 0 78px 8px rgb(var(--glow-rgb) / 0.14),
+      0 0 18px 0 rgb(var(--glow-rgb) / 0.5),
+      0 0 46px 4px rgb(var(--glow-rgb) / 0.2),
       0 18px 40px -24px rgba(0, 0, 0, 0.95);
   }
 
-  /* While a mode runs, crank the rim + halo way up so the color blazes
-     (colored light reads dimmer than white at the same alpha). */
+  /* While a mode runs, brighten via alpha (not bigger blur) so the color blazes
+     while the paint stays cheap. */
   .dark.mode-active .paper-card,
   .dark.mode-active .paper-shadow {
     box-shadow:
       0 0 0 2px rgb(var(--glow-rgb) / 1),
       inset 0 1px 0 0 rgb(var(--glow-rgb) / 0.9),
-      0 0 24px 0 rgb(var(--glow-rgb) / 0.85),
-      0 0 60px 6px rgb(var(--glow-rgb) / 0.5),
-      0 0 96px 10px rgb(var(--glow-rgb) / 0.26),
+      0 0 24px 0 rgb(var(--glow-rgb) / 0.9),
+      0 0 60px 6px rgb(var(--glow-rgb) / 0.36),
       0 18px 40px -24px rgba(0, 0, 0, 0.95);
   }
 
@@ -243,19 +245,19 @@
     /* Promote to its own compositor layer so opacity animates purely on the GPU. */
     will-change: opacity;
     transform: translateZ(0);
-    transition: opacity 0.6s ease-out;
+    backface-visibility: hidden;
+    transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1);
     background:
       radial-gradient(115% 85% at 50% 0%, rgb(var(--glow-rgb) / 0.24), transparent 55%),
       radial-gradient(115% 85% at 50% 100%, rgb(var(--glow-rgb) / 0.20), transparent 55%),
       radial-gradient(100% 100% at 50% 50%, transparent 42%, rgb(var(--glow-rgb) / 0.14) 100%);
   }
 
-  /* Ignition: an engine-crank sequence — glow / off / glow / off, then a smooth
-     gradient ramp up to the resting glow (BMW start feel). OPACITY ONLY, so it's
-     fully GPU-composited with zero repaint (no filter/scale — those were the lag). */
+  /* Ignition: a single smooth gradient fade of the wash to the resting glow —
+     pure opacity on a composited layer (see transition above). Monotonic 0->1,
+     so it's perfectly smooth with no flicker "stops" and no repaint. */
   .dark.mode-active .mode-ambient {
     opacity: 1;
-    animation: mode-ignite 1.6s both;
   }
 
   /* Cohesion: the timeline "now" line adopts the running mode's color. */
@@ -266,28 +268,10 @@
     background-color: rgb(var(--glow-rgb));
   }
 
-  @keyframes mode-ignite {
-    /* crank 1: quick flick on… */
-    0%   { opacity: 0;    animation-timing-function: ease-out; }
-    6%   { opacity: 0.9;  animation-timing-function: ease-in; }
-    /* …and off */
-    13%  { opacity: 0.04; animation-timing-function: ease-out; }
-    /* crank 2: flick on… */
-    21%  { opacity: 1;    animation-timing-function: ease-in; }
-    /* …and off */
-    30%  { opacity: 0.04; animation-timing-function: cubic-bezier(0.33, 0, 0.15, 1); }
-    /* engine catches: smooth gradient ramp up to the resting glow */
-    100% { opacity: 1; }
-  }
-
-  /* Respect users who ask for less motion: keep the color, drop the animation. */
+  /* Respect users who ask for less motion: keep the color, drop the fade. */
   @media (prefers-reduced-motion: reduce) {
     .mode-ambient {
       transition: none;
-      animation: none;
-    }
-    .dark.mode-active .mode-ambient {
-      animation: none;
     }
   }
 
