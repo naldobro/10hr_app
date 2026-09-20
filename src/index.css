@@ -49,17 +49,20 @@
   --surface-solid: #0d0d0d;
   --paper-border: rgba(255, 255, 255, 0.6);
   /* The glow color, as an "R G B" triple. Defaults to white; the Track tab
-     overrides this to the running mode's color so every card's halo re-tints
-     together (see `.paper-card` transition below). */
+     overrides this on its root to the running mode's color, and because the
+     dark halo below is painted DIRECTLY on each `.paper-card` element (not via
+     an inherited variable), every card re-substitutes this per-element and the
+     whole tab re-tints together. */
   --glow-rgb: 255 255 255;
-  /* Strong, bright rim + wide halo on all four sides. Layered from a crisp
-     high-alpha ring out to a broad soft bloom so it clearly glows, not greys. */
+  /* Fallback white halo for any element that reads `var(--paper-shadow)`
+     directly. The visible card glow is painted element-level (see
+     `.dark .paper-card` below) so it can pick up --glow-rgb. */
   --paper-shadow:
-    0 0 0 1px rgb(var(--glow-rgb) / 0.68),
-    inset 0 1px 0 0 rgb(var(--glow-rgb) / 0.6),
-    0 0 13px 0 rgb(var(--glow-rgb) / 0.42),
-    0 0 34px 1px rgb(var(--glow-rgb) / 0.24),
-    0 0 64px 6px rgb(var(--glow-rgb) / 0.12),
+    0 0 0 1px rgba(255, 255, 255, 0.68),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.6),
+    0 0 13px 0 rgba(255, 255, 255, 0.42),
+    0 0 34px 1px rgba(255, 255, 255, 0.24),
+    0 0 64px 6px rgba(255, 255, 255, 0.12),
     0 20px 44px -24px rgba(0, 0, 0, 0.95);
   --ink: #f5f5f5;
   --ink-muted: #9a9a9a;
@@ -141,6 +144,20 @@
      the `.dyn-sheen` helper for surfaces that don't use paper-card (calendar
      cells, the Stage Book page, tab chips). Layers over the element's own
      background-color, so colours and inline backgrounds are preserved. */
+  /* Painted element-level (not via var(--paper-shadow)) so each card resolves
+     --glow-rgb from its own inherited value — letting the Track root recolor the
+     whole tab's halo by overriding that one variable. */
+  .dark .paper-card,
+  .dark .paper-shadow {
+    box-shadow:
+      0 0 0 1px rgb(var(--glow-rgb) / 0.68),
+      inset 0 1px 0 0 rgb(var(--glow-rgb) / 0.6),
+      0 0 13px 0 rgb(var(--glow-rgb) / 0.42),
+      0 0 34px 1px rgb(var(--glow-rgb) / 0.24),
+      0 0 64px 6px rgb(var(--glow-rgb) / 0.12),
+      0 20px 44px -24px rgba(0, 0, 0, 0.95);
+  }
+
   .dark .paper-card {
     background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0) 52%);
   }
