@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Play, Square, Plus } from 'lucide-react';
 import { WorkSession } from '../types';
+import { MODES, MODE_MAP } from '../lib/modes';
 
 const TIMER_STORAGE_KEY = 'active_timer';
+const MODE_STORAGE_KEY = 'selected_mode';
 
 function formatTimerDisplay(seconds: number) {
   const hours = Math.floor(seconds / 3600);
@@ -15,50 +17,57 @@ function toLocalDateStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// hex + alpha byte → rgba-ish hex (e.g. #2563eb + 'aa'). Assumes 6-digit hex.
+function withAlpha(hex: string, alpha: string) {
+  return `${hex}${alpha}`;
+}
+
 interface ControlsPanelProps {
   onAddSession: (session: { start_time: number; end_time: number; label: string; color: string }) => void;
   isLoading?: boolean;
   sessions: WorkSession[];
   currentDay: string;
+  /** Notifies the parent which mode is currently RUNNING (null when idle) so it
+      can shift the tab's glow. Selecting a mode alone does not fire this. */
+  onRunningModeChange?: (modeKey: string | null) => void;
 }
 
-export default function ControlsPanel({ onAddSession, isLoading = false, sessions }: ControlsPanelProps) {
+export default function ControlsPanel({ onAddSession, isLoading = false, sessions, onRunningModeChange }: ControlsPanelProps) {
+  const [selectedMode, setSelectedMode] = useState<string | null>(() =>
+    typeof localStorage !== 'undefined' ? localStorage.getItem(MODE_STORAGE_KEY) : null
+  );
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [timerStart, setTimerStart] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [showModal, setShowModal] = useState(false);
-  const [showTimerLabelModal, setShowTimerLabelModal] = useState(false);
-  const [timerSessionData, setTimerSessionData] = useState<{ start_time: number; end_time: number } | null>(null);
-  const [timerLabel, setTimerLabel] = useState('Deep Work');
-  const [timerColor, setTimerColor] = useState('blue');
   const [validationError, setValidationError] = useState('');
 
+  const [manualMode, setManualMode] = useState<string>('work');
   const [manualStart, setManualStart] = useState('09:00');
   const [manualDuration, setManualDuration] = useState(1);
   const [manualLabel, setManualLabel] = useState('');
-  const [manualColor, setManualColor] = useState('blue');
   const [useCustomDuration, setUseCustomDuration] = useState(false);
   const [customHours, setCustomHours] = useState(0);
   const [customMinutes, setCustomMinutes] = useState(0);
 
-  const colorOptions = [
-    { value: 'blue', label: 'Blue', class: 'bg-blue-700' },
-    { value: 'green', label: 'Green', class: 'bg-emerald-600' },
-    { value: 'purple', label: 'Purple', class: 'bg-violet-700' },
-    { value: 'orange', label: 'Orange', class: 'bg-amber-600' },
-    { value: 'pink', label: 'Pink', class: 'bg-pink-600' },
-    { value: 'teal', label: 'Teal', class: 'bg-teal-700' },
-  ];
+  const activeMode = selectedMode ? MODE_MAP[selectedMode] : null;
 
+  // Only a RUNNING timer tints the tab — selecting a mode keeps the default glow.
+  useEffect(() => {
+    onRunningModeChange?.(isTimerRunning ? selectedMode : null);
+  }, [isTimerRunning, selectedMode, onRunningModeChange]);
+
+  // Restore an in-progress timer (survives reloads), including which mode it belongs to.
   useEffect(() => {
     const saved = localStorage.getItem(TIMER_STORAGE_KEY);
     if (saved) {
       try {
-        const { start } = JSON.parse(saved);
+        const { start, mode } = JSON.parse(saved);
         if (start && typeof start === 'number') {
           setTimerStart(start);
           setIsTimerRunning(true);
           setElapsedSeconds(Math.floor((Date.now() - start) / 1000));
+          if (mode && MODE_MAP[mode]) setSelectedMode(mode);
         }
       } catch {
         localStorage.removeItem(TIMER_STORAGE_KEY);
@@ -108,12 +117,25 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
     return sessions.find(s => start < s.end_time && end > s.start_time);
   }, [sessions]);
 
+  const handleSelectMode = (modeKey: string) => {
+    // Can't switch baskets mid-session — finish first.
+    if (isTimerRunning) return;
+    setSelectedMode(modeKey);
+    setValidationError('');
+    localStorage.setItem(MODE_STORAGE_KEY, modeKey);
+  };
+
   const handleStartTimer = () => {
+    if (!selectedMode) {
+      setValidationError('Pick a mode first');
+      return;
+    }
     const now = Date.now();
     setIsTimerRunning(true);
     setTimerStart(now);
     setElapsedSeconds(0);
-    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify({ start: now }));
+    setValidationError('');
+    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify({ start: now, mode: selectedMode }));
   };
 
   const clearTimerState = () => {
@@ -124,8 +146,8 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
     document.title = '10hr';
   };
 
-  const handleStopTimer = () => {
-    if (!timerStart) return;
+  const handleFinish = () => {
+    if (!timerStart || !activeMode) return;
 
     const startDate = new Date(timerStart);
     const now = new Date();
@@ -141,45 +163,28 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
       endTime = startTime + 0.01;
     }
 
-    setTimerSessionData({ start_time: startTime, end_time: endTime });
-    setShowTimerLabelModal(true);
-  };
-
-  const handleSaveTimerSession = () => {
-    if (!timerLabel.trim()) {
-      setValidationError('Please enter a label for this session');
+    const overlap = findOverlap(startTime, endTime);
+    if (overlap) {
+      setValidationError(`Overlaps with "${overlap.label}" (${formatHour(overlap.start_time)}–${formatHour(overlap.end_time)})`);
       return;
     }
 
-    if (timerSessionData) {
-      const overlap = findOverlap(timerSessionData.start_time, timerSessionData.end_time);
-      if (overlap) {
-        setValidationError(`Overlaps with "${overlap.label}" (${formatHour(overlap.start_time)}–${formatHour(overlap.end_time)})`);
-        return;
-      }
+    onAddSession({
+      start_time: startTime,
+      end_time: endTime,
+      label: activeMode.label,
+      color: activeMode.key,
+    });
 
-      onAddSession({
-        ...timerSessionData,
-        label: timerLabel,
-        color: timerColor,
-      });
-
-      setShowTimerLabelModal(false);
-      setTimerLabel('Deep Work');
-      setTimerColor('blue');
-      setTimerSessionData(null);
-      setValidationError('');
-      clearTimerState();
-    }
-  };
-
-  const handleCancelTimerSession = () => {
-    setShowTimerLabelModal(false);
-    setTimerLabel('Deep Work');
-    setTimerColor('blue');
-    setTimerSessionData(null);
     setValidationError('');
     clearTimerState();
+  };
+
+  const openManualModal = () => {
+    const seed = selectedMode || 'work';
+    setManualMode(seed);
+    setManualLabel(MODE_MAP[seed].label);
+    setShowModal(true);
   };
 
   const handleAddManualSession = () => {
@@ -190,10 +195,8 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
       return;
     }
 
-    if (!manualLabel.trim()) {
-      setValidationError('Please enter a label for this session');
-      return;
-    }
+    const mode = MODE_MAP[manualMode];
+    const label = manualLabel.trim() || mode.label;
 
     const finalDuration = useCustomDuration
       ? customHours + customMinutes / 60
@@ -222,15 +225,14 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
     onAddSession({
       start_time: startTime,
       end_time: endTime,
-      label: manualLabel,
-      color: manualColor,
+      label,
+      color: mode.key,
     });
 
     setShowModal(false);
     setManualStart('09:00');
     setManualDuration(1);
     setManualLabel('');
-    setManualColor('blue');
     setUseCustomDuration(false);
     setCustomHours(0);
     setCustomMinutes(0);
@@ -244,34 +246,64 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
   return (
     <>
       <div className="paper-card rounded-2xl paper-shadow p-3 sm:p-4 lg:p-6 paper-border">
+        {/* Mode picker — the five baskets. Pick one, then Start. */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-3 sm:mb-4">
+          {MODES.map((mode) => {
+            const isSelected = selectedMode === mode.key;
+            return (
+              <button
+                key={mode.key}
+                onClick={() => handleSelectMode(mode.key)}
+                disabled={isTimerRunning && !isSelected}
+                className="relative flex items-center justify-center text-center px-2 py-3 sm:py-4 rounded-xl font-semibold text-xs sm:text-sm transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  color: isSelected ? '#fff' : mode.color,
+                  backgroundColor: isSelected ? mode.color : withAlpha(mode.color, '1f'),
+                  boxShadow: isSelected
+                    ? `0 0 0 1px ${mode.color}, 0 0 18px -2px ${withAlpha(mode.color, 'bb')}`
+                    : `inset 0 0 0 1px ${withAlpha(mode.color, '4d')}`,
+                }}
+              >
+                {mode.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {validationError && (
+          <div className="mb-3 p-2.5 bg-red-50 dark:bg-red-400/10 text-red-700 dark:text-red-300 rounded-lg border border-red-200 text-sm">
+            {validationError}
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           {!isTimerRunning ? (
             <button
               onClick={handleStartTimer}
-              disabled={isLoading}
-              className="flex-1 flex items-center justify-center gap-2 sm:gap-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 sm:py-4 px-4 sm:px-6 rounded-lg transition-colors paper-shadow text-sm sm:text-base"
+              disabled={isLoading || !selectedMode}
+              className="flex-1 flex items-center justify-center gap-2 sm:gap-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3 sm:py-4 px-4 sm:px-6 rounded-lg transition-colors paper-shadow text-sm sm:text-base"
             >
               <Play className="w-4 h-4 sm:w-5 sm:h-5" />
-              Start Deep Work Timer
+              {activeMode ? `Start ${activeMode.label}` : 'Start Timer'}
             </button>
           ) : (
             <button
-              onClick={handleStopTimer}
+              onClick={handleFinish}
               disabled={isLoading}
               className="flex-1 flex items-center justify-center gap-2 sm:gap-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 sm:py-4 px-4 sm:px-6 rounded-lg transition-colors paper-shadow text-sm sm:text-base"
             >
               <Square className="w-4 h-4 sm:w-5 sm:h-5" />
-              Stop: {formatTimerDisplay(elapsedSeconds)}
+              Finish: {formatTimerDisplay(elapsedSeconds)}
             </button>
           )}
 
           <button
-            onClick={() => setShowModal(true)}
+            onClick={openManualModal}
             disabled={isLoading}
-            className="flex items-center justify-center gap-2 sm:gap-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 sm:py-4 px-4 sm:px-6 rounded-lg transition-colors paper-shadow text-sm sm:text-base"
+            className="flex items-center justify-center gap-2 sm:gap-3 bg-stone-700 hover:bg-stone-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 sm:py-4 px-4 sm:px-6 rounded-lg transition-colors paper-shadow text-sm sm:text-base"
           >
             <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-            Add Manual Session
+            Add Manually
           </button>
         </div>
       </div>
@@ -290,6 +322,39 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
             )}
 
             <div className="space-y-4 sm:space-y-6">
+              <div>
+                <label className="block text-sm font-medium ink-text-muted mb-2">
+                  Mode
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {MODES.map((mode) => {
+                    const isSelected = manualMode === mode.key;
+                    return (
+                      <button
+                        key={mode.key}
+                        onClick={() => {
+                          // Keep the label in sync unless the user has customised it.
+                          setManualLabel((prev) =>
+                            prev === MODE_MAP[manualMode].label || prev === '' ? mode.label : prev
+                          );
+                          setManualMode(mode.key);
+                        }}
+                        className="px-2 py-2.5 rounded-lg font-semibold text-xs sm:text-sm transition-all"
+                        style={{
+                          color: isSelected ? '#fff' : mode.color,
+                          backgroundColor: isSelected ? mode.color : withAlpha(mode.color, '1f'),
+                          boxShadow: isSelected
+                            ? `0 0 0 1px ${mode.color}`
+                            : `inset 0 0 0 1px ${withAlpha(mode.color, '4d')}`,
+                        }}
+                      >
+                        {mode.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium ink-text-muted mb-2">
                   Start Time
@@ -382,29 +447,9 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
                   type="text"
                   value={manualLabel}
                   onChange={(e) => setManualLabel(e.target.value)}
-                  placeholder="e.g., Outreach, Copywriting"
+                  placeholder={MODE_MAP[manualMode].label}
                   className="w-full px-3 sm:px-4 py-2.5 sm:py-3 paper-border rounded-lg focus:ring-2 focus:ring-amber-600 focus:border-transparent"
-                  autoFocus
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium ink-text-muted mb-2">
-                  Color
-                </label>
-                <div className="flex gap-2">
-                  {colorOptions.map((color) => (
-                    <button
-                      key={color.value}
-                      onClick={() => setManualColor(color.value)}
-                      className={`w-9 h-9 sm:w-12 sm:h-12 rounded-lg ${color.class} ${
-                        manualColor === color.value
-                          ? 'ring-4 ring-amber-800'
-                          : 'opacity-50 hover:opacity-100'
-                      } transition-all paper-shadow`}
-                    />
-                  ))}
-                </div>
               </div>
             </div>
 
@@ -425,80 +470,6 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
                 className="flex-1 px-4 py-2.5 sm:py-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold text-white transition-colors paper-shadow text-sm sm:text-base"
               >
                 {isLoading ? 'Adding...' : 'Add Session'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showTimerLabelModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-          <div className="paper-card rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 lg:p-8 max-w-md w-full shadow-2xl paper-border">
-            <h3 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 ink-text">
-              Name Your Session
-            </h3>
-
-            {validationError && (
-              <div className="mb-4 p-3 bg-red-50 dark:bg-red-400/10 text-red-700 dark:text-red-300 rounded-lg border border-red-200 text-sm">
-                {validationError}
-              </div>
-            )}
-
-            <div className="space-y-4 sm:space-y-5 mb-5 sm:mb-6">
-              <div>
-                <label className="block text-sm font-medium ink-text-muted mb-2">
-                  Session Label
-                </label>
-                <input
-                  type="text"
-                  value={timerLabel}
-                  onChange={(e) => {
-                    setTimerLabel(e.target.value);
-                    setValidationError('');
-                  }}
-                  placeholder="e.g., Deep Work, Writing, Coding"
-                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 paper-border rounded-lg focus:ring-2 focus:ring-amber-600 focus:border-transparent"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleSaveTimerSession();
-                    }
-                  }}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium ink-text-muted mb-2">
-                  Color
-                </label>
-                <div className="flex gap-2">
-                  {colorOptions.map((color) => (
-                    <button
-                      key={color.value}
-                      onClick={() => setTimerColor(color.value)}
-                      className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg ${color.class} ${
-                        timerColor === color.value
-                          ? 'ring-4 ring-amber-800'
-                          : 'opacity-50 hover:opacity-100'
-                      } transition-all paper-shadow`}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={handleCancelTimerSession}
-                className="flex-1 px-4 py-2.5 sm:py-3 bg-stone-200 hover:bg-stone-300 rounded-lg font-semibold ink-text transition-colors paper-border text-sm sm:text-base"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveTimerSession}
-                className="flex-1 px-4 py-2.5 sm:py-3 bg-amber-600 hover:bg-amber-700 rounded-lg font-semibold text-white transition-colors paper-shadow text-sm sm:text-base"
-              >
-                Save Session
               </button>
             </div>
           </div>

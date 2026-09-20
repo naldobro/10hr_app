@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { WorkSession } from '../types';
+import { resolveColor } from '../lib/modes';
 
 interface TimelineGraphProps {
   sessions: WorkSession[];
@@ -24,17 +25,7 @@ export default function TimelineGraph({ sessions, currentDay, onDeleteSession }:
     return currentTime.getHours() + currentTime.getMinutes() / 60;
   };
 
-  const getBlockColor = (color: string) => {
-    const colors: Record<string, string> = {
-      blue: '#1e40af',
-      green: '#059669',
-      purple: '#7c3aed',
-      orange: '#d97706',
-      pink: '#db2777',
-      teal: '#0f766e',
-    };
-    return colors[color] || '#1e40af';
-  };
+  const getBlockColor = (color: string) => resolveColor(color);
 
   const formatHour = (hour: number) => {
     return `${String(Math.floor(hour)).padStart(2, '0')}:${String(
