@@ -130,19 +130,7 @@ export default function Navigation({
               Vision
             </button>
           </div>
-          {/* The 3 focus pillars drop in below the tabs on Vision. */}
-          {isVision && (
-            <div className="flex justify-center pb-1 animate-[pillarsRow_0.28s_cubic-bezier(0.16,1,0.3,1)]">
-              <style>{`@keyframes pillarsRow { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }`}</style>
-              <FocusPillars
-                pillars={focusPillars}
-                onChange={onFocusPillarsChange}
-                onCommit={onCommitPillars}
-                active={isVision}
-                compact
-              />
-            </div>
-          )}
+          {/* Focus pillars are desktop-only — omitted here to keep the mobile nav tight. */}
         </div>
 
         {/* Desktop layout */}

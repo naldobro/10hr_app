@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Flag, CalendarClock, X, Check, Minus, Undo2, Redo2, History, RotateCcw, Save, Heart, ShieldCheck, Menu, NotebookPen, BookOpen, Rows3 } from 'lucide-react';
 import { db } from '../lib/database';
+import { supabase } from '../lib/supabase';
 import { undoManager } from '../lib/undoManager';
 import { VisionGoal, VisionSnapshot, VisionTopic, VisionDoc, StageBubble } from '../types';
 import {
@@ -363,6 +364,39 @@ export default function VisionTab() {
     return () => {
       document.removeEventListener('visibilitychange', refetch);
       window.removeEventListener('focus', refetch);
+    };
+  }, [reloadGoals, reloadDocs, reloadTopics, reloadFocus, reloadDiary, reloadNotebookMeta, reloadStageBubbles]);
+
+  // Live cross-device sync via Supabase Realtime. A change made elsewhere (e.g. a
+  // Planner page added on the phone) reloads here within a moment — no refresh.
+  // Guarded so it never overwrites an in-progress edit/drag on this device. If the
+  // realtime publication isn't enabled the subscription is simply inert (the
+  // focus refetch above still covers it).
+  // Mirror interaction state into a ref so the subscription reads it live without
+  // resubscribing (drag changes on every pointer move).
+  const interactingRef = useRef(false);
+  interactingRef.current = !!(drag || pendingMove || selectedId);
+  useEffect(() => {
+    const busy = () => {
+      if (interactingRef.current) return true;
+      const el = document.activeElement as HTMLElement | null;
+      return !!(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable));
+    };
+    const channel = supabase
+      .channel('vision-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vision_goals' }, () => !busy() && reloadGoals())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vision_docs' }, () => !busy() && reloadDocs())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vision_topics' }, () => !busy() && reloadTopics())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vision_settings' }, () => {
+        if (busy()) return;
+        reloadFocus();
+        reloadDiary();
+        reloadNotebookMeta();
+        reloadStageBubbles();
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
     };
   }, [reloadGoals, reloadDocs, reloadTopics, reloadFocus, reloadDiary, reloadNotebookMeta, reloadStageBubbles]);
 
