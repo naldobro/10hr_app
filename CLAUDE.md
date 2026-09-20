@@ -60,6 +60,16 @@ Three tabs: **Track** (log deep-work sessions + habits on a calendar), **Statist
 - No test suite. "Verification" = `typecheck` + `build` + eyeballing the running app (the user runs it as a Mac desktop-wrapped web app and shares screenshots).
 - Commit only when asked; branch off `main` if needed; end commit messages with the `Co-Authored-By: Claude Opus 4.8` trailer.
 
+## Design rules (from `.bolt/prompt`)
+
+This project was scaffolded with Bolt.new; its standing design instructions live in `.bolt/prompt`:
+- Designs should be **beautiful, not cookie-cutter** — fully-featured, production-worthy.
+- **Don't add UI/icon/theme packages** unless truly necessary or explicitly requested. Stick to Tailwind + React hooks + **lucide-react** for icons.
+
+## Desktop app (Tauri)
+
+The app is run as a native macOS app (`10Hr.app`) — that's the window in the user's screenshots. `.claude/settings.local.json` carries **Tauri** build permissions (`src-tauri/target/release/bundle/macos/10Hr.app` copied to `/Applications/10Hr.app`, plus `rustc`/`cargo`), so a Tauri wrapper was set up at some point. **But `src-tauri/` does not exist in this working copy** (not on disk, not tracked, not gitignored) — the Tauri config is absent here. If desktop packaging comes up, it needs to be (re)created; don't assume it's present.
+
 ## Persistent memory
 
 There's a separate auto-memory index at `~/.claude/.../memory/MEMORY.md` (Vision Stage Book notes, audit findings). Check it for in-flight work context that isn't in the repo.
