@@ -261,7 +261,7 @@
      fully GPU-composited with zero repaint (no filter/scale — those were the lag). */
   .dark.mode-active .mode-ambient {
     opacity: 1;
-    animation: mode-ignite 1.6s both;
+    animation: mode-ignite 2.4s both;
   }
 
   /* Cohesion: the timeline "now" line adopts the running mode's color. */
@@ -274,15 +274,15 @@
 
   @keyframes mode-ignite {
     /* crank 1: quick flick on… */
-    0%   { opacity: 0;    animation-timing-function: ease-out; }
-    6%   { opacity: 0.9;  animation-timing-function: ease-in; }
-    /* …and off */
-    13%  { opacity: 0.04; animation-timing-function: ease-out; }
+    0%   { opacity: 0; animation-timing-function: cubic-bezier(0.2, 0, 0, 1); }
+    9%   { opacity: 0.9; animation-timing-function: cubic-bezier(0.4, 0, 0.35, 1); }
+    /* …then fall smoothly all the way off */
+    22%  { opacity: 0; animation-timing-function: cubic-bezier(0.2, 0, 0, 1); }
     /* crank 2: flick on… */
-    21%  { opacity: 1;    animation-timing-function: ease-in; }
-    /* …and off */
-    30%  { opacity: 0.04; animation-timing-function: cubic-bezier(0.33, 0, 0.15, 1); }
-    /* engine catches: smooth gradient ramp up to the resting glow */
+    33%  { opacity: 1; animation-timing-function: cubic-bezier(0.4, 0, 0.35, 1); }
+    /* …fall smoothly all the way off */
+    46%  { opacity: 0; animation-timing-function: cubic-bezier(0.33, 0, 0.12, 1); }
+    /* engine catches: long, smooth gradient ramp up to the resting glow */
     100% { opacity: 1; }
   }
 
