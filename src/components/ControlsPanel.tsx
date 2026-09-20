@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Play, Square, Plus } from 'lucide-react';
 import { WorkSession } from '../types';
-import { MODES, MODE_MAP } from '../lib/modes';
+import { MODES, MODE_MAP, textOn } from '../lib/modes';
 import { applyModeGlow } from '../lib/modeGlow';
 
 const TIMER_STORAGE_KEY = 'active_timer';
@@ -256,7 +256,7 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
                 disabled={isTimerRunning && !isSelected}
                 className="relative flex items-center justify-center text-center px-2 py-3 sm:py-4 rounded-xl font-semibold text-xs sm:text-sm transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{
-                  color: isSelected ? '#fff' : mode.color,
+                  color: isSelected ? textOn(mode.color) : mode.color,
                   backgroundColor: isSelected ? mode.color : withAlpha(mode.color, '1f'),
                   boxShadow: isSelected
                     ? `0 0 0 1px ${mode.color}, 0 0 18px -2px ${withAlpha(mode.color, 'bb')}`
@@ -340,7 +340,7 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
                         }}
                         className="px-2 py-2.5 rounded-lg font-semibold text-xs sm:text-sm transition-all"
                         style={{
-                          color: isSelected ? '#fff' : mode.color,
+                          color: isSelected ? textOn(mode.color) : mode.color,
                           backgroundColor: isSelected ? mode.color : withAlpha(mode.color, '1f'),
                           boxShadow: isSelected
                             ? `0 0 0 1px ${mode.color}`

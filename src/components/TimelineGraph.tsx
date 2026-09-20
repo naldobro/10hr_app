@@ -144,13 +144,13 @@ export default function TimelineGraph({ sessions, currentDay, onDeleteSession }:
 
           {isToday && (
             <div
-              className="absolute top-0 bottom-0 w-1 bg-amber-700 z-50 animate-pulse shadow-lg"
+              className="mode-nowline absolute top-0 bottom-0 w-1 bg-amber-700 z-50 animate-pulse shadow-lg"
               style={{
                 left: `${(getCurrentHour() / 24) * 100}%`,
               }}
             >
-              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 bg-amber-700 rounded-full"></div>
-              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-3 h-3 bg-amber-700 rounded-full"></div>
+              <div className="mode-nowline absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 bg-amber-700 rounded-full"></div>
+              <div className="mode-nowline absolute -bottom-2 left-1/2 -translate-x-1/2 w-3 h-3 bg-amber-700 rounded-full"></div>
             </div>
           )}
         </div>

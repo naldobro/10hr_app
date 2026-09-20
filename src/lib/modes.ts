@@ -47,3 +47,10 @@ export function hexToRgbTriple(hex: string): string {
   const b = parseInt(h.slice(4, 6), 16);
   return `${r} ${g} ${b}`;
 }
+
+/** Legible text color (black/white) to sit on a filled swatch of `hex`. */
+export function textOn(hex: string): string {
+  const [r, g, b] = hexToRgbTriple(hex).split(' ').map(Number);
+  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+  return luminance > 140 ? '#0a0a0a' : '#ffffff';
+}

@@ -147,30 +147,31 @@
   /* Painted element-level (not via var(--paper-shadow)) so each card resolves
      --glow-rgb from its own inherited value — letting the Track root recolor the
      whole tab's halo by overriding that one variable. */
-  /* Kept deliberately COMPACT (max ~28px blur) so the box-shadow is cheap to
-     repaint while it transitions. The wide bloom lives on the composited
-     .mode-ambient layer, not here. */
+  /* Full, bright halo. The box-shadow is NOT transitioned (see the transition
+     rule below), so its blur size costs nothing per frame — the smooth motion
+     comes from the composited .mode-ambient layer instead. That's why we can go
+     big here without reintroducing lag. */
   .dark .paper-card,
   .dark .paper-shadow {
     box-shadow:
-      0 0 0 1px rgb(var(--glow-rgb) / 0.68),
-      inset 0 1px 0 0 rgb(var(--glow-rgb) / 0.55),
-      0 0 12px 0 rgb(var(--glow-rgb) / 0.38),
-      0 0 28px 2px rgb(var(--glow-rgb) / 0.16),
+      0 0 0 1px rgb(var(--glow-rgb) / 0.85),
+      inset 0 1px 0 0 rgb(var(--glow-rgb) / 0.7),
+      0 0 16px 0 rgb(var(--glow-rgb) / 0.5),
+      0 0 40px 3px rgb(var(--glow-rgb) / 0.28),
+      0 0 78px 8px rgb(var(--glow-rgb) / 0.14),
       0 18px 40px -24px rgba(0, 0, 0, 0.95);
   }
 
-  /* While a mode runs, brighten the rim + halo so the color really reads
-     (colored light looks dimmer than white at the same alpha). Same 5-layer
-     shape as idle so box-shadow interpolates cleanly; the big bloom comes from
-     the ambient wash. */
+  /* While a mode runs, crank the rim + halo way up so the color blazes
+     (colored light reads dimmer than white at the same alpha). */
   .dark.mode-active .paper-card,
   .dark.mode-active .paper-shadow {
     box-shadow:
-      0 0 0 1.5px rgb(var(--glow-rgb) / 0.95),
-      inset 0 1px 0 0 rgb(var(--glow-rgb) / 0.7),
-      0 0 16px 0 rgb(var(--glow-rgb) / 0.62),
-      0 0 36px 3px rgb(var(--glow-rgb) / 0.34),
+      0 0 0 2px rgb(var(--glow-rgb) / 1),
+      inset 0 1px 0 0 rgb(var(--glow-rgb) / 0.9),
+      0 0 26px 0 rgb(var(--glow-rgb) / 0.88),
+      0 0 66px 6px rgb(var(--glow-rgb) / 0.55),
+      0 0 130px 16px rgb(var(--glow-rgb) / 0.3),
       0 18px 40px -24px rgba(0, 0, 0, 0.95);
   }
 
@@ -178,15 +179,16 @@
     background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0) 52%);
   }
 
-  /* Smoothly cross-fade the halo + border when the Track mode flips. Short
-     ease-out; the compact shadows above keep the repaint cheap. */
+  /* Only the border eases (cheap). The halo box-shadow deliberately does NOT
+     transition — animating big blurs every frame is what caused the lag. The
+     card halo swaps in one repaint while the composited .mode-ambient wash fades
+     smoothly over it, so the change reads smooth without the per-frame cost. */
   .dark .paper-card,
   .dark .paper-shadow,
   .dark .dyn-sheen,
   .dark .dyn-glow,
   .dark .paper-border {
-    transition: box-shadow 0.4s ease-out,
-                border-color 0.4s ease-out;
+    transition: border-color 0.45s ease-out;
   }
 
   .dark .dyn-sheen {
@@ -241,17 +243,46 @@
     pointer-events: none;
     opacity: 0;
     /* Promote to its own compositor layer so the fade is pure GPU (no repaint). */
-    will-change: opacity;
+    will-change: opacity, transform;
     transform: translateZ(0);
     transition: opacity 0.55s ease-out;
     background:
-      radial-gradient(75% 60% at 50% 0%, rgb(var(--glow-rgb) / 0.30), transparent 70%),
-      radial-gradient(95% 70% at 50% 100%, rgb(var(--glow-rgb) / 0.22), transparent 72%),
-      radial-gradient(130% 100% at 50% 50%, rgb(var(--glow-rgb) / 0.09), transparent 68%);
+      radial-gradient(78% 62% at 50% 0%, rgb(var(--glow-rgb) / 0.42), transparent 70%),
+      radial-gradient(98% 72% at 50% 100%, rgb(var(--glow-rgb) / 0.32), transparent 72%),
+      radial-gradient(135% 105% at 50% 50%, rgb(var(--glow-rgb) / 0.14), transparent 66%);
   }
 
+  /* Ignition: when a mode engages, the wash blooms in with a subtle scale
+     overshoot then settles — the "engine fires" moment. Composited (opacity +
+     transform only), so it's free. */
   .dark.mode-active .mode-ambient {
     opacity: 1;
+    animation: mode-ignite 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Cohesion: the timeline "now" line adopts the running mode's color. */
+  .mode-nowline {
+    transition: background-color 0.45s ease-out;
+  }
+  .dark.mode-active .mode-nowline {
+    background-color: rgb(var(--glow-rgb));
+  }
+
+  @keyframes mode-ignite {
+    0% { opacity: 0; transform: translateZ(0) scale(1.06); }
+    45% { opacity: 1; }
+    100% { opacity: 1; transform: translateZ(0) scale(1); }
+  }
+
+  /* Respect users who ask for less motion: keep the color, drop the animation. */
+  @media (prefers-reduced-motion: reduce) {
+    .mode-ambient {
+      transition: none;
+      animation: none;
+    }
+    .dark.mode-active .mode-ambient {
+      animation: none;
+    }
   }
 
   .paper-shadow {
