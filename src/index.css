@@ -252,13 +252,13 @@
       radial-gradient(135% 105% at 50% 50%, rgb(var(--glow-rgb) / 0.14), transparent 66%);
   }
 
-  /* Ignition: when a mode engages, the wash SURGES bright then settles back —
-     the "engine fires" moment. Resting opacity is 0.8 while the surge peaks at
-     1.0 + a brightness pop, so the flash is clearly visible. Composited
-     (opacity + transform + filter), so it stays cheap. */
+  /* Ignition: an engine-crank sequence — glow / off / glow / off, then a smooth
+     gradient ramp up to the resting glow (BMW start feel). Per-keyframe timing
+     functions keep the flickers crisp and the final rise silky. Composited
+     (opacity + brightness), so it stays cheap. */
   .dark.mode-active .mode-ambient {
     opacity: 0.8;
-    animation: mode-ignite 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: mode-ignite 1.8s both;
   }
 
   /* Cohesion: the timeline "now" line adopts the running mode's color. */
@@ -270,9 +270,17 @@
   }
 
   @keyframes mode-ignite {
-    0%   { opacity: 0;   filter: brightness(1.9); transform: translateZ(0) scale(1.12); }
-    22%  { opacity: 1;   filter: brightness(1.6); transform: translateZ(0) scale(1.03); }
-    100% { opacity: 0.8; filter: brightness(1);   transform: translateZ(0) scale(1); }
+    /* crank 1: quick flick on… */
+    0%   { opacity: 0;    filter: brightness(1.8); animation-timing-function: ease-out; }
+    6%   { opacity: 0.85; filter: brightness(1.8); animation-timing-function: ease-in; }
+    /* …and off */
+    13%  { opacity: 0.02; filter: brightness(1);   animation-timing-function: ease-out; }
+    /* crank 2: flick on harder… */
+    21%  { opacity: 1;    filter: brightness(2);   animation-timing-function: ease-in; }
+    /* …and off */
+    30%  { opacity: 0.03; filter: brightness(1);   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+    /* engine catches: smooth gradient ramp up to the resting glow */
+    100% { opacity: 0.8;  filter: brightness(1); }
   }
 
   /* Respect users who ask for less motion: keep the color, drop the animation. */
