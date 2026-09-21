@@ -226,6 +226,13 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
     setValidationError('');
   };
 
+  // Ditch = throw the session away AND reset the timer, ready to start fresh.
+  const handleDitchFinish = () => {
+    setShowFinishModal(false);
+    setValidationError('');
+    clearTimerState();
+  };
+
   const openManualModal = () => {
     const seed = selectedMode || 'work';
     setManualMode(seed);
@@ -602,19 +609,27 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
               </div>
             </div>
 
-            <div className="flex gap-3 mt-6 sm:mt-8">
+            <div className="flex gap-2 sm:gap-3 mt-6 sm:mt-8">
+              <button
+                onClick={handleDitchFinish}
+                disabled={isLoading}
+                className="px-3 sm:px-4 py-2.5 sm:py-3 bg-rose-600/10 hover:bg-rose-600/20 text-rose-600 dark:text-rose-400 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors border border-rose-600/30 text-sm sm:text-base"
+                title="Discard this session and reset the timer"
+              >
+                Ditch
+              </button>
               <button
                 onClick={handleCancelFinish}
                 disabled={isLoading}
-                className="flex-1 px-4 py-2.5 sm:py-3 bg-stone-200 hover:bg-stone-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold ink-text transition-colors paper-border text-sm sm:text-base"
-                title="Timer keeps running"
+                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-stone-200 hover:bg-stone-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold ink-text transition-colors paper-border text-sm sm:text-base"
+                title="Keep the timer running"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmFinish}
                 disabled={isLoading}
-                className="flex-1 px-4 py-2.5 sm:py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold text-white transition-colors paper-shadow text-sm sm:text-base"
+                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold text-white transition-colors paper-shadow text-sm sm:text-base"
               >
                 {isLoading ? 'Adding...' : 'Add Session'}
               </button>
