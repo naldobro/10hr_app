@@ -254,11 +254,22 @@
       radial-gradient(100% 100% at 50% 50%, transparent 42%, rgb(var(--glow-rgb) / 0.14) 100%);
   }
 
-  /* Ignition: a single smooth gradient fade of the wash to the resting glow —
-     pure opacity on a composited layer (see transition above). Monotonic 0->1,
-     so it's perfectly smooth with no flicker "stops" and no repaint. */
+  /* Ignition: an engine-crank — glow / off / glow / off, then a smooth ramp up
+     to the resting glow. OPACITY ONLY on the composited layer, so it's GPU-cheap
+     (the old lag was a filter animation + heavy shadows, both now gone). The fade
+     transition above still handles the fade-OUT when the mode stops. */
   .dark.mode-active .mode-ambient {
     opacity: 1;
+    animation: mode-ignite 1.6s both;
+  }
+
+  @keyframes mode-ignite {
+    0%   { opacity: 0;    animation-timing-function: ease-out; }
+    6%   { opacity: 0.9;  animation-timing-function: ease-in; }   /* flick on */
+    13%  { opacity: 0.04; animation-timing-function: ease-out; }  /* off */
+    21%  { opacity: 1;    animation-timing-function: ease-in; }   /* flick on */
+    30%  { opacity: 0.04; animation-timing-function: cubic-bezier(0.33, 0, 0.15, 1); } /* off */
+    100% { opacity: 1; }                                          /* smooth ramp up */
   }
 
   /* Cohesion: the timeline "now" line adopts the running mode's color. */
@@ -269,10 +280,13 @@
     background-color: rgb(var(--glow-rgb));
   }
 
-  /* Respect users who ask for less motion: keep the color, drop the fade. */
+  /* Respect users who ask for less motion: keep the color, drop the fade/crank. */
   @media (prefers-reduced-motion: reduce) {
     .mode-ambient {
       transition: none;
+    }
+    .dark.mode-active .mode-ambient {
+      animation: none;
     }
   }
 
