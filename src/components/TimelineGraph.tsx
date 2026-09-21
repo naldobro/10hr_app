@@ -65,7 +65,7 @@ export default function TimelineGraph({ sessions, currentDay, onDeleteSession }:
       <h3 className="text-base sm:text-lg font-bold ink-text mb-3 sm:mb-4">Timeline</h3>
 
       <div className="relative bg-amber-50/30 dark:bg-amber-400/10 rounded-xl p-2 sm:p-4 paper-border overflow-x-auto" style={{ minHeight: `${timelineHeight}px` }}>
-        <div className="relative min-w-[600px]" style={{ height: `${timelineHeight}px` }}>
+        <div className="relative min-w-[960px]" style={{ height: `${timelineHeight}px` }}>
           {hourMarkers.map((hour) => (
             <div
               key={hour}
@@ -91,52 +91,59 @@ export default function TimelineGraph({ sessions, currentDay, onDeleteSession }:
             )}
             {todaySessions.map((session, index) => {
               const startPercent = (session.start_time / 24) * 100;
+              const endPercent = (session.end_time / 24) * 100;
               const duration = session.end_time - session.start_time;
               const widthPercent = (duration / 24) * 100;
-              const isShort = duration < 1;
-              const minWidth = isShort ? 100 : 0;
+              const color = getBlockColor(session.color);
+              // Bar length is now STRICTLY proportional to duration (with a tiny
+              // floor so a seconds-long session is still a visible sliver). The
+              // label/time sit BESIDE the bar so text never inflates its width.
+              const labelOnLeft = startPercent > 62;
 
               return (
                 <div
                   key={session.id}
-                  className="absolute h-12 sm:h-14 lg:h-16 rounded-lg paper-shadow transition-all hover:scale-[1.02] hover:shadow-xl group"
-                  style={{
-                    left: `${startPercent}%`,
-                    width: `max(${widthPercent}%, ${minWidth}px)`,
-                    top: `${16 + index * 60}px`,
-                    backgroundColor: getBlockColor(session.color),
-                  }}
+                  className="absolute left-0 right-0 h-12 sm:h-14 lg:h-16 group"
+                  style={{ top: `${16 + index * 60}px` }}
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent rounded-lg"></div>
-
-                  <div className="relative h-full flex items-center justify-between px-2 sm:px-3 gap-1 sm:gap-2 min-w-min">
-                    <div className="flex flex-col flex-shrink-0">
-                      <span className="text-white font-bold text-[10px] sm:text-xs lg:text-sm drop-shadow-md line-clamp-1">
-                        {session.label}
-                      </span>
-                      <span className="text-white/90 text-[9px] sm:text-xs font-medium">
-                        {formatHour(session.start_time)} - {formatHour(session.end_time)}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <span className="text-white font-bold text-[10px] sm:text-xs bg-white/20 dark:bg-paper/20 px-1 sm:px-1.5 py-0.5 rounded">
-                        {duration.toFixed(1)}h
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteClick(session.id);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white px-1.5 py-0.5 rounded text-xs font-bold flex-shrink-0"
-                      >
-                        &times;
-                      </button>
-                    </div>
+                  {/* the proportional bar */}
+                  <div
+                    className="absolute top-0 bottom-0 rounded-lg paper-shadow transition-transform hover:scale-y-[1.04]"
+                    style={{
+                      left: `${startPercent}%`,
+                      width: `max(${widthPercent}%, 8px)`,
+                      backgroundColor: color,
+                    }}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent rounded-lg"></div>
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-white/30 dark:bg-paper/30 rounded-l-lg"></div>
+                    <div className="absolute right-0 top-0 bottom-0 w-1 bg-black/20 rounded-r-lg"></div>
                   </div>
 
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-white/30 dark:bg-paper/30 rounded-l-lg"></div>
-                  <div className="absolute right-0 top-0 bottom-0 w-1 bg-black/20 rounded-r-lg"></div>
+                  {/* the label, placed beside the bar (flips to the left near the right edge) */}
+                  <div
+                    className={`absolute top-0 bottom-0 flex items-center whitespace-nowrap ${labelOnLeft ? 'pr-2 flex-row-reverse' : 'pl-2'}`}
+                    style={labelOnLeft ? { right: `${100 - startPercent}%` } : { left: `${endPercent}%` }}
+                  >
+                    <div className={`flex flex-col leading-tight ${labelOnLeft ? 'items-end' : 'items-start'}`}>
+                      <span className="ink-text font-bold text-xs sm:text-sm flex items-center gap-1.5">
+                        <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }}></span>
+                        {session.label}
+                      </span>
+                      <span className="ink-text-muted text-[10px] sm:text-xs font-medium">
+                        {formatHour(session.start_time)}–{formatHour(session.end_time)} · {duration.toFixed(1)}h
+                      </span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteClick(session.id);
+                      }}
+                      className={`${labelOnLeft ? 'mr-2' : 'ml-2'} opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white w-5 h-5 rounded flex items-center justify-center text-xs font-bold flex-shrink-0`}
+                    >
+                      &times;
+                    </button>
+                  </div>
                 </div>
               );
             })}

@@ -18,6 +18,18 @@ function toLocalDateStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// fractional hours (9.5) <-> "HH:MM" for the editable time inputs.
+function hoursToHHMM(h: number) {
+  let hh = Math.floor(h);
+  let mm = Math.round((h - hh) * 60);
+  if (mm === 60) { hh += 1; mm = 0; }
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+function hhmmToHours(str: string) {
+  const [h, m] = str.split(':').map(Number);
+  return (h || 0) + (m || 0) / 60;
+}
+
 // hex + alpha byte → rgba-ish hex (e.g. #2563eb + 'aa'). Assumes 6-digit hex.
 function withAlpha(hex: string, alpha: string) {
   return `${hex}${alpha}`;
@@ -39,6 +51,14 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [validationError, setValidationError] = useState('');
+
+  // Finish review modal — Finish no longer logs directly; it opens this so the
+  // session can be confirmed or its time/label edited first.
+  const [showFinishModal, setShowFinishModal] = useState(false);
+  const [finishMode, setFinishMode] = useState<string>('work');
+  const [finishStart, setFinishStart] = useState('09:00');
+  const [finishEnd, setFinishEnd] = useState('10:00');
+  const [finishLabel, setFinishLabel] = useState('');
 
   const [manualMode, setManualMode] = useState<string>('work');
   const [manualStart, setManualStart] = useState('09:00');
@@ -145,6 +165,7 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
     document.title = '10hr';
   };
 
+  // Finish captures the timed span and opens the review modal (does NOT log yet).
   const handleFinish = () => {
     if (!timerStart || !activeMode) return;
 
@@ -162,6 +183,25 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
       endTime = startTime + 0.01;
     }
 
+    setFinishMode(selectedMode || 'work');
+    setFinishLabel(activeMode.label);
+    setFinishStart(hoursToHHMM(startTime));
+    setFinishEnd(hoursToHHMM(endTime));
+    setValidationError('');
+    setShowFinishModal(true);
+  };
+
+  const handleConfirmFinish = () => {
+    setValidationError('');
+    const startTime = hhmmToHours(finishStart);
+    const endTime = hhmmToHours(finishEnd);
+
+    if (endTime <= startTime) {
+      setValidationError('End time must be after the start time');
+      return;
+    }
+
+    const mode = MODE_MAP[finishMode];
     const overlap = findOverlap(startTime, endTime);
     if (overlap) {
       setValidationError(`Overlaps with "${overlap.label}" (${formatHour(overlap.start_time)}–${formatHour(overlap.end_time)})`);
@@ -171,12 +211,19 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
     onAddSession({
       start_time: startTime,
       end_time: endTime,
-      label: activeMode.label,
-      color: activeMode.key,
+      label: finishLabel.trim() || mode.label,
+      color: mode.key,
     });
 
+    setShowFinishModal(false);
     setValidationError('');
     clearTimerState();
+  };
+
+  // Cancel = back out without logging; the timer keeps running so nothing is lost.
+  const handleCancelFinish = () => {
+    setShowFinishModal(false);
+    setValidationError('');
   };
 
   const openManualModal = () => {
@@ -467,6 +514,107 @@ export default function ControlsPanel({ onAddSession, isLoading = false, session
                 onClick={handleAddManualSession}
                 disabled={isLoading}
                 className="flex-1 px-4 py-2.5 sm:py-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold text-white transition-colors paper-shadow text-sm sm:text-base"
+              >
+                {isLoading ? 'Adding...' : 'Add Session'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showFinishModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="paper-card rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 lg:p-8 max-w-md w-full shadow-2xl paper-border max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl sm:text-2xl font-bold mb-1 ink-text">Session complete</h3>
+            <p className="text-sm ink-text-muted mb-4 sm:mb-6">Review the details, edit if needed, then add it.</p>
+
+            {validationError && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-400/10 text-red-700 dark:text-red-300 rounded-lg border border-red-200 text-sm">
+                {validationError}
+              </div>
+            )}
+
+            <div className="space-y-4 sm:space-y-5">
+              <div>
+                <label className="block text-sm font-medium ink-text-muted mb-2">Mode</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {MODES.map((mode) => {
+                    const isSelected = finishMode === mode.key;
+                    return (
+                      <button
+                        key={mode.key}
+                        onClick={() => {
+                          setFinishLabel((prev) =>
+                            prev === MODE_MAP[finishMode].label || prev === '' ? mode.label : prev
+                          );
+                          setFinishMode(mode.key);
+                        }}
+                        className="px-2 py-2.5 rounded-lg font-semibold text-xs sm:text-sm transition-all"
+                        style={{
+                          color: isSelected ? textOn(mode.color) : mode.color,
+                          backgroundColor: isSelected ? mode.color : withAlpha(mode.color, '1f'),
+                          boxShadow: isSelected
+                            ? `0 0 0 1px ${mode.color}`
+                            : `inset 0 0 0 1px ${withAlpha(mode.color, '4d')}`,
+                        }}
+                      >
+                        {mode.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium ink-text-muted mb-2">Start</label>
+                  <input
+                    type="time"
+                    value={finishStart}
+                    onChange={(e) => setFinishStart(e.target.value)}
+                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 paper-border rounded-lg text-base focus:ring-2 focus:ring-amber-600 focus:border-transparent ink-text"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium ink-text-muted mb-2">End</label>
+                  <input
+                    type="time"
+                    value={finishEnd}
+                    onChange={(e) => setFinishEnd(e.target.value)}
+                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 paper-border rounded-lg text-base focus:ring-2 focus:ring-amber-600 focus:border-transparent ink-text"
+                  />
+                </div>
+              </div>
+
+              <div className="text-sm ink-text-muted">
+                Duration: <span className="font-semibold ink-text">{Math.max(0, hhmmToHours(finishEnd) - hhmmToHours(finishStart)).toFixed(2)}h</span>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium ink-text-muted mb-2">Label</label>
+                <input
+                  type="text"
+                  value={finishLabel}
+                  onChange={(e) => setFinishLabel(e.target.value)}
+                  placeholder={MODE_MAP[finishMode].label}
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 paper-border rounded-lg focus:ring-2 focus:ring-amber-600 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6 sm:mt-8">
+              <button
+                onClick={handleCancelFinish}
+                disabled={isLoading}
+                className="flex-1 px-4 py-2.5 sm:py-3 bg-stone-200 hover:bg-stone-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold ink-text transition-colors paper-border text-sm sm:text-base"
+                title="Timer keeps running"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmFinish}
+                disabled={isLoading}
+                className="flex-1 px-4 py-2.5 sm:py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold text-white transition-colors paper-shadow text-sm sm:text-base"
               >
                 {isLoading ? 'Adding...' : 'Add Session'}
               </button>
