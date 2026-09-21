@@ -158,10 +158,11 @@
   .dark .paper-card,
   .dark .paper-shadow {
     box-shadow:
-      0 0 0 1px rgb(var(--glow-rgb) / 0.85),
-      inset 0 1px 0 0 rgb(var(--glow-rgb) / 0.7),
-      0 0 18px 0 rgb(var(--glow-rgb) / 0.5),
-      0 0 46px 4px rgb(var(--glow-rgb) / 0.2),
+      0 0 0 1px rgb(var(--glow-rgb) / 0.92),
+      inset 0 1px 0 0 rgb(var(--glow-rgb) / 0.78),
+      0 0 22px 0 rgb(var(--glow-rgb) / 0.58),
+      0 0 55px 5px rgb(var(--glow-rgb) / 0.3),
+      0 0 100px 12px rgb(var(--glow-rgb) / 0.15),
       0 18px 40px -24px rgba(0, 0, 0, 0.95);
   }
 
