@@ -209,12 +209,15 @@ export default function PlannerPanel({
   const [colorPreview, setColorPreview] = useState<{ name: string; color: string } | null>(null);
   const [renamingNb, setRenamingNb] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
-  // Collapsed sections (per notebook+month), remembered locally. Key: `${notebook}::${month}`.
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+  // Per-section collapse OVERRIDES (the user's explicit open/close choices),
+  // keyed `${notebook}::${month}`. A section absent from this map uses the
+  // DEFAULT, which keeps only the current month open (see isCollapsed) so the
+  // rail looks clean on load. Persisted locally.
+  const [collapseOverride, setCollapseOverride] = useState<Record<string, boolean>>(() => {
     try {
-      return new Set<string>(JSON.parse(localStorage.getItem('planner_collapsed') || '[]'));
+      return JSON.parse(localStorage.getItem('planner_collapse_v2') || '{}');
     } catch {
-      return new Set();
+      return {};
     }
   });
   // Inline rename of the pinned section header.
@@ -388,16 +391,18 @@ export default function PlannerPanel({
 
   // Section collapse (per notebook + month), persisted locally.
   const sectionKey = (month: string) => `${notebook}::${month || '__pinned__'}`;
-  const isCollapsed = (month: string) => collapsed.has(sectionKey(month));
+  // Default: only the current month is open; every other month AND the pinned /
+  // Private section start collapsed for a clean rail. The override map holds any
+  // section the user has since toggled.
+  const isCollapsed = (month: string) => {
+    const k = sectionKey(month);
+    if (k in collapseOverride) return collapseOverride[k];
+    return month !== currentMonth;
+  };
   const toggleCollapse = (month: string) => {
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      const k = sectionKey(month);
-      if (next.has(k)) next.delete(k);
-      else next.add(k);
-      localStorage.setItem('planner_collapsed', JSON.stringify([...next]));
-      return next;
-    });
+    const next = { ...collapseOverride, [sectionKey(month)]: !isCollapsed(month) };
+    setCollapseOverride(next);
+    localStorage.setItem('planner_collapse_v2', JSON.stringify(next));
   };
 
   // The pinned section's name (renamable); defaults to "Private".
