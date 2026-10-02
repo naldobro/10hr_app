@@ -138,9 +138,22 @@ export default function StageBook({
 
   const commit = (next: StageBubble[]) => activeId && onBubblesChange(activeId, next);
 
+  // The text of the bubble currently being edited lives only in `editingBubble`
+  // until blur. Any OTHER structural change (add / move / flip / remove) commits
+  // from `pageBubbles`, which still holds the last-saved text — so without this
+  // the in-progress edit would be silently reverted. Fold that buffer into the
+  // list first (same trim/drop-if-empty rule as commitText) so edits survive.
+  const flushEditing = (list: StageBubble[]): StageBubble[] => {
+    if (!editingBubble) return list;
+    const t = editingBubble.text.trim();
+    return t
+      ? list.map((b) => (b.id === editingBubble.id ? { ...b, text: t } : b))
+      : list.filter((b) => b.id !== editingBubble.id);
+  };
+
   const addBubble = (kind: StageBubble['kind']) => {
     const b: StageBubble = { id: uid(), text: '', kind, x: 0.28 + Math.random() * 0.44, y: 0.3 + Math.random() * 0.4 };
-    commit([...pageBubbles, b]);
+    commit([...flushEditing(pageBubbles), b]);
     setEditingBubble({ id: b.id, text: '' });
   };
 
@@ -153,10 +166,15 @@ export default function StageBook({
 
   const flipKind = (id: string) =>
     commit(
-      pageBubbles.map((b) => (b.id === id && b.kind !== 'note' ? { ...b, kind: b.kind === 'focus' ? 'avoid' : 'focus' } : b))
+      flushEditing(pageBubbles).map((b) =>
+        b.id === id && b.kind !== 'note' ? { ...b, kind: b.kind === 'focus' ? 'avoid' : 'focus' } : b
+      )
     );
 
-  const removeBubble = (id: string) => commit(pageBubbles.filter((b) => b.id !== id));
+  const removeBubble = (id: string) => {
+    if (editingBubble?.id === id) setEditingBubble(null);
+    commit(flushEditing(pageBubbles).filter((b) => b.id !== id));
+  };
 
   const onBubblePointerDown = (e: React.PointerEvent, b: StageBubble) => {
     // Phones: canvas is read-only (view + scroll) so nothing moves by accident.
@@ -182,7 +200,8 @@ export default function StageBook({
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       setDragPos((d) => {
-        if (d && d.id === b.id) commit(pageBubbles.map((bb) => (bb.id === b.id ? { ...bb, x: d.x, y: d.y } : bb)));
+        if (d && d.id === b.id)
+          commit(flushEditing(pageBubbles).map((bb) => (bb.id === b.id ? { ...bb, x: d.x, y: d.y } : bb)));
         return null;
       });
       if (!moved) setEditingBubble({ id: b.id, text: b.text });

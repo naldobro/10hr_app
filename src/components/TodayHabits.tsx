@@ -40,7 +40,7 @@ function Ring({ done, total, complete }: { done: number; total: number; complete
           r={r}
           fill="none"
           strokeWidth="4"
-          className="stroke-stone-200 dark:stroke-paper/10"
+          className="stroke-stone-200 dark:stroke-white/10"
         />
         <circle
           cx="24"
@@ -125,20 +125,20 @@ export default function TodayHabits({ habit, schedules, streaks, onToggle }: Tod
                   onClick={() => onToggle(key)}
                   className={`group relative flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl border text-center transition-all duration-200 active:scale-95 ${
                     on
-                      ? 'bg-emerald-500/15 border-emerald-500/30 shadow-[0_0_14px_rgba(16,185,129,0.25)]'
-                      : 'bg-stone-100 dark:bg-paper/[0.04] border-stone-200 dark:border-paper/[0.08] hover:bg-stone-200 dark:hover:bg-paper/[0.08] paper-border'
+                      ? 'bg-emerald-500/15 dark:bg-emerald-500/20 border-emerald-500/30 dark:border-emerald-400/40 shadow-[0_0_14px_rgba(16,185,129,0.25)] dark:shadow-[0_0_16px_rgba(16,185,129,0.3)]'
+                      : 'bg-stone-100 dark:bg-white/[0.06] border-stone-200 dark:border-white/10 hover:bg-stone-200 dark:hover:bg-white/[0.1]'
                   }`}
                 >
                   <div
                     className={`w-5 h-5 rounded-full flex items-center justify-center transition-all duration-200 ${
-                      on ? 'bg-emerald-500 scale-100' : 'bg-stone-300/60 dark:bg-paper/10 scale-90'
+                      on ? 'bg-emerald-500 scale-100' : 'bg-stone-300/60 dark:bg-white/15 scale-90'
                     }`}
                   >
                     {on && <Check className="w-3 h-3 text-white stroke-[3]" />}
                   </div>
                   <span
                     className={`text-[10px] sm:text-[11px] font-bold leading-none ${
-                      on ? 'text-emerald-600 dark:text-emerald-400' : 'ink-text-muted'
+                      on ? 'text-emerald-600 dark:text-emerald-300' : 'ink-text-muted'
                     }`}
                   >
                     {label}
@@ -161,15 +161,15 @@ export default function TodayHabits({ habit, schedules, streaks, onToggle }: Tod
                 onClick={() => onToggle(key)}
                 className={`flex items-center justify-between gap-2 px-3.5 py-3 rounded-xl border transition-all duration-200 active:scale-[0.98] ${
                   on
-                    ? 'bg-emerald-500/15 border-emerald-500/30 shadow-[0_0_14px_rgba(16,185,129,0.25)]'
-                    : 'bg-stone-100 dark:bg-paper/[0.04] border-stone-200 dark:border-paper/[0.08] hover:bg-stone-200 dark:hover:bg-paper/[0.08] paper-border'
+                    ? 'bg-emerald-500/15 dark:bg-emerald-500/20 border-emerald-500/30 dark:border-emerald-400/40 shadow-[0_0_14px_rgba(16,185,129,0.25)] dark:shadow-[0_0_16px_rgba(16,185,129,0.3)]'
+                    : 'bg-stone-100 dark:bg-white/[0.06] border-stone-200 dark:border-white/10 hover:bg-stone-200 dark:hover:bg-white/[0.1]'
                 }`}
               >
                 <span className="flex items-center gap-2 min-w-0">
                   <span className="text-lg flex-shrink-0">{icon}</span>
                   <span
                     className={`text-sm font-bold truncate ${
-                      on ? 'text-emerald-600 dark:text-emerald-400' : 'ink-text'
+                      on ? 'text-emerald-600 dark:text-emerald-300' : 'ink-text'
                     }`}
                   >
                     {label}
@@ -179,7 +179,7 @@ export default function TodayHabits({ habit, schedules, streaks, onToggle }: Tod
                   <StreakFlame count={streaks[key] || 0} />
                   <span
                     className={`w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 ${
-                      on ? 'bg-emerald-500 scale-100' : 'bg-stone-300/60 dark:bg-paper/10 scale-90'
+                      on ? 'bg-emerald-500 scale-100' : 'bg-stone-300/60 dark:bg-white/15 scale-90'
                     }`}
                   >
                     {on && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}

@@ -93,6 +93,25 @@ export function computeStreak(
   return streak;
 }
 
+/** A blank today-row for optimistic UI before the real row exists in the DB. */
+export function emptyHabitEntry(date: string): HabitEntry {
+  return {
+    id: '',
+    user_id: 'single-user',
+    date,
+    prayer_fajr: false,
+    prayer_dhuhr: false,
+    prayer_asr: false,
+    prayer_maghrib: false,
+    prayer_isha: false,
+    gym: false,
+    outreach: false,
+    learn: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
 export const allPrayersDone = (entry: HabitEntry | undefined): boolean =>
   !!entry &&
   entry.prayer_fajr &&

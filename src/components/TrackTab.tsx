@@ -18,6 +18,7 @@ import {
   toDateStr,
   computeStreak,
   allPrayersDone,
+  emptyHabitEntry,
 } from '../lib/habits';
 import { Undo2, Redo2, ChevronRight, ChevronLeft, Settings, X } from 'lucide-react';
 
@@ -178,62 +179,71 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
     }
   };
 
+  // Streaks are derived from a ~90-day window held in a ref so a tap can
+  // recompute them locally (no network round-trip per tap).
+  const habitHistoryRef = useRef<Map<string, HabitEntry>>(new Map());
+
+  const recomputeStreaks = useCallback(() => {
+    const map = habitHistoryRef.current;
+    setHabitStreaks({
+      prayer: computeStreak(map, 'prayer', habitSchedules, allPrayersDone),
+      gym: computeStreak(map, 'gym', habitSchedules, e => !!e?.gym),
+      outreach: computeStreak(map, 'outreach', habitSchedules, e => !!e?.outreach),
+      learn: computeStreak(map, 'learn', habitSchedules, e => !!e?.learn),
+    });
+  }, [habitSchedules]);
+
   const loadHabitStreaks = async () => {
     try {
       const today = new Date();
       const start = new Date(today);
       start.setDate(start.getDate() - 89); // ~90-day window
       const entries = await db.habits.getByDateRange(toDateStr(start), toDateStr(today));
-      const map = new Map(entries.map(e => [e.date, e]));
-      setHabitStreaks({
-        prayer: computeStreak(map, 'prayer', habitSchedules, allPrayersDone),
-        gym: computeStreak(map, 'gym', habitSchedules, e => !!e?.gym),
-        outreach: computeStreak(map, 'outreach', habitSchedules, e => !!e?.outreach),
-        learn: computeStreak(map, 'learn', habitSchedules, e => !!e?.learn),
-      });
+      habitHistoryRef.current = new Map(entries.map(e => [e.date, e]));
+      recomputeStreaks();
     } catch {
       // Table might not exist yet
     }
   };
 
-  // One-tap toggle from the pinned "Today" strip. Always targets today's row
-  // regardless of which day/month the calendar is showing. Reuses the existing
-  // habit_toggle undo action so a tap is Ctrl/Cmd+Z-undoable like calendar ticks.
-  const handleTodayHabitToggle = async (field: HabitField) => {
+  // One-tap toggle from the pinned "Today" strip. Optimistic: the UI and
+  // streaks update instantly from local state, and the DB write happens in the
+  // background (fire-and-forget). Always targets today's row regardless of which
+  // day/month the calendar shows, and reuses the existing habit_toggle undo
+  // action so a tap is Ctrl/Cmd+Z-undoable like calendar ticks.
+  const handleTodayHabitToggle = (field: HabitField) => {
     const today = todayStr();
-    try {
-      const current = todayHabit;
-      const newValue = !(current?.[field] || false);
-      const updated = await db.habits.upsert({
-        date: today,
-        ...(current ? {} : {
-          prayer_fajr: false,
-          prayer_dhuhr: false,
-          prayer_asr: false,
-          prayer_maghrib: false,
-          prayer_isha: false,
-          gym: false,
-          outreach: false,
-          learn: false,
-        }),
-        [field]: newValue,
+    const current = todayHabit;
+    const newValue = !(current?.[field] || false);
+    const optimistic: HabitEntry = {
+      ...(current ?? emptyHabitEntry(today)),
+      [field]: newValue,
+    };
+
+    // Instant local update — no await.
+    setTodayHabit(optimistic);
+    setHabitMap(prev => new Map(prev).set(today, optimistic));
+    if (today === currentDayString) setCurrentHabit(optimistic);
+    habitHistoryRef.current.set(today, optimistic);
+    recomputeStreaks();
+
+    undoManager.addToUndoHistory({
+      type: 'habit_toggle',
+      date: today,
+      field: field as string,
+      prev: !newValue,
+      timestamp: Date.now(),
+    });
+    updateUndoRedoState();
+
+    // Persist in the background; only the one toggled column is sent so quick
+    // successive taps never clobber each other.
+    db.habits
+      .upsert({ date: today, [field]: newValue })
+      .catch(err => {
+        console.error('Error saving habit:', err);
+        showFeedback('error', "Couldn't save — check your connection");
       });
-      setTodayHabit(updated);
-      setHabitMap(prev => new Map(prev).set(today, updated));
-      // Keep the calendar's selected-day panel in sync if it's showing today.
-      if (today === currentDayString) setCurrentHabit(updated);
-      undoManager.addToUndoHistory({
-        type: 'habit_toggle',
-        date: today,
-        field: field as string,
-        prev: !newValue,
-        timestamp: Date.now(),
-      });
-      updateUndoRedoState();
-      loadHabitStreaks();
-    } catch (err) {
-      console.error('Error toggling habit:', err);
-    }
   };
 
   const loadHabitData = async () => {
@@ -320,7 +330,8 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
       // Keep the pinned "Today" strip + streaks in sync when editing today.
       if (currentDayString === todayStr()) {
         setTodayHabit(updated);
-        loadHabitStreaks();
+        habitHistoryRef.current.set(currentDayString, updated);
+        recomputeStreaks();
       }
       // Record one undo step per toggle so habit ticks join the undo/redo stack.
       undoManager.addToUndoHistory({
