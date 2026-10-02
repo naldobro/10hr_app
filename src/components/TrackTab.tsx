@@ -11,6 +11,14 @@ import TimelineGraph from './TimelineGraph';
 import TodayFocus from './TodayFocus';
 import ControlsPanel from './ControlsPanel';
 import MilestoneQuote from './MilestoneQuote';
+import TodayHabits from './TodayHabits';
+import {
+  HabitField,
+  todayStr,
+  toDateStr,
+  computeStreak,
+  allPrayersDone,
+} from '../lib/habits';
 import { Undo2, Redo2, ChevronRight, ChevronLeft, Settings, X } from 'lucide-react';
 
 interface TrackTabProps {
@@ -33,6 +41,10 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
   const [currentHabit, setCurrentHabit] = useState<HabitEntry | null>(null);
   const [habitViewOpen, setHabitViewOpen] = useState(false);
   const [habitSchedules, setHabitSchedules] = useState<Record<string, number[]>>({});
+  // Today's habit row, loaded independently of the browsed month so the pinned
+  // "Today" strip always reflects today even while paging the calendar.
+  const [todayHabit, setTodayHabit] = useState<HabitEntry | null>(null);
+  const [habitStreaks, setHabitStreaks] = useState<Record<string, number>>({});
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   // The Track tab's own single global Focus note — day-independent, and entirely
   // separate from the Vision tab's Focus (that one lives in vision_settings.focus_note).
@@ -72,6 +84,16 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
     updateUndoRedoState();
   }, [selectedDay]);
 
+  // The "Today" strip is month-independent: load today's row once on mount.
+  useEffect(() => {
+    loadTodayHabit();
+  }, []);
+
+  // Recompute streaks whenever the schedules land (they decide which days count).
+  useEffect(() => {
+    loadHabitStreaks();
+  }, [habitSchedules]);
+
   const handleUndo = useCallback(async () => {
     if (!undoManager.canUndo()) return;
     if (await undoManager.undo()) {
@@ -80,6 +102,8 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
       await loadFocus();
       await loadCurrentHabit();
       await loadHabitData();
+      await loadTodayHabit();
+      await loadHabitStreaks();
       updateUndoRedoState();
       showFeedback('success', 'Undone');
     }
@@ -93,6 +117,8 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
       await loadFocus();
       await loadCurrentHabit();
       await loadHabitData();
+      await loadTodayHabit();
+      await loadHabitStreaks();
       updateUndoRedoState();
       showFeedback('success', 'Redone');
     }
@@ -141,6 +167,72 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
       setHabitSchedules(prev => ({ ...prev, [habitKey]: activeDays }));
     } catch (err) {
       console.error('Error updating schedule:', err);
+    }
+  };
+
+  const loadTodayHabit = async () => {
+    try {
+      setTodayHabit(await db.habits.getByDate(todayStr()));
+    } catch {
+      // Table might not exist yet
+    }
+  };
+
+  const loadHabitStreaks = async () => {
+    try {
+      const today = new Date();
+      const start = new Date(today);
+      start.setDate(start.getDate() - 89); // ~90-day window
+      const entries = await db.habits.getByDateRange(toDateStr(start), toDateStr(today));
+      const map = new Map(entries.map(e => [e.date, e]));
+      setHabitStreaks({
+        prayer: computeStreak(map, 'prayer', habitSchedules, allPrayersDone),
+        gym: computeStreak(map, 'gym', habitSchedules, e => !!e?.gym),
+        outreach: computeStreak(map, 'outreach', habitSchedules, e => !!e?.outreach),
+        learn: computeStreak(map, 'learn', habitSchedules, e => !!e?.learn),
+      });
+    } catch {
+      // Table might not exist yet
+    }
+  };
+
+  // One-tap toggle from the pinned "Today" strip. Always targets today's row
+  // regardless of which day/month the calendar is showing. Reuses the existing
+  // habit_toggle undo action so a tap is Ctrl/Cmd+Z-undoable like calendar ticks.
+  const handleTodayHabitToggle = async (field: HabitField) => {
+    const today = todayStr();
+    try {
+      const current = todayHabit;
+      const newValue = !(current?.[field] || false);
+      const updated = await db.habits.upsert({
+        date: today,
+        ...(current ? {} : {
+          prayer_fajr: false,
+          prayer_dhuhr: false,
+          prayer_asr: false,
+          prayer_maghrib: false,
+          prayer_isha: false,
+          gym: false,
+          outreach: false,
+          learn: false,
+        }),
+        [field]: newValue,
+      });
+      setTodayHabit(updated);
+      setHabitMap(prev => new Map(prev).set(today, updated));
+      // Keep the calendar's selected-day panel in sync if it's showing today.
+      if (today === currentDayString) setCurrentHabit(updated);
+      undoManager.addToUndoHistory({
+        type: 'habit_toggle',
+        date: today,
+        field: field as string,
+        prev: !newValue,
+        timestamp: Date.now(),
+      });
+      updateUndoRedoState();
+      loadHabitStreaks();
+    } catch (err) {
+      console.error('Error toggling habit:', err);
     }
   };
 
@@ -225,6 +317,11 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
       });
       setCurrentHabit(updated);
       setHabitMap(prev => new Map(prev).set(currentDayString, updated));
+      // Keep the pinned "Today" strip + streaks in sync when editing today.
+      if (currentDayString === todayStr()) {
+        setTodayHabit(updated);
+        loadHabitStreaks();
+      }
       // Record one undo step per toggle so habit ticks join the undo/redo stack.
       undoManager.addToUndoHistory({
         type: 'habit_toggle',
@@ -405,6 +502,15 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
           </div>
         </div>
       )}
+
+      {/* Pinned "Today" strip — one-tap recurring-habit completion, always
+          showing today regardless of the browsed calendar month. */}
+      <TodayHabits
+        habit={todayHabit}
+        schedules={habitSchedules}
+        streaks={habitStreaks}
+        onToggle={handleTodayHabitToggle}
+      />
 
       {/* Toolbar — Undo/Redo plus the global Focus note pill, kept out of the
           calendar so it never overlaps the days. */}
