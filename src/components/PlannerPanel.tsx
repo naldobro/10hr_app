@@ -1669,9 +1669,22 @@ function DocEditor({
   // default paste turns them into anything lossy (or nothing at all).
   const onEditorPaste = (e: React.ClipboardEvent) => {
     const files = Array.from(e.clipboardData?.files || []).filter((f) => f.type.startsWith('image/'));
-    if (files.length === 0) return;
+    if (files.length > 0) {
+      e.preventDefault();
+      void insertImageFiles(files);
+      return;
+    }
+    // Everything else pastes as PLAIN TEXT. Pasting the clipboard's raw HTML let
+    // copied block structure (stray paragraphs, even whole <details> toggles) get
+    // re-injected — which is what spawned nested toggles, orphaned lines, and
+    // broken collapse. Plain text can't carry structure, so it stays inside the
+    // current block; newlines become <br> so multi-line pastes keep their shape.
+    const text = e.clipboardData?.getData('text/plain') ?? '';
     e.preventDefault();
-    void insertImageFiles(files);
+    if (!text) return;
+    const html = escapeHtml(text).replace(/\r\n?/g, '\n').split('\n').join('<br>');
+    document.execCommand('insertHTML', false, html);
+    afterEdit();
   };
 
   const onEditorDrop = (e: React.DragEvent) => {
