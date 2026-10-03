@@ -570,6 +570,17 @@ export default function PlannerPanel({
         .doc-body ul.doc-tasks li.doc-task[data-checked="true"]::before { background: #059669; border-color: #059669; }
         .doc-body ul.doc-tasks li.doc-task[data-checked="true"]::after { content: ''; position: absolute; left: .35em; top: .28em; width: .28em; height: .55em; border: solid #fff; border-width: 0 .16em .16em 0; transform: rotate(45deg); pointer-events: none; }
         .doc-body ul.doc-tasks li.doc-task[data-checked="true"] { color: #a8a29e; text-decoration: line-through; }
+        /* toggle / collapsible block — click the ▸ to open/close; content stays saved while hidden */
+        .doc-body .doc-toggle { margin: .5em 0; border-left: 2px solid rgba(120,120,120,.22); padding-left: .15em; }
+        .doc-body .doc-toggle-head { position: relative; padding-left: 1.5em; font-weight: 600; cursor: text; }
+        .doc-body .doc-toggle-head::before {
+          content: '▸'; position: absolute; left: .35em; top: 0; font-size: .9em; line-height: 1.65;
+          color: #a8a29e; cursor: pointer; user-select: none; transition: transform .15s ease; transform-origin: 45% 55%;
+        }
+        .doc-body .doc-toggle[data-open="true"] > .doc-toggle-head::before { transform: rotate(90deg); }
+        .doc-body .doc-toggle-head:empty::after { content: 'Toggle'; color: #a8a29e; font-weight: 600; }
+        .doc-body .doc-toggle-body { padding-left: 1.5em; margin-top: .1em; }
+        .doc-body .doc-toggle[data-open="false"] > .doc-toggle-body { display: none; }
         /* linked-page reference chips (collapsed; click opens the page in a window) */
         .doc-body a.doc-ref {
           display: inline-flex; align-items: center; gap: .3em;
@@ -1309,7 +1320,7 @@ function DocEditor({
   const setEmpty = (el: HTMLDivElement | null) => {
     if (!el) return;
     const hasText = !!(el.textContent && el.textContent.trim());
-    const hasBlocks = !!el.querySelector('table, hr, img, ul, ol');
+    const hasBlocks = !!el.querySelector('table, hr, img, ul, ol, .doc-toggle');
     el.dataset.empty = hasText || hasBlocks ? 'false' : 'true';
   };
 
@@ -1591,6 +1602,30 @@ function DocEditor({
       false,
       '<ul class="doc-tasks"><li class="doc-task" data-checked="false">&#8203;</li></ul>'
     );
+    afterEdit();
+  };
+
+  // Insert a collapsible toggle: a clickable head (title) + a hidden-able body.
+  // Content inside stays in the saved HTML even when collapsed. The head text is
+  // pre-selected so typing names the toggle immediately.
+  const insertToggle = () => {
+    ensureFocus();
+    const id = 'tg-' + Date.now().toString(36);
+    document.execCommand(
+      'insertHTML',
+      false,
+      `<div class="doc-toggle" data-open="true"><div class="doc-toggle-head" id="${id}">Toggle</div><div class="doc-toggle-body"><p><br></p></div></div><p><br></p>`
+    );
+    const head = document.getElementById(id);
+    if (head) {
+      head.removeAttribute('id');
+      const r = document.createRange();
+      r.selectNodeContents(head); // select "Toggle" so the first keystroke replaces it
+      const s = window.getSelection();
+      s?.removeAllRanges();
+      s?.addRange(r);
+      savedRange.current = r.cloneRange();
+    }
     afterEdit();
   };
 
@@ -1896,6 +1931,7 @@ function DocEditor({
         <TB onClick={() => exec('insertUnorderedList')} title="Bulleted list"><List className="w-4 h-4" /></TB>
         <TB onClick={() => exec('insertOrderedList')} title="Numbered list"><ListOrdered className="w-4 h-4" /></TB>
         <TB onClick={insertChecklist} title="Checklist (tick boxes)"><ListTodo className="w-4 h-4" /></TB>
+        <TB onClick={insertToggle} title="Toggle (collapsible section)"><ChevronRight className="w-4 h-4" /></TB>
 
         <Sep />
         {/* table insert with a quick size picker */}
@@ -1985,6 +2021,7 @@ function DocEditor({
             contentEditable
             suppressContentEditableWarning
             onInput={afterEdit}
+            onKeyDown={onEditorKeyDown}
             onClick={onTaskClick}
             onPaste={onEditorPaste}
             onDrop={onEditorDrop}
@@ -1999,6 +2036,7 @@ function DocEditor({
           contentEditable
           suppressContentEditableWarning
           onInput={afterEdit}
+          onKeyDown={onEditorKeyDown}
           onClick={onTaskClick}
           onPaste={onEditorPaste}
           onDrop={onEditorDrop}
@@ -2064,6 +2102,28 @@ function DocEditor({
 
   // Toggle a checklist item when its tick box (the left ~26px) is clicked, or
   // select an image for resizing when the image itself is clicked.
+  // Enter inside a toggle title drops the caret into its body instead of
+  // splitting the head into two lines.
+  function onEditorKeyDown(e: React.KeyboardEvent) {
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    const sel = window.getSelection();
+    const node = sel?.anchorNode;
+    if (!node) return;
+    const el = node.nodeType === 3 ? node.parentElement : (node as HTMLElement);
+    const head = el?.closest?.('.doc-toggle-head') as HTMLElement | null;
+    if (!head) return;
+    e.preventDefault();
+    const body = head.nextElementSibling as HTMLElement | null; // .doc-toggle-body
+    const target = (body?.querySelector('p, li, div') as HTMLElement | null) || body;
+    if (target) {
+      const r = document.createRange();
+      r.selectNodeContents(target);
+      r.collapse(true);
+      sel?.removeAllRanges();
+      sel?.addRange(r);
+    }
+  }
+
   function onTaskClick(e: React.MouseEvent) {
     const target = e.target as HTMLElement;
     // Linked-page chip: open it in a window (unless this editor is itself a linked
@@ -2077,6 +2137,19 @@ function DocEditor({
     }
     if (target.tagName === 'IMG') {
       selectImage(target as HTMLImageElement);
+      return;
+    }
+    // Toggle block: clicking the ▸ caret (left ~24px of the head) opens/closes it;
+    // clicking anywhere else in the head just places the caret to edit the title.
+    const head = target.closest?.('.doc-toggle-head') as HTMLElement | null;
+    if (head) {
+      if (e.clientX - head.getBoundingClientRect().left <= 24) {
+        const tg = head.parentElement as HTMLElement | null;
+        if (tg) {
+          tg.dataset.open = tg.dataset.open === 'true' ? 'false' : 'true';
+          scheduleSave();
+        }
+      }
       return;
     }
     const li = target.closest?.('li.doc-task') as HTMLElement | null;
