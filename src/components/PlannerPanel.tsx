@@ -543,7 +543,10 @@ export default function PlannerPanel({
     <div className="fixed inset-0 z-[80]" onClick={onClose}>
       <div className="absolute inset-0 bg-black/30" />
       <style>{`
-        .doc-body { line-height: 1.65; }
+        /* Paint/layout containment + own compositor layer so each keystroke
+           repaints only the text, never forcing the parent paper-card's big
+           (mode-active) glow shadows to re-rasterize — that was the typing jank. */
+        .doc-body { line-height: 1.65; contain: content; transform: translateZ(0); }
         .doc-body:focus { outline: none; }
         .doc-body h1 { font-size: 1.6rem; font-weight: 700; margin: .6em 0 .3em; }
         .doc-body h2 { font-size: 1.25rem; font-weight: 700; margin: .6em 0 .25em; }
