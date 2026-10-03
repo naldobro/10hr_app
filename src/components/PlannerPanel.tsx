@@ -570,17 +570,23 @@ export default function PlannerPanel({
         .doc-body ul.doc-tasks li.doc-task[data-checked="true"]::before { background: #059669; border-color: #059669; }
         .doc-body ul.doc-tasks li.doc-task[data-checked="true"]::after { content: ''; position: absolute; left: .35em; top: .28em; width: .28em; height: .55em; border: solid #fff; border-width: 0 .16em .16em 0; transform: rotate(45deg); pointer-events: none; }
         .doc-body ul.doc-tasks li.doc-task[data-checked="true"] { color: #a8a29e; text-decoration: line-through; }
-        /* toggle / collapsible block — click the ▸ to open/close; content stays saved while hidden */
-        .doc-body .doc-toggle { margin: .5em 0; border-left: 2px solid rgba(120,120,120,.22); padding-left: .15em; }
-        .doc-body .doc-toggle-head { position: relative; padding-left: 1.5em; font-weight: 600; cursor: text; }
-        .doc-body .doc-toggle-head::before {
-          content: '▸'; position: absolute; left: .35em; top: 0; font-size: .9em; line-height: 1.65;
-          color: #a8a29e; cursor: pointer; user-select: none; transition: transform .15s ease; transform-origin: 45% 55%;
+        /* toggle / collapsible block — native <details>, so open/close is reliable
+           and the body is never lost (it stays in the DOM + saved HTML when closed) */
+        .doc-body details.doc-toggle { margin: .5em 0; border-left: 2px solid rgba(120,120,120,.22); padding-left: .2em; }
+        .doc-body details.doc-toggle > summary.doc-toggle-head {
+          list-style: none; position: relative; padding-left: 2em; font-weight: 600; cursor: text; outline: none;
         }
-        .doc-body .doc-toggle[data-open="true"] > .doc-toggle-head::before { transform: rotate(90deg); }
-        .doc-body .doc-toggle-head:empty::after { content: 'Toggle'; color: #a8a29e; font-weight: 600; }
-        .doc-body .doc-toggle-body { padding-left: 1.5em; margin-top: .1em; }
-        .doc-body .doc-toggle[data-open="false"] > .doc-toggle-body { display: none; }
+        .doc-body details.doc-toggle > summary.doc-toggle-head::-webkit-details-marker { display: none; }
+        .doc-body details.doc-toggle > summary.doc-toggle-head::marker { content: ''; }
+        .doc-body details.doc-toggle > summary.doc-toggle-head::before {
+          content: '▶'; position: absolute; left: 0; top: 0; width: 1.4em; text-align: center;
+          font-size: 1.45em; line-height: .95; color: #b0aca6;
+          cursor: pointer; user-select: none; transition: transform .15s ease; transform-origin: 50% 55%;
+        }
+        .doc-body details.doc-toggle > summary.doc-toggle-head:hover::before { color: #d6d3d1; }
+        .doc-body details.doc-toggle[open] > summary.doc-toggle-head::before { transform: rotate(90deg); }
+        .doc-body details.doc-toggle > summary.doc-toggle-head:empty::after { content: 'Toggle'; color: #a8a29e; font-weight: 600; }
+        .doc-body details.doc-toggle > .doc-toggle-body { padding-left: 2em; margin-top: .2em; }
         /* linked-page reference chips (collapsed; click opens the page in a window) */
         .doc-body a.doc-ref {
           display: inline-flex; align-items: center; gap: .3em;
@@ -1605,16 +1611,17 @@ function DocEditor({
     afterEdit();
   };
 
-  // Insert a collapsible toggle: a clickable head (title) + a hidden-able body.
-  // Content inside stays in the saved HTML even when collapsed. The head text is
-  // pre-selected so typing names the toggle immediately.
+  // Insert a collapsible toggle built on native <details>: a clickable summary
+  // (title) + a body that collapses reliably. The body stays in the saved HTML
+  // even when closed, so content is never lost. The title is pre-selected so the
+  // first keystroke names the toggle.
   const insertToggle = () => {
     ensureFocus();
     const id = 'tg-' + Date.now().toString(36);
     document.execCommand(
       'insertHTML',
       false,
-      `<div class="doc-toggle" data-open="true"><div class="doc-toggle-head" id="${id}">Toggle</div><div class="doc-toggle-body"><p><br></p></div></div><p><br></p>`
+      `<details class="doc-toggle" open><summary class="doc-toggle-head" id="${id}">Toggle</summary><div class="doc-toggle-body"><p><br></p></div></details><p><br></p>`
     );
     const head = document.getElementById(id);
     if (head) {
@@ -2102,25 +2109,63 @@ function DocEditor({
 
   // Toggle a checklist item when its tick box (the left ~26px) is clicked, or
   // select an image for resizing when the image itself is clicked.
-  // Enter inside a toggle title drops the caret into its body instead of
-  // splitting the head into two lines.
+  // Keyboard guards for toggles: Enter in a title descends into the body, and
+  // Backspace/Delete can never merge a block INTO a toggle (that used to wipe a
+  // collapsed toggle's hidden body) — instead they open it and park the caret.
   function onEditorKeyDown(e: React.KeyboardEvent) {
-    if (e.key !== 'Enter' || e.shiftKey) return;
     const sel = window.getSelection();
     const node = sel?.anchorNode;
     if (!node) return;
-    const el = node.nodeType === 3 ? node.parentElement : (node as HTMLElement);
-    const head = el?.closest?.('.doc-toggle-head') as HTMLElement | null;
-    if (!head) return;
-    e.preventDefault();
-    const body = head.nextElementSibling as HTMLElement | null; // .doc-toggle-body
-    const target = (body?.querySelector('p, li, div') as HTMLElement | null) || body;
-    if (target) {
-      const r = document.createRange();
-      r.selectNodeContents(target);
-      r.collapse(true);
-      sel?.removeAllRanges();
-      sel?.addRange(r);
+    const host = hostOf(node);
+    if (!host) return;
+
+    if (e.key === 'Enter' && !e.shiftKey) {
+      const el = node.nodeType === 3 ? node.parentElement : (node as HTMLElement);
+      const head = el?.closest?.('summary.doc-toggle-head') as HTMLElement | null;
+      if (!head) return;
+      e.preventDefault();
+      const d = head.parentElement as HTMLDetailsElement | null;
+      if (d && !d.open) d.open = true; // descending always reveals the body
+      const body = head.nextElementSibling as HTMLElement | null; // .doc-toggle-body
+      const target = (body?.querySelector('p, li, div') as HTMLElement | null) || body;
+      if (target) placeCaret(target, true);
+      return;
+    }
+
+    if ((e.key === 'Backspace' || e.key === 'Delete') && sel!.isCollapsed && sel!.rangeCount) {
+      const range = sel!.getRangeAt(0);
+      // The top-level block the caret sits in (a direct child of the editor host).
+      let block: HTMLElement | null = node.nodeType === 3 ? node.parentElement : (node as HTMLElement);
+      while (block && block.parentElement && block.parentElement !== host) block = block.parentElement;
+      if (!block || block.parentElement !== host) return;
+      if (block.matches?.('details.doc-toggle')) return; // caret is already inside a toggle
+
+      const probe = range.cloneRange();
+      probe.selectNodeContents(block);
+
+      if (e.key === 'Backspace') {
+        probe.setEnd(range.startContainer, range.startOffset);
+        if (probe.toString().length !== 0) return; // not at the block's start
+        const prev = block.previousElementSibling as HTMLElement | null;
+        if (prev?.matches?.('details.doc-toggle')) {
+          e.preventDefault();
+          (prev as HTMLDetailsElement).open = true;
+          placeCaretInToggleBody(prev, false);
+          if (isEmptyBlock(block)) block.remove();
+          scheduleSave();
+        }
+      } else {
+        probe.setStart(range.endContainer, range.endOffset);
+        if (probe.toString().length !== 0) return; // not at the block's end
+        const next = block.nextElementSibling as HTMLElement | null;
+        if (next?.matches?.('details.doc-toggle')) {
+          e.preventDefault();
+          (next as HTMLDetailsElement).open = true;
+          placeCaretInToggleBody(next, true);
+          if (isEmptyBlock(block)) block.remove();
+          scheduleSave();
+        }
+      }
     }
   }
 
@@ -2139,16 +2184,17 @@ function DocEditor({
       selectImage(target as HTMLImageElement);
       return;
     }
-    // Toggle block: clicking the ▸ caret (left ~24px of the head) opens/closes it;
-    // clicking anywhere else in the head just places the caret to edit the title.
-    const head = target.closest?.('.doc-toggle-head') as HTMLElement | null;
+    // Toggle block (native <details>): clicking the ▶ arrow (left ~30px of the
+    // summary) opens/closes it; clicking anywhere else in the summary just edits
+    // the title. We always preventDefault so the native summary-toggle never
+    // fires on its own — we drive `open` ourselves and persist it.
+    const head = target.closest?.('summary.doc-toggle-head') as HTMLElement | null;
     if (head) {
-      if (e.clientX - head.getBoundingClientRect().left <= 24) {
-        const tg = head.parentElement as HTMLElement | null;
-        if (tg) {
-          tg.dataset.open = tg.dataset.open === 'true' ? 'false' : 'true';
-          scheduleSave();
-        }
+      e.preventDefault();
+      const d = head.parentElement as HTMLDetailsElement | null;
+      if (d && e.clientX - head.getBoundingClientRect().left <= 30) {
+        d.open = !d.open;
+        scheduleSave();
       }
       return;
     }
@@ -2158,6 +2204,27 @@ function DocEditor({
     li.dataset.checked = li.dataset.checked === 'true' ? 'false' : 'true';
     scheduleSave();
   }
+}
+
+// Collapse the live selection to the start/end of an element's contents.
+function placeCaret(el: HTMLElement, atStart: boolean) {
+  const r = document.createRange();
+  r.selectNodeContents(el);
+  r.collapse(atStart);
+  const s = window.getSelection();
+  s?.removeAllRanges();
+  s?.addRange(r);
+}
+
+// Park the caret at the start/end of a toggle's body (its nearest editable edge).
+function placeCaretInToggleBody(det: HTMLElement, atStart: boolean) {
+  const body = det.querySelector('.doc-toggle-body') as HTMLElement | null;
+  const edge = (atStart ? body?.firstElementChild : body?.lastElementChild) as HTMLElement | null;
+  placeCaret(edge || body || det, atStart);
+}
+
+function isEmptyBlock(block: HTMLElement): boolean {
+  return (block.textContent ?? '').trim() === '' && !block.querySelector('img,table,hr,ul,ol,details');
 }
 
 function TB({ onClick, title, children }: { onClick: () => void; title: string; children: React.ReactNode }) {
