@@ -78,11 +78,13 @@ const INLINE = '__inline__';
 const isInline = (d: VisionDoc) => d.month === INLINE;
 
 // Quick presets ------------------------------------------------------------
-const FONT_SIZES: { label: string; size: string; px: string }[] = [
-  { label: 'Small', size: '2', px: '13px' },
-  { label: 'Normal', size: '3', px: '15px' },
-  { label: 'Large', size: '5', px: '20px' },
-  { label: 'Huge', size: '7', px: '28px' },
+// Text-style presets are real block headings (not font-size spans) so headings
+// are bold by default and their size is controlled by the .doc-body h1/h2/h3 CSS.
+const FONT_SIZES: { label: string; hint: string; block: string; px: string; weight: number }[] = [
+  { label: 'Title', hint: 'Biggest', block: '<h1>', px: '30px', weight: 800 },
+  { label: 'Heading', hint: 'Large', block: '<h2>', px: '23px', weight: 700 },
+  { label: 'Subheading', hint: 'Medium', block: '<h3>', px: '18px', weight: 700 },
+  { label: 'Body', hint: 'Normal', block: '<p>', px: '15px', weight: 400 },
 ];
 // Accent colours offered for notebook cards in the gallery.
 const NOTEBOOK_COLORS = [
@@ -548,8 +550,9 @@ export default function PlannerPanel({
            (mode-active) glow shadows to re-rasterize — that was the typing jank. */
         .doc-body { line-height: 1.65; contain: content; transform: translateZ(0); }
         .doc-body:focus { outline: none; }
-        .doc-body h1 { font-size: 1.6rem; font-weight: 700; margin: .6em 0 .3em; }
-        .doc-body h2 { font-size: 1.25rem; font-weight: 700; margin: .6em 0 .25em; }
+        .doc-body h1 { font-size: 2rem; font-weight: 800; letter-spacing: -.01em; margin: .6em 0 .3em; line-height: 1.2; }
+        .doc-body h2 { font-size: 1.5rem; font-weight: 700; margin: .6em 0 .25em; line-height: 1.25; }
+        .doc-body h3 { font-size: 1.2rem; font-weight: 700; margin: .5em 0 .2em; line-height: 1.3; }
         .doc-body p { margin: .35em 0; }
         .doc-body ul { list-style: disc; padding-left: 1.4rem; margin: .35em 0; }
         .doc-body ol { list-style: decimal; padding-left: 1.4rem; margin: .35em 0; }
@@ -1876,26 +1879,30 @@ function DocEditor({
         <TB onClick={() => exec('italic')} title="Italic"><Italic className="w-4 h-4" /></TB>
         <TB onClick={() => exec('underline')} title="Underline"><Underline className="w-4 h-4" /></TB>
 
-        {/* font size preset */}
+        {/* text style / heading preset */}
         <Menu
           open={menu === 'size'}
           onToggle={() => setMenu(menu === 'size' ? null : 'size')}
-          title="Text size"
+          title="Text style"
           icon={<><Type className="w-4 h-4" /><ChevronDown className="w-3 h-3 -ml-0.5" /></>}
+          wide
         >
-          {FONT_SIZES.map((f) => (
-            <button
-              key={f.size}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                execStyled('fontSize', f.size);
-                setMenu(null);
-              }}
-              className="flex w-full items-center justify-between gap-4 px-3 py-1.5 rounded-md hover:bg-stone-100 text-left"
-            >
-              <span className="ink-text" style={{ fontSize: f.px, lineHeight: 1 }}>{f.label}</span>
-            </button>
-          ))}
+          <div className="min-w-[190px]">
+            {FONT_SIZES.map((f) => (
+              <button
+                key={f.label}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  exec('formatBlock', f.block);
+                  setMenu(null);
+                }}
+                className="flex w-full items-baseline justify-between gap-4 px-3 py-2 rounded-lg hover:bg-stone-100 text-left transition-colors"
+              >
+                <span className="ink-text" style={{ fontSize: f.px, fontWeight: f.weight, lineHeight: 1.1 }}>{f.label}</span>
+                <span className="text-[11px] ink-text-muted font-medium">{f.hint}</span>
+              </button>
+            ))}
+          </div>
         </Menu>
 
         {/* text color */}
@@ -2135,13 +2142,27 @@ function DocEditor({
     if (e.key === 'Enter' && !e.shiftKey) {
       const el = node.nodeType === 3 ? node.parentElement : (node as HTMLElement);
       const head = el?.closest?.('summary.doc-toggle-head') as HTMLElement | null;
-      if (!head) return;
-      e.preventDefault();
-      const d = head.parentElement as HTMLDetailsElement | null;
-      if (d && !d.open) d.open = true; // descending always reveals the body
-      const body = head.nextElementSibling as HTMLElement | null; // .doc-toggle-body
-      const target = (body?.querySelector('p, li, div') as HTMLElement | null) || body;
-      if (target) placeCaret(target, true);
+      if (head) {
+        e.preventDefault();
+        const d = head.parentElement as HTMLDetailsElement | null;
+        if (d && !d.open) d.open = true; // descending always reveals the body
+        const body = head.nextElementSibling as HTMLElement | null; // .doc-toggle-body
+        const target = (body?.querySelector('p, li, div') as HTMLElement | null) || body;
+        if (target) placeCaret(target, true);
+        return;
+      }
+      // Enter exits a blockquote to a normal paragraph instead of trapping you in
+      // it forever. (Shift+Enter still adds a soft line break inside the quote.)
+      const bq = el?.closest?.('blockquote') as HTMLElement | null;
+      if (bq && hostOf(bq)) {
+        e.preventDefault();
+        const p = document.createElement('p');
+        p.appendChild(document.createElement('br'));
+        bq.parentNode?.insertBefore(p, bq.nextSibling);
+        placeCaret(p, true);
+        afterEdit();
+        return;
+      }
       return;
     }
 
