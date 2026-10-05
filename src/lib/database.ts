@@ -70,6 +70,21 @@ export const db = {
       return data;
     },
 
+    update: async (
+      id: string,
+      patch: Partial<Pick<WorkSession, 'start_time' | 'end_time' | 'label' | 'color'>>
+    ): Promise<WorkSession> => {
+      const { data, error } = await supabase
+        .from('work_sessions')
+        .update(patch)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+
     delete: async (id: string): Promise<void> => {
       const { error } = await supabase
         .from('work_sessions')

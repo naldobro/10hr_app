@@ -5,6 +5,9 @@ import { db } from './database';
 // (soft-delete) instead, so a blind undo can never hard-delete a page you've filled in.
 type UndoAction =
   | { type: 'add_session' | 'delete_session'; sessionData: WorkSession; timestamp: number }
+  // A logged session edited in place (mode/colour, label, or times). `before`/`after`
+  // hold the whole row so undo restores it exactly and redo re-applies the edit.
+  | { type: 'edit_session'; before: WorkSession; after: WorkSession; timestamp: number }
   | { type: 'vision_add'; row: VisionGoal; timestamp: number }
   | { type: 'vision_delete'; row: VisionGoal; timestamp: number }
   | { type: 'vision_update'; before: VisionGoal; after: VisionGoal; timestamp: number }
@@ -114,6 +117,14 @@ export const undoManager = {
       });
       action.sessionData = restored;
       await undoManager.recalculateSummary(action.sessionData.date);
+    } else if (action.type === 'edit_session') {
+      await db.sessions.update(action.before.id, {
+        start_time: action.before.start_time,
+        end_time: action.before.end_time,
+        label: action.before.label,
+        color: action.before.color,
+      });
+      await undoManager.recalculateSummary(action.before.date);
     } else if (action.type === 'vision_add') {
       await db.visionGoals.delete(action.row.id);
     } else if (action.type === 'vision_delete') {
@@ -174,6 +185,14 @@ export const undoManager = {
     } else if (action.type === 'delete_session') {
       await db.sessions.delete(action.sessionData.id);
       await undoManager.recalculateSummary(action.sessionData.date);
+    } else if (action.type === 'edit_session') {
+      await db.sessions.update(action.after.id, {
+        start_time: action.after.start_time,
+        end_time: action.after.end_time,
+        label: action.after.label,
+        color: action.after.color,
+      });
+      await undoManager.recalculateSummary(action.after.date);
     } else if (action.type === 'vision_add') {
       await db.visionGoals.restore(action.row);
     } else if (action.type === 'vision_delete') {

@@ -458,6 +458,44 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
     }
   };
 
+  // Edit a logged block in place (change its mode/colour + label, or its times).
+  const handleEditSession = async (
+    sessionId: string,
+    patch: { start_time?: number; end_time?: number; label?: string; color?: string }
+  ) => {
+    try {
+      const before = sessions.find((s) => s.id === sessionId);
+      if (!before) return;
+
+      const updated = await db.sessions.update(sessionId, patch);
+
+      undoManager.addToUndoHistory({
+        type: 'edit_session',
+        before,
+        after: updated,
+        timestamp: Date.now(),
+      });
+
+      // Recompute the day's total in case the times changed.
+      const allSessionsForDay = await db.sessions.getByDate(currentDayString);
+      const newTotal = allSessionsForDay.reduce(
+        (sum, session) => sum + (session.end_time - session.start_time),
+        0
+      );
+      await db.summaries.upsert({ date: currentDayString, total_hours: newTotal });
+
+      showFeedback('success', 'Session updated');
+
+      await loadSessions();
+      await loadMonthData();
+      updateUndoRedoState();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Error updating session:', err);
+      showFeedback('error', message);
+    }
+  };
+
   const handleDeleteSession = async (sessionId: string) => {
     try {
       const sessionToDelete = sessions.find((s) => s.id === sessionId);
@@ -617,6 +655,7 @@ export default function TrackTab({ currentMonth }: TrackTabProps) {
         sessions={sessions}
         currentDay={currentDayString}
         onDeleteSession={handleDeleteSession}
+        onEditSession={handleEditSession}
       />
 
       <ControlsPanel

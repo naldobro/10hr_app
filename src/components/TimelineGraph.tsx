@@ -1,17 +1,25 @@
 import { useEffect, useState } from 'react';
 import { WorkSession } from '../types';
-import { resolveColor } from '../lib/modes';
+import { MODES, resolveColor, textOn } from '../lib/modes';
 
 interface TimelineGraphProps {
   sessions: WorkSession[];
   currentDay: string;
   onDeleteSession: (sessionId: string) => void;
+  onEditSession?: (
+    sessionId: string,
+    patch: { start_time?: number; end_time?: number; label?: string; color?: string }
+  ) => void;
 }
 
-export default function TimelineGraph({ sessions, currentDay, onDeleteSession }: TimelineGraphProps) {
+// Draft held while an existing block is being edited in the modal.
+type EditDraft = { id: string; color: string; label: string; start_time: number; end_time: number };
+
+export default function TimelineGraph({ sessions, currentDay, onDeleteSession, onEditSession }: TimelineGraphProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const [edit, setEdit] = useState<EditDraft | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -56,6 +64,41 @@ export default function TimelineGraph({ sessions, currentDay, onDeleteSession }:
   const cancelDelete = () => {
     setShowDeleteModal(false);
     setSessionToDelete(null);
+  };
+
+  // --- editing a logged block ---
+  const openEdit = (session: WorkSession) => {
+    if (!onEditSession) return;
+    setEdit({
+      id: session.id,
+      color: session.color,
+      label: session.label,
+      start_time: session.start_time,
+      end_time: session.end_time,
+    });
+  };
+
+  // "HH:MM" (what <input type="time"> uses) ⇆ fractional hours.
+  const hhmmToHour = (v: string) => {
+    const [h, m] = v.split(':').map(Number);
+    if (Number.isNaN(h)) return 0;
+    return Math.min(24, Math.max(0, h + (m || 0) / 60));
+  };
+  // <input type="time"> can't show 24:00, so a midnight end is displayed as 23:59.
+  // (Only affects the field's display; the stored value stays unless the user edits it.)
+  const timeValue = (h: number) => formatHour(Math.min(h, 23 + 59 / 60));
+
+  const editValid = !!edit && edit.end_time > edit.start_time;
+
+  const saveEdit = () => {
+    if (!edit || !onEditSession || !editValid) return;
+    onEditSession(edit.id, {
+      color: edit.color,
+      label: edit.label,
+      start_time: edit.start_time,
+      end_time: edit.end_time,
+    });
+    setEdit(null);
   };
 
   const timelineHeight = Math.max(200, todaySessions.length * 80 + 60);
@@ -106,9 +149,13 @@ export default function TimelineGraph({ sessions, currentDay, onDeleteSession }:
                   className="absolute left-0 right-0 h-12 sm:h-14 lg:h-16 group"
                   style={{ top: `${16 + index * 60}px` }}
                 >
-                  {/* the proportional bar */}
+                  {/* the proportional bar — click to edit (change mode / times) */}
                   <div
-                    className="absolute top-0 bottom-0 rounded-lg paper-shadow transition-transform hover:scale-y-[1.04]"
+                    onClick={() => openEdit(session)}
+                    title={onEditSession ? 'Click to edit' : undefined}
+                    className={`absolute top-0 bottom-0 rounded-lg paper-shadow transition-transform hover:scale-y-[1.04] ${
+                      onEditSession ? 'cursor-pointer' : ''
+                    }`}
                     style={{
                       left: `${startPercent}%`,
                       width: `max(${widthPercent}%, 8px)`,
@@ -125,7 +172,13 @@ export default function TimelineGraph({ sessions, currentDay, onDeleteSession }:
                     className={`absolute top-0 bottom-0 flex items-center whitespace-nowrap ${labelOnLeft ? 'pr-2 flex-row-reverse' : 'pl-2'}`}
                     style={labelOnLeft ? { right: `${100 - startPercent}%` } : { left: `${endPercent}%` }}
                   >
-                    <div className={`flex flex-col leading-tight ${labelOnLeft ? 'items-end' : 'items-start'}`}>
+                    <div
+                      onClick={() => openEdit(session)}
+                      title={onEditSession ? 'Click to edit' : undefined}
+                      className={`flex flex-col leading-tight ${labelOnLeft ? 'items-end' : 'items-start'} ${
+                        onEditSession ? 'cursor-pointer' : ''
+                      }`}
+                    >
                       <span className="ink-text font-bold text-xs sm:text-sm flex items-center gap-1.5">
                         <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }}></span>
                         {session.label}
@@ -182,6 +235,88 @@ export default function TimelineGraph({ sessions, currentDay, onDeleteSession }:
                 className="flex-1 px-4 py-2.5 sm:py-3 bg-rose-600 hover:bg-rose-700 rounded-lg font-semibold text-white transition-colors paper-shadow text-sm sm:text-base"
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {edit && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setEdit(null)}
+        >
+          <div
+            className="paper-card rounded-2xl p-6 sm:p-7 max-w-md w-full shadow-2xl paper-border"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold mb-1 ink-text">Edit session</h3>
+            <p className="ink-text-muted text-sm mb-5">Change its mode, or adjust the time.</p>
+
+            <label className="block text-[11px] font-bold uppercase tracking-wider ink-text-muted mb-2">
+              Mode
+            </label>
+            <div className="grid grid-cols-2 gap-2 mb-5">
+              {MODES.map((m) => {
+                const active = edit.color === m.key;
+                return (
+                  <button
+                    key={m.key}
+                    onClick={() => setEdit({ ...edit, color: m.key, label: m.label })}
+                    className="px-3 py-2.5 rounded-xl text-sm font-semibold transition border text-left"
+                    style={
+                      active
+                        ? { backgroundColor: m.color, color: textOn(m.color), borderColor: m.color }
+                        : { borderColor: `${m.color}66`, color: m.color }
+                    }
+                  >
+                    {m.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider ink-text-muted mb-1.5">
+                  Start
+                </label>
+                <input
+                  type="time"
+                  value={timeValue(edit.start_time)}
+                  onChange={(e) => setEdit({ ...edit, start_time: hhmmToHour(e.target.value) })}
+                  className="w-full px-3 py-2 rounded-lg bg-white dark:bg-paper ink-text paper-border outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider ink-text-muted mb-1.5">
+                  End
+                </label>
+                <input
+                  type="time"
+                  value={timeValue(edit.end_time)}
+                  onChange={(e) => setEdit({ ...edit, end_time: hhmmToHour(e.target.value) })}
+                  className="w-full px-3 py-2 rounded-lg bg-white dark:bg-paper ink-text paper-border outline-none"
+                />
+              </div>
+            </div>
+            {!editValid && (
+              <p className="text-[12px] text-rose-500 mt-2">End time must be after the start time.</p>
+            )}
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setEdit(null)}
+                className="flex-1 px-4 py-2.5 bg-stone-200 hover:bg-stone-300 rounded-lg font-semibold ink-text transition-colors paper-border"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveEdit}
+                disabled={!editValid}
+                className="flex-1 px-4 py-2.5 bg-stone-800 hover:bg-stone-900 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg font-semibold text-white transition-colors"
+              >
+                Save
               </button>
             </div>
           </div>
