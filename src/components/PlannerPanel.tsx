@@ -36,9 +36,12 @@ import {
   CalendarDays,
   RotateCcw,
   Link2,
+  ClipboardPaste,
+  History,
 } from 'lucide-react';
-import { VisionDoc } from '../types';
+import { VisionDoc, VisionDocSnapshot } from '../types';
 import { GOAL_COLORS } from '../lib/visionUtils';
+import { db } from '../lib/database';
 import ColorPicker from './ColorPicker';
 
 interface PlannerPanelProps {
@@ -78,14 +81,20 @@ const INLINE = '__inline__';
 const isInline = (d: VisionDoc) => d.month === INLINE;
 
 // Quick presets ------------------------------------------------------------
-// Text-style presets are real block headings (not font-size spans) so headings
-// are bold by default and their size is controlled by the .doc-body h1/h2/h3 CSS.
-const FONT_SIZES: { label: string; hint: string; block: string; px: string; weight: number }[] = [
+// Block-level text styles. These change the WHOLE line/paragraph — real headings
+// (bold by default, size driven by the .doc-body h1/h2/h3 CSS) or normal body
+// text. Picking one here converts the block's type.
+const BLOCK_STYLES: { label: string; hint: string; block: string; px: string; weight: number }[] = [
   { label: 'Title', hint: 'Biggest', block: '<h1>', px: '30px', weight: 800 },
   { label: 'Heading', hint: 'Large', block: '<h2>', px: '23px', weight: 700 },
   { label: 'Subheading', hint: 'Medium', block: '<h3>', px: '18px', weight: 700 },
   { label: 'Body', hint: 'Normal', block: '<p>', px: '15px', weight: 400 },
 ];
+// Inline font sizes (px). Unlike the block styles above, these resize only the
+// SELECTED text and never touch its block type — so you can make the text inside
+// a code block (or a list, or anything) bigger/smaller without turning it into a
+// heading. This is the "lots of sizes to choose between" control.
+const TEXT_SIZES = [12, 13, 14, 16, 18, 20, 24, 28, 32, 40, 48];
 // Accent colours offered for notebook cards in the gallery.
 const NOTEBOOK_COLORS = [
   '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e',
@@ -558,6 +567,18 @@ export default function PlannerPanel({
         .doc-body ol { list-style: decimal; padding-left: 1.4rem; margin: .35em 0; }
         .doc-body li { margin: .15em 0; }
         .doc-body blockquote { border-left: 3px solid #d6d3d1; padding-left: .8rem; margin: .5em 0; color: #78716c; font-style: italic; }
+        /* monospace / preformatted text (e.g. pasted code) — styled so it still
+           reads well if it ever lands in a note. */
+        .doc-body pre {
+          font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+          font-size: .92em; line-height: 1.5; tab-size: 2;
+          background: #f5f5f4; border: 1px solid #e7e5e4; border-radius: .5rem;
+          padding: .7em .9em; margin: .5em 0; white-space: pre-wrap; overflow-x: auto;
+        }
+        .dark .doc-body pre { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.14); }
+        .doc-body code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; background: #f5f5f4; padding: .1em .35em; border-radius: .35em; }
+        .dark .doc-body code { background: rgba(255,255,255,.08); }
+        .doc-body pre code { background: none; padding: 0; }
         .doc-body a { color: #2563eb; text-decoration: underline; }
         .doc-body hr { border: none; border-top: 1px solid #d6d3d1; margin: .9em 0; }
         .doc-body img { max-width: 100%; height: auto; border-radius: .5rem; margin: .5em 0; display: block; }
@@ -1324,6 +1345,18 @@ function DocEditor({
   // focus leaves a contenteditable — so we remember the range and restore it before
   // every toolbar action. This is what keeps formatting + table controls reliable.
   const savedRange = useRef<Range | null>(null);
+  // Paste events don't carry modifier keys, so we track whether Shift is held
+  // from key events and read it at paste time (⌘⇧V / Ctrl+Shift+V = plain paste).
+  const shiftHeld = useRef(false);
+  // Version snapshots: when the last one was taken, and a fingerprint of what it
+  // held, so we don't store duplicates or snapshot more than once per interval.
+  const lastSnapAt = useRef(0);
+  const lastSnapKey = useRef<string | null>(null);
+  // Page-history panel state.
+  const [showHistory, setShowHistory] = useState(false);
+  const [snaps, setSnaps] = useState<VisionDocSnapshot[] | null>(null);
+  const [snapError, setSnapError] = useState(false);
+  const [confirmRestore, setConfirmRestore] = useState<string | null>(null);
 
   // Empty only when there's no text AND no block content (table/list/rule/image).
   const setEmpty = (el: HTMLDivElement | null) => {
@@ -1358,9 +1391,29 @@ function DocEditor({
 
   const persistNow = () => {
     onChange(snapshot(), true);
+    maybeSnapshot();
     setStatus('saved');
     window.clearTimeout(savedTimer.current);
     savedTimer.current = window.setTimeout(() => setStatus('idle'), 1500);
+  };
+
+  const SNAPSHOT_INTERVAL_MS = 90_000;
+  // Store a recovery snapshot of the current page, but only when something changed
+  // since the last one and (unless forced) at most once per interval. Fire-and-
+  // forget — a missing table / offline just means no snapshot this time.
+  const maybeSnapshot = (force = false) => {
+    const summaryHtml = summaryRef.current?.innerHTML ?? '';
+    const contentHtml = bodyRef.current?.innerHTML ?? '';
+    const key = `${meta.current.title} ${summaryHtml} ${contentHtml}`;
+    if (key === lastSnapKey.current) return; // nothing new to capture
+    if (!force && Date.now() - lastSnapAt.current < SNAPSHOT_INTERVAL_MS) return;
+    lastSnapAt.current = Date.now();
+    lastSnapKey.current = key;
+    db.visionDocSnapshots
+      .add({ doc_id: doc.id, title: meta.current.title, summary: summaryHtml, content: contentHtml })
+      .catch(() => {
+        /* table not set up / offline — ignore; the history panel surfaces setup */
+      });
   };
 
   const scheduleSave = () => {
@@ -1374,21 +1427,33 @@ function DocEditor({
 
   // Seed both editors once; keyed by doc.id in the parent so switching docs remounts.
   useEffect(() => {
+    // New paragraphs (Enter, paste) should be <p> blocks, not <div>/<br> — so the
+    // whole doc stays block-structured and block commands behave predictably.
+    try {
+      document.execCommand('defaultParagraphSeparator', false, 'p');
+    } catch {
+      /* not supported everywhere — the load-time normalize still keeps blocks clean */
+    }
     if (summaryRef.current) {
       summaryRef.current.innerHTML = doc.summary || '';
+      normalizeLoadedBlocks(summaryRef.current);
       setEmpty(summaryRef.current);
     }
     if (bodyRef.current) {
       bodyRef.current.innerHTML = doc.content || '';
+      normalizeLoadedBlocks(bodyRef.current);
       setEmpty(bodyRef.current);
     }
+    // Baseline fingerprint = the state as loaded, so we never snapshot an unchanged page.
+    lastSnapKey.current = `${doc.title} ${summaryRef.current?.innerHTML ?? ''} ${bodyRef.current?.innerHTML ?? ''}`;
     refreshDocRefs();
     return () => {
-      // Flush any pending edit when leaving this doc.
+      // Flush any pending edit when leaving this doc, and capture a final snapshot.
       if (saveTimer.current) {
         window.clearTimeout(saveTimer.current);
         onChange(snapshot(), true);
       }
+      maybeSnapshot(true);
       window.clearTimeout(savedTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1408,7 +1473,16 @@ function DocEditor({
       setInTable(!!getCell());
     };
     document.addEventListener('selectionchange', onSel);
-    return () => document.removeEventListener('selectionchange', onSel);
+    const onShift = (e: KeyboardEvent) => {
+      shiftHeld.current = e.shiftKey;
+    };
+    document.addEventListener('keydown', onShift, true);
+    document.addEventListener('keyup', onShift, true);
+    return () => {
+      document.removeEventListener('selectionchange', onSel);
+      document.removeEventListener('keydown', onShift, true);
+      document.removeEventListener('keyup', onShift, true);
+    };
   }, []);
 
   // Close any open toolbar menu on an outside click.
@@ -1537,6 +1611,71 @@ function DocEditor({
     afterEdit();
   };
 
+  // Resize just the SELECTED text with an inline font-size span — this never
+  // changes the block type, so code stays code, a list stays a list, etc. With
+  // nothing selected it sets the size for whatever you type next.
+  const applyFontSize = (px: number) => {
+    ensureFocus();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (!hostOf(range.commonAncestorContainer)) return;
+    const span = document.createElement('span');
+    span.style.fontSize = `${px}px`;
+    if (range.collapsed) {
+      span.appendChild(document.createTextNode('​')); // zero-width space to hold the caret
+      range.insertNode(span);
+      const r = document.createRange();
+      r.setStart(span.firstChild!, 1);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      savedRange.current = r.cloneRange();
+    } else {
+      try {
+        range.surroundContents(span);
+      } catch {
+        // Selection crosses element boundaries — extract then wrap.
+        const frag = range.extractContents();
+        span.appendChild(frag);
+        range.insertNode(span);
+      }
+      // Clear any nested font-size spans so the new size actually wins.
+      span.querySelectorAll('span[style*="font-size"]').forEach((inner) => {
+        (inner as HTMLElement).style.removeProperty('font-size');
+      });
+      const r = document.createRange();
+      r.selectNodeContents(span);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      savedRange.current = r.cloneRange();
+    }
+    afterEdit();
+  };
+
+  // Drop any inline font-size on the selection, falling back to the block's
+  // default size (the Text-size "Reset" action).
+  const clearFontSize = () => {
+    ensureFocus();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    const host = hostOf(range.commonAncestorContainer);
+    if (!host) return;
+    host.querySelectorAll('span[style*="font-size"], font[size]').forEach((el) => {
+      if (!range.intersectsNode(el)) return;
+      if (el.tagName === 'FONT') el.removeAttribute('size');
+      else (el as HTMLElement).style.removeProperty('font-size');
+      const e = el as HTMLElement;
+      if (e.tagName === 'SPAN' && !e.getAttribute('style') && e.className === '') {
+        const p = e.parentNode!;
+        while (e.firstChild) p.insertBefore(e.firstChild, e);
+        p.removeChild(e);
+      }
+    });
+    afterEdit();
+  };
+
   const insertTable = (rows: number, cols: number) => {
     ensureFocus();
     let html = '<table class="doc-table"><tbody>';
@@ -1604,14 +1743,201 @@ function DocEditor({
     });
   };
 
-  const insertChecklist = () => {
+  // Bullet / numbered / checklist, driven by our lossless block transform. Click
+  // on plain lines → wrap them; click again on the same kind → unwrap back to
+  // paragraphs; click a different kind → convert. Never deletes content.
+  const applyList = (kind: ListKind) => {
     ensureFocus();
-    document.execCommand(
-      'insertHTML',
-      false,
-      '<ul class="doc-tasks"><li class="doc-task" data-checked="false">&#8203;</li></ul>'
-    );
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    const host = hostOf(range.commonAncestorContainer);
+    if (!host) return;
+
+    const touches = (node: Node) => {
+      try {
+        return range.intersectsNode(node);
+      } catch {
+        return true;
+      }
+    };
+
+    // Collect the selected "lines": top-level non-list blocks, or the selected
+    // <li>s within a top-level list.
+    const touched: ListUnit[] = [];
+    let anySelected = false;
+    let allKind = true;
+    Array.from(host.children).forEach((child) => {
+      const el = child as HTMLElement;
+      if (!touches(el)) return;
+      if (el.tagName === 'UL' || el.tagName === 'OL') {
+        const selectedLis = new Set<Element>();
+        Array.from(el.children).forEach((li) => {
+          if (li.tagName === 'LI' && touches(li)) {
+            selectedLis.add(li);
+            anySelected = true;
+            if (listKindOf(el) !== kind) allKind = false;
+          }
+        });
+        if (selectedLis.size) touched.push({ list: el, selectedLis });
+      } else {
+        touched.push({ block: el });
+        anySelected = true;
+        allKind = false;
+      }
+    });
+
+    // Empty editor / unresolved caret: drop in a fresh one-item list.
+    if (!anySelected || touched.length === 0) {
+      const list = makeListEl(kind);
+      const li = makeLi(kind, []);
+      list.appendChild(li);
+      host.appendChild(list);
+      placeCaret(li, true);
+      afterEdit();
+      return;
+    }
+
+    // Drop a marker at the caret so the selection can be restored after the rebuild.
+    const marker = document.createElement('span');
+    marker.setAttribute('data-caret-marker', '1');
+    const mr = range.cloneRange();
+    mr.collapse(true);
+    mr.insertNode(marker);
+
+    applyListTransform(host, touched, allKind ? null : kind);
+
+    const m = host.querySelector('span[data-caret-marker="1"]');
+    if (m) {
+      const r = document.createRange();
+      r.setStartBefore(m);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      savedRange.current = r.cloneRange();
+      m.remove();
+    }
+    normalizeTasks(host);
     afterEdit();
+  };
+
+  // Shared helpers for the block-level controls below -------------------------
+  const selRangeHost = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
+    const range = sel.getRangeAt(0);
+    const host = hostOf(range.commonAncestorContainer);
+    if (!host) return null;
+    return { sel, range, host };
+  };
+  const rangeTouches = (range: Range, node: Node) => {
+    try {
+      return range.intersectsNode(node);
+    } catch {
+      return true;
+    }
+  };
+
+  // Re-type the selected top-level blocks (heading ⇄ body ⇄ quote), losslessly:
+  // we only swap each block's tag and move its children across, never deleting
+  // text. Clicking the current type again toggles back to a paragraph.
+  const setBlockType = (tag: string) => {
+    ensureFocus();
+    const ctx = selRangeHost();
+    if (!ctx) return;
+    const { sel, range, host } = ctx;
+    const blocks = Array.from(host.children).filter(
+      (el) => rangeTouches(range, el) && CONVERTIBLE_TAGS.has(el.tagName)
+    ) as HTMLElement[];
+    if (blocks.length === 0) return;
+    const target = blocks.every((b) => b.tagName === tag.toUpperCase()) ? 'p' : tag;
+
+    const marker = document.createElement('span');
+    marker.setAttribute('data-caret-marker', '1');
+    const mr = range.cloneRange();
+    mr.collapse(true);
+    mr.insertNode(marker);
+
+    blocks.forEach((b) => {
+      const nb = document.createElement(target);
+      if (b.style.textAlign) nb.style.textAlign = b.style.textAlign;
+      while (b.firstChild) nb.appendChild(b.firstChild);
+      b.replaceWith(nb);
+    });
+
+    const m = host.querySelector('span[data-caret-marker="1"]');
+    if (m) {
+      const r = document.createRange();
+      r.setStartBefore(m);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      savedRange.current = r.cloneRange();
+      m.remove();
+    }
+    afterEdit();
+  };
+
+  // Align the selected top-level blocks. Pure style change — no structural edit,
+  // so the caret stays put and nothing can be lost.
+  const setAlign = (dir: 'left' | 'center' | 'right') => {
+    ensureFocus();
+    const ctx = selRangeHost();
+    if (!ctx) return;
+    const { range, host } = ctx;
+    let any = false;
+    Array.from(host.children).forEach((el) => {
+      if (!rangeTouches(range, el)) return;
+      (el as HTMLElement).style.textAlign = dir;
+      any = true;
+    });
+    if (any) afterEdit();
+  };
+
+  // Clear formatting: strip inline marks (bold/colour/size/…) then flatten the
+  // block back to a plain paragraph.
+  const clearFormatting = () => {
+    exec('removeFormat');
+    setBlockType('p');
+  };
+
+  // Page history ------------------------------------------------------------
+  const openHistory = () => {
+    setShowHistory(true);
+    setSnaps(null);
+    setSnapError(false);
+    setConfirmRestore(null);
+    maybeSnapshot(true); // capture the current state so it's in the list too
+    db.visionDocSnapshots
+      .list(doc.id)
+      .then(setSnaps)
+      .catch(() => {
+        setSnaps([]);
+        setSnapError(true);
+      });
+  };
+
+  // Roll the page back to a snapshot. The current state is captured first, so a
+  // restore is itself reversible (just restore the newest snapshot again).
+  const restoreSnapshot = (snap: VisionDocSnapshot) => {
+    maybeSnapshot(true);
+    setTitle(snap.title);
+    meta.current.title = snap.title;
+    if (summaryRef.current) {
+      summaryRef.current.innerHTML = snap.summary || '';
+      normalizeLoadedBlocks(summaryRef.current);
+      setEmpty(summaryRef.current);
+    }
+    if (bodyRef.current) {
+      bodyRef.current.innerHTML = snap.content || '';
+      normalizeLoadedBlocks(bodyRef.current);
+      setEmpty(bodyRef.current);
+    }
+    refreshDocRefs();
+    lastSnapKey.current = `${snap.title} ${summaryRef.current?.innerHTML ?? ''} ${bodyRef.current?.innerHTML ?? ''}`;
+    persistNow();
+    setShowHistory(false);
+    setConfirmRestore(null);
   };
 
   // Insert a collapsible toggle built on native <details>: a clickable summary
@@ -1677,17 +2003,76 @@ function DocEditor({
       void insertImageFiles(files);
       return;
     }
-    // Everything else pastes as PLAIN TEXT. Pasting the clipboard's raw HTML let
-    // copied block structure (stray paragraphs, even whole <details> toggles) get
-    // re-injected — which is what spawned nested toggles, orphaned lines, and
-    // broken collapse. Plain text can't carry structure, so it stays inside the
-    // current block; newlines become <br> so multi-line pastes keep their shape.
-    const text = e.clipboardData?.getData('text/plain') ?? '';
     e.preventDefault();
+    const plain = e.clipboardData?.getData('text/plain') ?? '';
+    const rawHtml = e.clipboardData?.getData('text/html') ?? '';
+
+    // DEFAULT (plain ⌘V / Ctrl+V): paste as PLAIN TEXT — clean, structure-free,
+    // stays inside the current block. This is the main, trusted behaviour and is
+    // never touched by the formatted path. Formatting is opt-in only: hold Shift
+    // (⌘⇧V) or use the toolbar's "Paste with formatting" button.
+    if (!shiftHeld.current || !rawHtml.trim()) {
+      insertPlainText(plain);
+      return;
+    }
+    insertFormattedHtml(rawHtml, plain);
+  };
+
+  // Insert clipboard text as plain text. A single line flows into the current
+  // block; multiple lines become separate <p> paragraphs (NOT <br>-joined) so each
+  // is a real block and list/heading commands can act on them without mangling.
+  const insertPlainText = (text: string) => {
     if (!text) return;
-    const html = escapeHtml(text).replace(/\r\n?/g, '\n').split('\n').join('<br>');
+    const normalized = text.replace(/\r\n?/g, '\n');
+    if (!normalized.includes('\n')) {
+      document.execCommand('insertText', false, normalized);
+      afterEdit();
+      return;
+    }
+    const html = normalized
+      .split('\n')
+      .map((line) => (line ? `<p>${escapeHtml(line)}</p>` : '<p><br></p>'))
+      .join('');
     document.execCommand('insertHTML', false, html);
     afterEdit();
+  };
+
+  // Insert clipboard HTML WITH formatting, after passing it through the strict
+  // whitelist so stray structure / Word-Docs cruft can't corrupt the doc. Falls
+  // back to plain text if there's nothing safe left.
+  const insertFormattedHtml = (rawHtml: string, plain: string) => {
+    const clean = rawHtml.trim() ? sanitizeDocHtml(rawHtml) : '';
+    if (!clean.trim()) {
+      insertPlainText(plain);
+      return;
+    }
+    document.execCommand('insertHTML', false, clean);
+    refreshDocRefs();
+    afterEdit();
+  };
+
+  // Toolbar "Paste with formatting" button: read the clipboard ourselves (async
+  // API) and insert it formatted. If the browser blocks clipboard.read (some
+  // webviews do), fall back to plain text, and ultimately to the ⌘⇧V shortcut.
+  const pasteWithFormatting = async () => {
+    setMenu(null);
+    let html = '';
+    let text = '';
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        if (item.types.includes('text/html')) html = await (await item.getType('text/html')).text();
+        if (item.types.includes('text/plain')) text = await (await item.getType('text/plain')).text();
+      }
+    } catch {
+      try {
+        text = await navigator.clipboard.readText();
+      } catch {
+        /* clipboard blocked — nothing we can do here; use ⌘⇧V instead */
+      }
+    }
+    ensureFocus();
+    insertFormattedHtml(html, text);
   };
 
   const onEditorDrop = (e: React.DragEvent) => {
@@ -1843,6 +2228,13 @@ function DocEditor({
             <span className="text-[11px] ink-text-muted w-16 text-right">
               {status === 'saving' ? 'Saving…' : status === 'saved' ? 'Saved ✓' : ''}
             </span>
+            <button
+              onClick={openHistory}
+              className="p-1.5 rounded-lg ink-text-muted hover:ink-text hover:bg-stone-100 dark:hover:bg-white/10 transition"
+              title="Page history — restore an earlier version"
+            >
+              <History className="w-4 h-4" />
+            </button>
             {nested ? null : confirmDel ? (
               <div className="flex items-center gap-1">
                 <button
@@ -1887,21 +2279,54 @@ function DocEditor({
           icon={<><Type className="w-4 h-4" /><ChevronDown className="w-3 h-3 -ml-0.5" /></>}
           wide
         >
-          <div className="min-w-[190px]">
-            {FONT_SIZES.map((f) => (
+          <div className="min-w-[214px]">
+            <div className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider ink-text-muted/70">Style</div>
+            {BLOCK_STYLES.map((f) => (
               <button
                 key={f.label}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
-                  exec('formatBlock', f.block);
+                  setBlockType(f.block.replace(/[<>]/g, ''));
                   setMenu(null);
                 }}
                 className="flex w-full items-baseline justify-between gap-4 px-3 py-2 rounded-lg hover:bg-stone-100 text-left transition-colors"
               >
-                <span className="ink-text" style={{ fontSize: f.px, fontWeight: f.weight, lineHeight: 1.1 }}>{f.label}</span>
+                <span className="ink-text" style={{ fontSize: f.px, fontWeight: f.weight, lineHeight: 1.1 }}>
+                  {f.label}
+                </span>
                 <span className="text-[11px] ink-text-muted font-medium">{f.hint}</span>
               </button>
             ))}
+            <div className="border-t border-black/5 dark:border-white/[0.13] my-1.5" />
+            <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider ink-text-muted/70">
+              Text size <span className="font-medium normal-case tracking-normal">(selected text)</span>
+            </div>
+            <div className="grid grid-cols-4 gap-1 px-1.5">
+              {TEXT_SIZES.map((s) => (
+                <button
+                  key={s}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    applyFontSize(s);
+                    setMenu(null);
+                  }}
+                  className="h-8 grid place-items-center rounded-lg text-[12px] font-semibold ink-text-muted hover:ink-text hover:bg-stone-100 transition"
+                  title={`${s}px`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                clearFontSize();
+                setMenu(null);
+              }}
+              className="mt-1 w-full text-[12px] ink-text-muted hover:ink-text px-3 py-1.5 rounded-lg hover:bg-stone-100 text-left transition-colors"
+            >
+              Reset size
+            </button>
           </div>
         </Menu>
 
@@ -1950,14 +2375,14 @@ function DocEditor({
         </Menu>
 
         <Sep />
-        <TB onClick={() => exec('formatBlock', '<h1>')} title="Heading 1"><Heading1 className="w-4 h-4" /></TB>
-        <TB onClick={() => exec('formatBlock', '<h2>')} title="Heading 2"><Heading2 className="w-4 h-4" /></TB>
-        <TB onClick={() => exec('formatBlock', '<blockquote>')} title="Quote"><Quote className="w-4 h-4" /></TB>
+        <TB onClick={() => setBlockType('h1')} title="Heading 1"><Heading1 className="w-4 h-4" /></TB>
+        <TB onClick={() => setBlockType('h2')} title="Heading 2"><Heading2 className="w-4 h-4" /></TB>
+        <TB onClick={() => setBlockType('blockquote')} title="Quote"><Quote className="w-4 h-4" /></TB>
 
         <Sep />
-        <TB onClick={() => exec('insertUnorderedList')} title="Bulleted list"><List className="w-4 h-4" /></TB>
-        <TB onClick={() => exec('insertOrderedList')} title="Numbered list"><ListOrdered className="w-4 h-4" /></TB>
-        <TB onClick={insertChecklist} title="Checklist (tick boxes)"><ListTodo className="w-4 h-4" /></TB>
+        <TB onClick={() => applyList('bullet')} title="Bulleted list"><List className="w-4 h-4" /></TB>
+        <TB onClick={() => applyList('number')} title="Numbered list"><ListOrdered className="w-4 h-4" /></TB>
+        <TB onClick={() => applyList('task')} title="Checklist (tick boxes)"><ListTodo className="w-4 h-4" /></TB>
         <TB onClick={insertToggle} title="Toggle (collapsible section)"><ChevronRight className="w-4 h-4" /></TB>
 
         <Sep />
@@ -1993,18 +2418,18 @@ function DocEditor({
         )}
 
         <Sep />
-        <TB onClick={() => exec('justifyLeft')} title="Align left"><AlignLeft className="w-4 h-4" /></TB>
-        <TB onClick={() => exec('justifyCenter')} title="Align center"><AlignCenter className="w-4 h-4" /></TB>
-        <TB onClick={() => exec('justifyRight')} title="Align right"><AlignRight className="w-4 h-4" /></TB>
+        <TB onClick={() => setAlign('left')} title="Align left"><AlignLeft className="w-4 h-4" /></TB>
+        <TB onClick={() => setAlign('center')} title="Align center"><AlignCenter className="w-4 h-4" /></TB>
+        <TB onClick={() => setAlign('right')} title="Align right"><AlignRight className="w-4 h-4" /></TB>
 
         <Sep />
         <TB
-          onClick={() => {
-            exec('removeFormat');
-            exec('formatBlock', '<p>');
-          }}
-          title="Clear formatting"
+          onClick={() => void pasteWithFormatting()}
+          title="Paste with formatting (keeps headings, quotes, etc.) — or press ⌘⇧V"
         >
+          <ClipboardPaste className="w-4 h-4" />
+        </TB>
+        <TB onClick={clearFormatting} title="Clear formatting">
           <Eraser className="w-4 h-4" />
         </TB>
 
@@ -2122,6 +2547,111 @@ function DocEditor({
               }}
             />
           </>,
+          document.body
+        )}
+
+      {/* Page history / restore — portaled over everything. */}
+      {showHistory &&
+        createPortal(
+          <div className="fixed inset-0 z-[96]" onClick={() => setShowHistory(false)}>
+            <div className="absolute inset-0 bg-black/40" />
+            <div className="absolute inset-0 flex items-center justify-center p-3 sm:p-6">
+              <div
+                className="relative paper-card rounded-2xl border border-black/10 dark:border-white/[0.2] shadow-2xl w-[min(560px,96vw)] h-[min(640px,90vh)] flex flex-col overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-2 px-5 pt-4 pb-3 border-b border-black/5 dark:border-white/[0.13]">
+                  <History className="w-5 h-5 ink-text-muted flex-none" />
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-[15px] font-bold ink-text leading-tight">Page history</h3>
+                    <p className="text-[11px] ink-text-muted">Restore an earlier version of this page</p>
+                  </div>
+                  <button
+                    onClick={() => setShowHistory(false)}
+                    title="Close"
+                    className="p-1.5 rounded-lg ink-text-muted hover:ink-text hover:bg-stone-100 dark:hover:bg-white/10 transition flex-none"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3">
+                  {snapError ? (
+                    <div className="px-3 py-10 text-center text-[13px] ink-text-muted">
+                      Page history needs a one-time setup. Run the{' '}
+                      <span className="font-semibold ink-text">vision_doc_snapshots</span> migration in Supabase, then
+                      reopen this page.
+                    </div>
+                  ) : snaps === null ? (
+                    <div className="px-3 py-10 text-center text-[13px] ink-text-muted">Loading…</div>
+                  ) : snaps.length === 0 ? (
+                    <div className="px-3 py-10 text-center text-[13px] ink-text-muted">
+                      No earlier versions yet. As you edit, snapshots are saved here automatically.
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {snaps.map((s, i) => {
+                        const preview = htmlToPreview(`${s.summary} ${s.content}`);
+                        return (
+                          <div
+                            key={s.id}
+                            className="rounded-xl border border-black/5 dark:border-white/[0.13] bg-white/60 dark:bg-paper/60 px-3.5 py-2.5"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="text-[13px] font-semibold ink-text">
+                                  {new Date(s.created_at).toLocaleString([], {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                  })}
+                                  {i === 0 && (
+                                    <span className="ml-2 text-[10px] font-bold text-amber-700 dark:text-amber-300">
+                                      LATEST
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[12px] ink-text-muted truncate">
+                                  {s.title || 'Untitled'}
+                                  {preview ? ` — ${preview}` : ''}
+                                </div>
+                              </div>
+                              {confirmRestore === s.id ? (
+                                <div className="flex items-center gap-1 flex-none">
+                                  <button
+                                    onClick={() => restoreSnapshot(s)}
+                                    className="text-[12px] font-bold text-amber-700 dark:text-amber-300 px-2 py-1 rounded hover:bg-amber-50 dark:hover:bg-amber-400/10 transition"
+                                  >
+                                    Restore
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmRestore(null)}
+                                    className="text-[12px] ink-text-muted px-1.5 py-1 rounded hover:bg-stone-100 transition"
+                                  >
+                                    No
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => setConfirmRestore(s.id)}
+                                  className="flex-none flex items-center gap-1 text-[12px] font-semibold ink-text-muted hover:ink-text px-2 py-1 rounded-lg hover:bg-stone-100 dark:hover:bg-white/10 transition"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5" /> Restore
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <p className="px-1 pt-2 text-[11px] ink-text-muted/70">
+                        Restoring saves your current version first, so you can always undo it.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>,
           document.body
         )}
     </div>
@@ -2259,6 +2789,231 @@ function placeCaretInToggleBody(det: HTMLElement, atStart: boolean) {
 
 function isEmptyBlock(block: HTMLElement): boolean {
   return (block.textContent ?? '').trim() === '' && !block.querySelector('img,table,hr,ul,ol,details');
+}
+
+// Real block-level tags. Everything else at the top level of an editor is "loose"
+// inline content (bare text, <span>, <a>, <br>) that must be wrapped in a paragraph.
+const BLOCK_TAGS = new Set([
+  'P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI', 'BLOCKQUOTE',
+  'PRE', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TD', 'TH', 'HR', 'DETAILS', 'FIGURE', 'IMG',
+]);
+
+// Make an editor's content properly block-structured: wrap any loose inline content
+// that sits directly in the editor into <p> blocks, splitting at <br>. This is what
+// makes list / heading / quote / alignment commands reliable — they operate on whole
+// blocks, and <br>-joined "soft lines" (e.g. from an old plain-text paste) used to
+// get mangled or deleted by execCommand. Idempotent; safe to run on every load.
+function normalizeLoadedBlocks(host: HTMLElement) {
+  const isBlock = (n: Node) => n.nodeType === Node.ELEMENT_NODE && BLOCK_TAGS.has((n as Element).tagName);
+  const snapshot = Array.from(host.childNodes);
+  let run: Node[] = [];
+  const flushBefore = (ref: Node | null) => {
+    if (run.length === 0) return;
+    // Split the run into visual lines at each <br>.
+    const lines: Node[][] = [[]];
+    run.forEach((n) => {
+      if (n.nodeType === Node.ELEMENT_NODE && (n as Element).tagName === 'BR') {
+        lines.push([]);
+        n.parentNode?.removeChild(n); // the <br> becomes the paragraph break itself
+      } else {
+        lines[lines.length - 1].push(n);
+      }
+    });
+    lines.forEach((lineNodes, i) => {
+      // Drop a purely-empty trailing line so a single paste doesn't leave a blank para.
+      if (lineNodes.length === 0 && i === lines.length - 1 && lines.length > 1) return;
+      const p = document.createElement('p');
+      if (lineNodes.length === 0) p.appendChild(document.createElement('br'));
+      else lineNodes.forEach((ln) => p.appendChild(ln)); // moves the node into the <p>
+      host.insertBefore(p, ref);
+    });
+    run = [];
+  };
+  snapshot.forEach((child) => {
+    if (isBlock(child)) flushBefore(child);
+    else run.push(child);
+  });
+  flushBefore(null);
+}
+
+// ---- list engine -----------------------------------------------------------
+// Lists are driven by our own block-level transform instead of
+// execCommand('insert*List'), which mangles/deletes content on WebKit. Every
+// operation is lossless: it only ever MOVES existing nodes into new <li>/<p>
+// wrappers, never deletes text. Covers bullet, numbered, and checklist, plus
+// toggling a list back off and converting between kinds.
+type ListKind = 'bullet' | 'number' | 'task';
+type ListUnit = { block: HTMLElement } | { list: HTMLElement; selectedLis: Set<Element> };
+
+// Top-level blocks that can be freely re-typed (heading ⇄ body ⇄ quote). Lists,
+// tables, toggles, rules and images are left alone by the block-type control.
+const CONVERTIBLE_TAGS = new Set(['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE']);
+
+const LIST_SPEC: Record<ListKind, { tag: string; cls: string }> = {
+  bullet: { tag: 'ul', cls: '' },
+  number: { tag: 'ol', cls: '' },
+  task: { tag: 'ul', cls: 'doc-tasks' },
+};
+function listKindOf(list: Element): ListKind | null {
+  if (list.tagName === 'OL') return 'number';
+  if (list.classList.contains('doc-tasks')) return 'task';
+  if (list.tagName === 'UL') return 'bullet';
+  return null;
+}
+function makeListEl(kind: ListKind): HTMLElement {
+  const spec = LIST_SPEC[kind];
+  const el = document.createElement(spec.tag);
+  if (spec.cls) el.className = spec.cls;
+  return el;
+}
+function makeLi(kind: ListKind, children: Node[]): HTMLElement {
+  const li = document.createElement('li');
+  if (kind === 'task') {
+    li.className = 'doc-task';
+    li.setAttribute('data-checked', 'false');
+  }
+  if (children.length === 0) li.appendChild(document.createElement('br'));
+  else children.forEach((c) => li.appendChild(c));
+  return li;
+}
+function makePara(children: Node[]): HTMLElement {
+  const p = document.createElement('p');
+  if (children.length === 0) p.appendChild(document.createElement('br'));
+  else children.forEach((c) => p.appendChild(c));
+  return p;
+}
+// Turn the selected "lines" into `kindOrNull` (null ⇒ unwrap back to paragraphs).
+// Returns the new top-level nodes, in document order. Unselected items inside a
+// touched list are kept, in their original kind, so partial selections split cleanly.
+function retargetList(touched: ListUnit[], kindOrNull: ListKind | null): HTMLElement[] {
+  const out: HTMLElement[] = [];
+  let curList: HTMLElement | null = null;
+  const pushLine = (children: Node[]) => {
+    if (kindOrNull === null) {
+      curList = null;
+      out.push(makePara(children));
+    } else {
+      if (!curList) {
+        curList = makeListEl(kindOrNull);
+        out.push(curList);
+      }
+      curList.appendChild(makeLi(kindOrNull, children));
+    }
+  };
+  touched.forEach((u) => {
+    if ('block' in u) {
+      pushLine(Array.from(u.block.childNodes));
+    } else {
+      const srcKind = listKindOf(u.list);
+      let keepList: HTMLElement | null = null;
+      Array.from(u.list.children).forEach((li) => {
+        if (li.tagName !== 'LI') return;
+        if (u.selectedLis.has(li)) {
+          keepList = null;
+          pushLine(Array.from(li.childNodes));
+        } else {
+          curList = null; // a kept item breaks the run, so following selected lines start a fresh list
+          if (!keepList && srcKind) {
+            keepList = makeListEl(srcKind);
+            out.push(keepList);
+          }
+          keepList?.appendChild(li);
+        }
+      });
+    }
+  });
+  return out;
+}
+function applyListTransform(host: HTMLElement, touched: ListUnit[], kindOrNull: ListKind | null) {
+  const out = retargetList(touched, kindOrNull);
+  const topEls = touched.map((u) => ('block' in u ? u.block : u.list));
+  const anchor = topEls[0];
+  out.forEach((n) => host.insertBefore(n, anchor));
+  topEls.forEach((el) => el.remove());
+}
+
+// ---- paste sanitizer -------------------------------------------------------
+// Clean clipboard HTML down to a strict whitelist before it's inserted, so a
+// formatted paste can carry over real structure (headings, lists, tables, code
+// blocks, our toggles/checklists/link-chips) WITHOUT letting scripts, unknown
+// tags, or Word/Google-Docs cruft corrupt the doc. Anything not on the list is
+// unwrapped (its text survives); comments and disallowed attributes are dropped.
+const PASTE_TAGS = new Set([
+  'P', 'BR', 'H1', 'H2', 'H3', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'STRIKE', 'SPAN', 'FONT',
+  'A', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'CODE', 'HR', 'IMG', 'TABLE', 'THEAD', 'TBODY',
+  'TR', 'TH', 'TD', 'DETAILS', 'SUMMARY', 'DIV',
+]);
+const PASTE_CLASSES = new Set([
+  'doc-table', 'doc-tasks', 'doc-task', 'doc-toggle', 'doc-toggle-head', 'doc-toggle-body', 'doc-ref',
+]);
+const PASTE_STYLE_PROPS = [
+  'font-size', 'color', 'background-color', 'font-weight', 'font-style', 'text-decoration', 'text-align', 'width',
+];
+
+function cleanPasteNode(node: Node): Node[] {
+  if (node.nodeType === Node.TEXT_NODE) return [document.createTextNode(node.nodeValue ?? '')];
+  if (node.nodeType !== Node.ELEMENT_NODE) return []; // drop comments / others
+  const el = node as HTMLElement;
+  const kids = Array.from(el.childNodes).flatMap(cleanPasteNode);
+  if (!PASTE_TAGS.has(el.tagName)) return kids; // unwrap unknown tag, keep contents
+
+  const out = document.createElement(el.tagName.toLowerCase());
+  const tag = el.tagName;
+  const keepAttr = (name: string, value: string) => out.setAttribute(name, value);
+
+  if (tag === 'A') {
+    const href = el.getAttribute('href') || '';
+    if (href && !/^\s*javascript:/i.test(href)) keepAttr('href', href);
+    const id = el.getAttribute('data-doc-id');
+    if (id) keepAttr('data-doc-id', id);
+    if (el.classList.contains('doc-ref')) out.setAttribute('contenteditable', 'false');
+  } else if (tag === 'IMG') {
+    const src = el.getAttribute('src') || '';
+    if (/^(https?:|data:image\/)/i.test(src)) keepAttr('src', src);
+    const alt = el.getAttribute('alt');
+    if (alt) keepAttr('alt', alt);
+  } else if (tag === 'DETAILS') {
+    out.setAttribute('open', ''); // always paste toggles open so content is visible
+  } else if (tag === 'LI') {
+    const checked = el.getAttribute('data-checked');
+    if (checked != null) keepAttr('data-checked', checked);
+  } else if (tag === 'FONT') {
+    const color = el.getAttribute('color');
+    if (color) keepAttr('color', color);
+  }
+
+  // Keep only whitelisted classes.
+  const classes = Array.from(el.classList).filter((c) => PASTE_CLASSES.has(c));
+  if (classes.length) out.className = classes.join(' ');
+
+  // Keep only safe inline style props (text formatting + image width).
+  const style = PASTE_STYLE_PROPS.map((p) => {
+    const v = el.style.getPropertyValue(p);
+    return v ? `${p}: ${v}` : '';
+  }).filter(Boolean);
+  if (style.length) out.setAttribute('style', style.join('; '));
+
+  kids.forEach((k) => out.appendChild(k));
+  return [out];
+}
+
+// Flatten stored HTML to a short one-line preview (used in the history list).
+function htmlToPreview(html: string): string {
+  const d = document.createElement('div');
+  d.innerHTML = html;
+  const text = (d.textContent || '').replace(/\s+/g, ' ').trim();
+  return text.length > 90 ? `${text.slice(0, 90)}…` : text;
+}
+
+function sanitizeDocHtml(html: string): string {
+  // Strip anything outside <body>, plus style/script blocks, up front.
+  const tmpl = document.createElement('template');
+  tmpl.innerHTML = html.replace(/<!--[\s\S]*?-->/g, '').replace(/<(script|style)[\s\S]*?<\/\1>/gi, '');
+  const container = document.createElement('div');
+  Array.from(tmpl.content.childNodes)
+    .flatMap(cleanPasteNode)
+    .forEach((n) => container.appendChild(n));
+  return container.innerHTML;
 }
 
 function TB({ onClick, title, children }: { onClick: () => void; title: string; children: React.ReactNode }) {
