@@ -9,6 +9,7 @@ import {
   VisionTopic,
   VisionSettings,
   VisionDoc,
+  VisionDocSnapshot,
 } from '../types';
 
 const snapshotRow = (g: VisionGoal) => ({
@@ -544,6 +545,41 @@ export const db = {
 
       if (error) throw error;
       return data;
+    },
+  },
+
+  // Point-in-time copies of planner pages, so a bad edit can be rolled back.
+  visionDocSnapshots: {
+    // Newest first. Cheap: capped per doc by prune() on every add.
+    list: async (docId: string): Promise<VisionDocSnapshot[]> => {
+      const { data, error } = await supabase
+        .from('vision_doc_snapshots')
+        .select('*')
+        .eq('user_id', SINGLE_USER_ID)
+        .eq('doc_id', docId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+
+    add: async (
+      snap: Pick<VisionDocSnapshot, 'doc_id' | 'title' | 'summary' | 'content'>,
+      keep = 40
+    ): Promise<void> => {
+      const { error } = await supabase
+        .from('vision_doc_snapshots')
+        .insert([{ ...snap, user_id: SINGLE_USER_ID }]);
+      if (error) throw error;
+      // Prune anything older than the newest `keep` for this doc.
+      const { data: old } = await supabase
+        .from('vision_doc_snapshots')
+        .select('id')
+        .eq('user_id', SINGLE_USER_ID)
+        .eq('doc_id', snap.doc_id)
+        .order('created_at', { ascending: false })
+        .range(keep, keep + 200);
+      const ids = (old || []).map((r) => r.id);
+      if (ids.length) await supabase.from('vision_doc_snapshots').delete().in('id', ids);
     },
   },
 

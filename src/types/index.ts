@@ -162,3 +162,14 @@ export interface VisionDoc {
   created_at: string;
   updated_at: string;
 }
+
+/** A point-in-time copy of a planner page, for recovery. */
+export interface VisionDocSnapshot {
+  id: string;
+  doc_id: string;
+  user_id: string;
+  title: string;
+  summary: string;
+  content: string;
+  created_at: string;
+}
