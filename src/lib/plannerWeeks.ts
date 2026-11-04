@@ -77,14 +77,20 @@ export function seedDayHeadersHTML(startISO: string): string {
  */
 export function repairWeekHeadings(html: string, startISO: string): string {
   if (!html || typeof document === 'undefined') return html;
-  const labelToIso = new Map(weekDays(startISO).map((d) => [d.label, d.iso] as const));
+  // contentEditable likes to slip in non-breaking spaces, so match on whitespace-
+  // normalised text rather than the raw label — otherwise a stray &nbsp; would make
+  // the exact match miss and a mangled heading would never get repaired.
+  const norm = (s: string) => s.replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
+  const days = weekDays(startISO);
+  const normToDay = new Map(days.map((d) => [norm(d.label), d] as const));
   const div = document.createElement('div');
   div.innerHTML = html;
   let changed = false;
   Array.from(div.children).forEach((el) => {
-    const label = (el.textContent || '').trim();
-    const iso = labelToIso.get(label);
-    if (!iso) return;
+    const day = normToDay.get(norm(el.textContent || ''));
+    if (!day) return;
+    const iso = day.iso;
+    const label = day.label;
     // Already the canonical anchored <h3> with no stray inline wrappers? Leave it.
     if (el.tagName === 'H3' && el.getAttribute('data-day') === iso && el.children.length === 0) return;
     const h3 = document.createElement('h3');
