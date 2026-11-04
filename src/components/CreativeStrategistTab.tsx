@@ -109,9 +109,16 @@ export default function CreativeStrategistTab() {
     })();
   }, []);
 
-  // Single writer: update state + localStorage, tell the nav about stage changes,
-  // and debounce the DB upsert (surfacing a "run the migration" toast on failure).
-  const commit = useCallback(
+  // Undo/redo: snapshots of the whole strategist blob. Because every writer
+  // produces a brand-new object (spreads, never in-place mutation), each entry is
+  // an immutable point-in-time copy — no deep clone needed.
+  const undoStack = useRef<StrategistState[]>([]);
+  const redoStack = useRef<StrategistState[]>([]);
+
+  // Low-level writer: update state + localStorage, tell the nav about stage
+  // changes, and debounce the DB upsert (surfacing a "run the migration" toast on
+  // failure). Does NOT touch history — undo/redo reuse it to replay a snapshot.
+  const persist = useCallback(
     (next: StrategistState) => {
       setStrat(next);
       stratRef.current = next;
@@ -127,6 +134,55 @@ export default function CreativeStrategistTab() {
     },
     [dbDown, flash]
   );
+
+  // Public writer every user action goes through. Pushes the pre-change snapshot
+  // onto the undo stack (unless `history:false` for bookkeeping writes like the
+  // auto-created week mapping) and clears the redo stack.
+  const commit = useCallback(
+    (next: StrategistState, opts?: { history?: boolean }) => {
+      if (opts?.history !== false) {
+        undoStack.current.push(stratRef.current);
+        if (undoStack.current.length > 200) undoStack.current.shift();
+        redoStack.current = [];
+      }
+      persist(next);
+    },
+    [persist]
+  );
+
+  const undo = useCallback(() => {
+    const prev = undoStack.current.pop();
+    if (!prev) return;
+    redoStack.current.push(stratRef.current);
+    persist(prev);
+  }, [persist]);
+
+  const redo = useCallback(() => {
+    const next = redoStack.current.pop();
+    if (!next) return;
+    undoStack.current.push(stratRef.current);
+    persist(next);
+  }, [persist]);
+
+  // Cmd/Ctrl+Z to undo, Cmd/Ctrl+Shift+Z (or Cmd/Ctrl+Y) to redo — for the tab's
+  // structural state (stages, goals, notes). When the caret is in a text field or
+  // the planner editor, step aside so the browser's native text undo wins there.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const k = e.key.toLowerCase();
+      const isRedo = (k === 'z' && e.shiftKey) || k === 'y';
+      const isUndo = k === 'z' && !e.shiftKey;
+      if (!isUndo && !isRedo) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      e.preventDefault();
+      if (isRedo) redo();
+      else undo();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [undo, redo]);
 
   // ---------- planner doc CRUD (thin wrappers over db.visionDocs) ----------
   const addDoc = useCallback(
@@ -182,7 +238,7 @@ export default function CreativeStrategistTab() {
       try {
         const { label } = weekRange(startISO);
         const id = await addDoc(monthBucket(startISO), label, seedDayHeadersHTML(startISO));
-        if (id) commit({ ...stratRef.current, weeks: { ...stratRef.current.weeks, [startISO]: id } });
+        if (id) commit({ ...stratRef.current, weeks: { ...stratRef.current.weeks, [startISO]: id } }, { history: false });
         return id;
       } finally {
         ensuringRef.current.delete(startISO);
@@ -223,7 +279,7 @@ export default function CreativeStrategistTab() {
 
   return (
     <main
-      className="relative pb-4 px-3 sm:px-6 lg:px-8 max-w-[1400px] mx-auto"
+      className="relative pb-4 px-3 sm:px-4 lg:px-5"
       style={{ paddingTop: 'var(--nav-h, calc(100px + env(safe-area-inset-top)))' }}
     >
       <style>{DOC_BODY_CSS}</style>
@@ -541,10 +597,21 @@ function PlannerPreview({ doc, onOpen }: { doc: VisionDoc | null; onOpen: () => 
     const div = document.createElement('div');
     div.innerHTML = doc.content;
     const head = div.querySelector(`[data-day="${today}"]`);
-    let node = head?.nextElementSibling || null;
+    let node = head?.nextElementSibling as Element | null;
     const bits: string[] = [];
-    while (node && node.tagName !== 'H3') {
+    // Collect only what sits under TODAY's heading — stop at the next day's
+    // heading. Headings are normally <h3 data-day=…>, but editing can flatten one
+    // into a styled <p> that keeps the "Thu · Nov 5" text yet loses the tag AND
+    // the data-day anchor — so also stop on anything that *reads* like a day label.
+    const DAY_LABEL = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) · [A-Z][a-z]{2} \d{1,2}\b/;
+    while (node) {
       const t = (node.textContent || '').trim();
+      const isDayBoundary =
+        /^H[1-6]$/.test(node.tagName) ||
+        node.hasAttribute('data-day') ||
+        !!node.querySelector('[data-day]') ||
+        DAY_LABEL.test(t);
+      if (isDayBoundary) break;
       if (t) bits.push(t);
       node = node.nextElementSibling;
     }
@@ -588,8 +655,10 @@ function PlannerView({
   const isThisWeek = weekISO === weekStartISO(new Date());
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // When the current week opens, jump to today's heading and drop the caret just
-  // after it so the user can type their day straight away.
+  // When the current week opens, scroll today's heading to the TOP of the page
+  // (so the already-passed days tuck away above it and the later days are a
+  // scroll down) and drop the caret just after it so the user can type straight
+  // away.
   useEffect(() => {
     if (!doc || !isThisWeek) return;
     const t = setTimeout(() => {
@@ -597,7 +666,7 @@ function PlannerView({
       if (!root) return;
       const head = root.querySelector(`[data-day="${todayISO()}"]`) as HTMLElement | null;
       if (!head) return;
-      head.scrollIntoView({ block: 'center' });
+      head.scrollIntoView({ block: 'start' });
       const target = (head.nextElementSibling as HTMLElement | null) ?? head;
       const body = target.closest('.doc-body') as HTMLElement | null;
       if (body) {
