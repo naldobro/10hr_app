@@ -223,13 +223,13 @@ export default function CreativeStrategistTab() {
 
   return (
     <main
-      className="relative pb-12 px-3 sm:px-6 lg:px-8 max-w-[1400px] mx-auto"
+      className="relative pb-4 px-3 sm:px-6 lg:px-8 max-w-[1400px] mx-auto"
       style={{ paddingTop: 'var(--nav-h, calc(100px + env(safe-area-inset-top)))' }}
     >
       <style>{DOC_BODY_CSS}</style>
 
-      {/* ---------------- the 2×2 map ---------------- */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-3">
+      {/* ---------------- the 2×2 map — fills the screen below the nav ---------------- */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 lg:grid-rows-2 gap-4 mt-3 lg:h-[calc(100dvh-var(--nav-h,100px)-1.5rem)]">
         <Box k="stages" n="01" title="Stages" icon={<Target className="w-4 h-4" />} onExpand={() => setExpanded('stages')}>
           <StagesView strat={strat} activeIdx={activeIdx} onEdit={editStage} compact />
         </Box>
@@ -308,7 +308,7 @@ function Box({
 }) {
   const accent = ACCENT[k];
   return (
-    <section className="paper-card paper-border dyn-glow rounded-2xl overflow-hidden flex flex-col min-h-[300px]">
+    <section className="paper-card paper-border dyn-glow rounded-2xl overflow-hidden flex flex-col min-h-[260px] lg:min-h-0">
       <header className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-black/5 dark:border-white/[0.1]">
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="font-mono text-[11px] font-black tracking-tight" style={{ color: accent }}>

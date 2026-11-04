@@ -125,17 +125,6 @@ export default function Navigation({
               Statistics
             </button>
             <button
-              onClick={() => onTabChange('vision')}
-              className={`flex-1 py-1.5 rounded-md text-sm font-semibold transition-all flex items-center justify-center gap-1 ${
-                activeTab === 'vision'
-                  ? 'paper-card ink-text paper-shadow'
-                  : 'ink-text-muted hover:bg-amber-50 dark:hover:bg-amber-400/10'
-              }`}
-            >
-              <Sparkles className={`w-3.5 h-3.5 ${activeTab === 'vision' ? 'text-violet-500' : ''}`} />
-              Vision
-            </button>
-            <button
               onClick={() => onTabChange('strategist')}
               title={strategistLabel}
               className={`flex-1 min-w-0 py-1.5 rounded-md text-sm font-semibold transition-all flex items-center justify-center gap-1 ${
@@ -146,6 +135,17 @@ export default function Navigation({
             >
               <Compass className={`w-3.5 h-3.5 flex-none ${isStrategist ? 'text-emerald-500' : ''}`} />
               <span className="truncate">{strategistLabel}</span>
+            </button>
+            <button
+              onClick={() => onTabChange('vision')}
+              className={`flex-1 py-1.5 rounded-md text-sm font-semibold transition-all flex items-center justify-center gap-1 ${
+                activeTab === 'vision'
+                  ? 'paper-card ink-text paper-shadow'
+                  : 'ink-text-muted hover:bg-amber-50 dark:hover:bg-amber-400/10'
+              }`}
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${activeTab === 'vision' ? 'text-violet-500' : ''}`} />
+              Vision
             </button>
           </div>
           {/* Focus pillars are desktop-only — omitted here to keep the mobile nav tight. */}
@@ -183,15 +183,16 @@ export default function Navigation({
                 Statistics
               </button>
               <button
-                onClick={() => onTabChange('vision')}
-                className={`px-4 lg:px-6 py-2 rounded-md font-semibold transition-all flex items-center gap-1.5 ${
-                  activeTab === 'vision'
+                onClick={() => onTabChange('strategist')}
+                title={strategistLabel}
+                className={`px-4 lg:px-6 py-2 rounded-md font-semibold transition-all flex items-center gap-1.5 max-w-[220px] ${
+                  isStrategist
                     ? 'paper-card ink-text paper-shadow'
                     : 'ink-text-muted hover:bg-amber-50 dark:hover:bg-amber-400/10'
                 }`}
               >
-                <Sparkles className={`w-4 h-4 ${activeTab === 'vision' ? 'text-violet-500' : ''}`} />
-                Vision
+                <Compass className={`w-4 h-4 flex-none ${isStrategist ? 'text-emerald-500' : ''}`} />
+                <span className="truncate">{strategistLabel}</span>
               </button>
             </div>
           </div>
@@ -230,22 +231,6 @@ export default function Navigation({
           </div>
 
           <div className="flex items-center gap-3 lg:gap-4">
-            {/* Creative Strategist — the focus tab, pulled out to the right. Its
-                label is the active identity stage (Creative Strategist → Business
-                → Enlightenment). */}
-            <button
-              onClick={() => onTabChange('strategist')}
-              title={strategistLabel}
-              className={`flex items-center gap-1.5 px-3 lg:px-4 py-2 rounded-lg font-semibold transition-all border max-w-[220px] ${
-                isStrategist
-                  ? 'paper-card ink-text paper-shadow border-emerald-500/50'
-                  : 'ink-text-muted border-transparent hover:bg-amber-50 dark:hover:bg-amber-400/10'
-              }`}
-            >
-              <Compass className={`w-4 h-4 flex-none ${isStrategist ? 'text-emerald-500' : ''}`} />
-              <span className="truncate">{strategistLabel}</span>
-            </button>
-
             {/* On Vision the streak shrinks to just the flame + count, giving the pillars room. */}
             <div
               title={isVision ? `${streakDays} day streak (≥8h/day)` : undefined}
@@ -275,6 +260,19 @@ export default function Navigation({
               <ThemeIcon className="w-5 h-5 lg:w-6 lg:h-6 ink-text-muted" />
             </button>
             <img src="/profile.png" alt="profile" className="w-9 h-9 lg:w-10 lg:h-10 rounded-full object-cover" />
+
+            {/* Vision — pulled all the way out to the right of the profile photo. */}
+            <button
+              onClick={() => onTabChange('vision')}
+              className={`flex items-center gap-1.5 px-3 lg:px-4 py-2 rounded-lg font-semibold transition-all border ${
+                isVision
+                  ? 'paper-card ink-text paper-shadow border-violet-500/50'
+                  : 'ink-text-muted border-transparent hover:bg-amber-50 dark:hover:bg-amber-400/10'
+              }`}
+            >
+              <Sparkles className={`w-4 h-4 flex-none ${isVision ? 'text-violet-500' : ''}`} />
+              Vision
+            </button>
           </div>
         </div>
       </div>
