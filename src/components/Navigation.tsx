@@ -1,10 +1,10 @@
 import { useLayoutEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Flame, Sparkles, Moon, Sun } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Flame, Sparkles, Moon, Sun, Compass } from 'lucide-react';
 import { useTheme } from '../lib/theme';
 import type { FocusPillar } from '../types';
 import FocusPillars from './FocusPillars';
 
-type Tab = 'track' | 'statistics' | 'vision';
+type Tab = 'track' | 'statistics' | 'vision' | 'strategist';
 
 interface NavigationProps {
   activeTab: Tab;
@@ -16,6 +16,8 @@ interface NavigationProps {
   focusPillars: FocusPillar[];
   onFocusPillarsChange: (pillars: FocusPillar[]) => void;
   onCommitPillars: (before: FocusPillar[], after: FocusPillar[]) => void;
+  /** Dynamic label of the Creative Strategist tab = the active identity stage. */
+  strategistLabel: string;
 }
 
 export default function Navigation({
@@ -28,11 +30,15 @@ export default function Navigation({
   focusPillars,
   onFocusPillarsChange,
   onCommitPillars,
+  strategistLabel,
 }: NavigationProps) {
   const { theme, toggleTheme } = useTheme();
   const ThemeIcon = theme === 'dark' ? Sun : Moon;
   const themeLabel = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
   const isVision = activeTab === 'vision';
+  const isStrategist = activeTab === 'strategist';
+  // The month in the centre is only meaningful on the calendar tabs.
+  const hideMonth = isVision || isStrategist;
 
   // Publish the nav's real height as --nav-h so page content can sit exactly below
   // it. The nav grows/shrinks (the Vision pillars row, mobile vs desktop, a notch's
@@ -129,6 +135,18 @@ export default function Navigation({
               <Sparkles className={`w-3.5 h-3.5 ${activeTab === 'vision' ? 'text-violet-500' : ''}`} />
               Vision
             </button>
+            <button
+              onClick={() => onTabChange('strategist')}
+              title={strategistLabel}
+              className={`flex-1 min-w-0 py-1.5 rounded-md text-sm font-semibold transition-all flex items-center justify-center gap-1 ${
+                isStrategist
+                  ? 'paper-card ink-text paper-shadow'
+                  : 'ink-text-muted hover:bg-amber-50 dark:hover:bg-amber-400/10'
+              }`}
+            >
+              <Compass className={`w-3.5 h-3.5 flex-none ${isStrategist ? 'text-emerald-500' : ''}`} />
+              <span className="truncate">{strategistLabel}</span>
+            </button>
           </div>
           {/* Focus pillars are desktop-only — omitted here to keep the mobile nav tight. */}
         </div>
@@ -182,7 +200,7 @@ export default function Navigation({
           <div className="relative flex items-center justify-center">
             <div
               className={`flex items-center gap-2 transition-all duration-300 ${
-                isVision ? 'opacity-0 -translate-y-1 pointer-events-none' : 'opacity-100'
+                hideMonth ? 'opacity-0 -translate-y-1 pointer-events-none' : 'opacity-100'
               }`}
             >
               <h1 className="text-xl lg:text-2xl font-bold ink-text tracking-tight whitespace-nowrap">
@@ -212,6 +230,22 @@ export default function Navigation({
           </div>
 
           <div className="flex items-center gap-3 lg:gap-4">
+            {/* Creative Strategist — the focus tab, pulled out to the right. Its
+                label is the active identity stage (Creative Strategist → Business
+                → Enlightenment). */}
+            <button
+              onClick={() => onTabChange('strategist')}
+              title={strategistLabel}
+              className={`flex items-center gap-1.5 px-3 lg:px-4 py-2 rounded-lg font-semibold transition-all border max-w-[220px] ${
+                isStrategist
+                  ? 'paper-card ink-text paper-shadow border-emerald-500/50'
+                  : 'ink-text-muted border-transparent hover:bg-amber-50 dark:hover:bg-amber-400/10'
+              }`}
+            >
+              <Compass className={`w-4 h-4 flex-none ${isStrategist ? 'text-emerald-500' : ''}`} />
+              <span className="truncate">{strategistLabel}</span>
+            </button>
+
             {/* On Vision the streak shrinks to just the flame + count, giving the pillars room. */}
             <div
               title={isVision ? `${streakDays} day streak (≥8h/day)` : undefined}

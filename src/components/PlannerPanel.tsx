@@ -183,6 +183,85 @@ async function compressImage(file: File): Promise<{ blob: Blob; type: string }> 
   }
 }
 
+// The rich-text styling for a planner page body. Exported so any surface that
+// embeds <DocEditor> (e.g. the Creative Strategist planner box) can inject the
+// same `.doc-body` rules — the editor markup is meaningless without them.
+export const DOC_BODY_CSS = `
+        /* Paint/layout containment + own compositor layer so each keystroke
+           repaints only the text, never forcing the parent paper-card's big
+           (mode-active) glow shadows to re-rasterize — that was the typing jank. */
+        .doc-body { line-height: 1.65; contain: content; transform: translateZ(0); }
+        .doc-body:focus { outline: none; }
+        .doc-body h1 { font-size: 2rem; font-weight: 800; letter-spacing: -.01em; margin: .6em 0 .3em; line-height: 1.2; }
+        .doc-body h2 { font-size: 1.5rem; font-weight: 700; margin: .6em 0 .25em; line-height: 1.25; }
+        .doc-body h3 { font-size: 1.2rem; font-weight: 700; margin: .5em 0 .2em; line-height: 1.3; }
+        .doc-body p { margin: .35em 0; }
+        .doc-body ul { list-style: disc; padding-left: 1.4rem; margin: .35em 0; }
+        .doc-body ol { list-style: decimal; padding-left: 1.4rem; margin: .35em 0; }
+        .doc-body li { margin: .15em 0; }
+        .doc-body blockquote { border-left: 3px solid #d6d3d1; padding-left: .8rem; margin: .5em 0; color: #78716c; font-style: italic; }
+        /* monospace / preformatted text (e.g. pasted code) — styled so it still
+           reads well if it ever lands in a note. */
+        .doc-body pre {
+          font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+          font-size: .92em; line-height: 1.5; tab-size: 2;
+          background: #f5f5f4; border: 1px solid #e7e5e4; border-radius: .5rem;
+          padding: .7em .9em; margin: .5em 0; white-space: pre-wrap; overflow-x: auto;
+        }
+        .dark .doc-body pre { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.14); }
+        .doc-body code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; background: #f5f5f4; padding: .1em .35em; border-radius: .35em; }
+        .dark .doc-body code { background: rgba(255,255,255,.08); }
+        .doc-body pre code { background: none; padding: 0; }
+        .doc-body a { color: #2563eb; text-decoration: underline; }
+        .doc-body hr { border: none; border-top: 1px solid #d6d3d1; margin: .9em 0; }
+        .doc-body img { max-width: 100%; height: auto; border-radius: .5rem; margin: .5em 0; display: block; }
+        .doc-body[data-empty="true"]::before { content: attr(data-placeholder); color: #a8a29e; }
+        /* tables */
+        .doc-body table.doc-table { border-collapse: collapse; width: 100%; margin: .6em 0; }
+        .doc-body table.doc-table td, .doc-body table.doc-table th { border: 1px solid #d6d3d1; padding: .4em .55em; min-width: 3em; vertical-align: top; }
+        .doc-body table.doc-table th { background: #f5f5f4; font-weight: 700; text-align: left; }
+        /* checklists / tick boxes */
+        .doc-body ul.doc-tasks { list-style: none; padding-left: 0; margin: .4em 0; }
+        .doc-body ul.doc-tasks li.doc-task { position: relative; padding-left: 1.8em; margin: .22em 0; }
+        .doc-body ul.doc-tasks li.doc-task::before { content: ''; position: absolute; left: 0; top: .18em; width: 1.05em; height: 1.05em; border: 2px solid #a8a29e; border-radius: .3em; background: #fff; cursor: pointer; box-sizing: border-box; }
+        .doc-body ul.doc-tasks li.doc-task[data-checked="true"]::before { background: #059669; border-color: #059669; }
+        .doc-body ul.doc-tasks li.doc-task[data-checked="true"]::after { content: ''; position: absolute; left: .35em; top: .28em; width: .28em; height: .55em; border: solid #fff; border-width: 0 .16em .16em 0; transform: rotate(45deg); pointer-events: none; }
+        .doc-body ul.doc-tasks li.doc-task[data-checked="true"] { color: #a8a29e; text-decoration: line-through; }
+        /* toggle / collapsible block — native <details>, so open/close is reliable
+           and the body is never lost (it stays in the DOM + saved HTML when closed) */
+        .doc-body details.doc-toggle { margin: .5em 0; border-left: 2px solid rgba(120,120,120,.22); padding-left: .2em; }
+        .doc-body details.doc-toggle > summary.doc-toggle-head {
+          list-style: none; position: relative; padding-left: 2em; font-weight: 600; cursor: text; outline: none;
+        }
+        .doc-body details.doc-toggle > summary.doc-toggle-head::-webkit-details-marker { display: none; }
+        .doc-body details.doc-toggle > summary.doc-toggle-head::marker { content: ''; }
+        .doc-body details.doc-toggle > summary.doc-toggle-head::before {
+          content: '▶'; position: absolute; left: 0; top: 0; width: 1.4em; text-align: center;
+          font-size: 1.45em; line-height: .95; color: #b0aca6;
+          cursor: pointer; user-select: none; transition: transform .15s ease; transform-origin: 50% 55%;
+        }
+        .doc-body details.doc-toggle > summary.doc-toggle-head:hover::before { color: #d6d3d1; }
+        .doc-body details.doc-toggle[open] > summary.doc-toggle-head::before { transform: rotate(90deg); }
+        .doc-body details.doc-toggle > summary.doc-toggle-head:empty::after { content: 'Toggle'; color: #a8a29e; font-weight: 600; }
+        .doc-body details.doc-toggle > .doc-toggle-body { padding-left: 2em; margin-top: .2em; }
+        /* linked-page reference chips (collapsed; click opens the page in a window) */
+        .doc-body a.doc-ref {
+          display: inline-flex; align-items: center; gap: .3em;
+          padding: .05em .5em; margin: 0 .1em; border-radius: .5em;
+          background: #eef2ff; border: 1px solid #c7d2fe; color: #4338ca;
+          font-size: .92em; font-weight: 600; text-decoration: none;
+          cursor: pointer; vertical-align: baseline; white-space: nowrap;
+          max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+        }
+        .doc-body a.doc-ref:hover { background: #e0e7ff; border-color: #a5b4fc; }
+        .doc-body a.doc-ref[data-missing="true"] {
+          background: #fef2f2; border-color: #fecaca; color: #b91c1c; cursor: default;
+        }
+        .dark .doc-body a.doc-ref { background: rgba(99,102,241,.18); border-color: rgba(129,140,248,.4); color: #c7d2fe; }
+        .dark .doc-body a.doc-ref:hover { background: rgba(99,102,241,.3); }
+        .dark .doc-body a.doc-ref[data-missing="true"] { background: rgba(239,68,68,.14); border-color: rgba(248,113,113,.4); color: #fca5a5; }
+      `;
+
 export default function PlannerPanel({
   docs,
   trashDocs,
@@ -553,81 +632,7 @@ export default function PlannerPanel({
     <>
     <div className="fixed inset-0 z-[80]" onClick={onClose}>
       <div className="absolute inset-0 bg-black/30" />
-      <style>{`
-        /* Paint/layout containment + own compositor layer so each keystroke
-           repaints only the text, never forcing the parent paper-card's big
-           (mode-active) glow shadows to re-rasterize — that was the typing jank. */
-        .doc-body { line-height: 1.65; contain: content; transform: translateZ(0); }
-        .doc-body:focus { outline: none; }
-        .doc-body h1 { font-size: 2rem; font-weight: 800; letter-spacing: -.01em; margin: .6em 0 .3em; line-height: 1.2; }
-        .doc-body h2 { font-size: 1.5rem; font-weight: 700; margin: .6em 0 .25em; line-height: 1.25; }
-        .doc-body h3 { font-size: 1.2rem; font-weight: 700; margin: .5em 0 .2em; line-height: 1.3; }
-        .doc-body p { margin: .35em 0; }
-        .doc-body ul { list-style: disc; padding-left: 1.4rem; margin: .35em 0; }
-        .doc-body ol { list-style: decimal; padding-left: 1.4rem; margin: .35em 0; }
-        .doc-body li { margin: .15em 0; }
-        .doc-body blockquote { border-left: 3px solid #d6d3d1; padding-left: .8rem; margin: .5em 0; color: #78716c; font-style: italic; }
-        /* monospace / preformatted text (e.g. pasted code) — styled so it still
-           reads well if it ever lands in a note. */
-        .doc-body pre {
-          font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-          font-size: .92em; line-height: 1.5; tab-size: 2;
-          background: #f5f5f4; border: 1px solid #e7e5e4; border-radius: .5rem;
-          padding: .7em .9em; margin: .5em 0; white-space: pre-wrap; overflow-x: auto;
-        }
-        .dark .doc-body pre { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.14); }
-        .doc-body code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; background: #f5f5f4; padding: .1em .35em; border-radius: .35em; }
-        .dark .doc-body code { background: rgba(255,255,255,.08); }
-        .doc-body pre code { background: none; padding: 0; }
-        .doc-body a { color: #2563eb; text-decoration: underline; }
-        .doc-body hr { border: none; border-top: 1px solid #d6d3d1; margin: .9em 0; }
-        .doc-body img { max-width: 100%; height: auto; border-radius: .5rem; margin: .5em 0; display: block; }
-        .doc-body[data-empty="true"]::before { content: attr(data-placeholder); color: #a8a29e; }
-        /* tables */
-        .doc-body table.doc-table { border-collapse: collapse; width: 100%; margin: .6em 0; }
-        .doc-body table.doc-table td, .doc-body table.doc-table th { border: 1px solid #d6d3d1; padding: .4em .55em; min-width: 3em; vertical-align: top; }
-        .doc-body table.doc-table th { background: #f5f5f4; font-weight: 700; text-align: left; }
-        /* checklists / tick boxes */
-        .doc-body ul.doc-tasks { list-style: none; padding-left: 0; margin: .4em 0; }
-        .doc-body ul.doc-tasks li.doc-task { position: relative; padding-left: 1.8em; margin: .22em 0; }
-        .doc-body ul.doc-tasks li.doc-task::before { content: ''; position: absolute; left: 0; top: .18em; width: 1.05em; height: 1.05em; border: 2px solid #a8a29e; border-radius: .3em; background: #fff; cursor: pointer; box-sizing: border-box; }
-        .doc-body ul.doc-tasks li.doc-task[data-checked="true"]::before { background: #059669; border-color: #059669; }
-        .doc-body ul.doc-tasks li.doc-task[data-checked="true"]::after { content: ''; position: absolute; left: .35em; top: .28em; width: .28em; height: .55em; border: solid #fff; border-width: 0 .16em .16em 0; transform: rotate(45deg); pointer-events: none; }
-        .doc-body ul.doc-tasks li.doc-task[data-checked="true"] { color: #a8a29e; text-decoration: line-through; }
-        /* toggle / collapsible block — native <details>, so open/close is reliable
-           and the body is never lost (it stays in the DOM + saved HTML when closed) */
-        .doc-body details.doc-toggle { margin: .5em 0; border-left: 2px solid rgba(120,120,120,.22); padding-left: .2em; }
-        .doc-body details.doc-toggle > summary.doc-toggle-head {
-          list-style: none; position: relative; padding-left: 2em; font-weight: 600; cursor: text; outline: none;
-        }
-        .doc-body details.doc-toggle > summary.doc-toggle-head::-webkit-details-marker { display: none; }
-        .doc-body details.doc-toggle > summary.doc-toggle-head::marker { content: ''; }
-        .doc-body details.doc-toggle > summary.doc-toggle-head::before {
-          content: '▶'; position: absolute; left: 0; top: 0; width: 1.4em; text-align: center;
-          font-size: 1.45em; line-height: .95; color: #b0aca6;
-          cursor: pointer; user-select: none; transition: transform .15s ease; transform-origin: 50% 55%;
-        }
-        .doc-body details.doc-toggle > summary.doc-toggle-head:hover::before { color: #d6d3d1; }
-        .doc-body details.doc-toggle[open] > summary.doc-toggle-head::before { transform: rotate(90deg); }
-        .doc-body details.doc-toggle > summary.doc-toggle-head:empty::after { content: 'Toggle'; color: #a8a29e; font-weight: 600; }
-        .doc-body details.doc-toggle > .doc-toggle-body { padding-left: 2em; margin-top: .2em; }
-        /* linked-page reference chips (collapsed; click opens the page in a window) */
-        .doc-body a.doc-ref {
-          display: inline-flex; align-items: center; gap: .3em;
-          padding: .05em .5em; margin: 0 .1em; border-radius: .5em;
-          background: #eef2ff; border: 1px solid #c7d2fe; color: #4338ca;
-          font-size: .92em; font-weight: 600; text-decoration: none;
-          cursor: pointer; vertical-align: baseline; white-space: nowrap;
-          max-width: 100%; overflow: hidden; text-overflow: ellipsis;
-        }
-        .doc-body a.doc-ref:hover { background: #e0e7ff; border-color: #a5b4fc; }
-        .doc-body a.doc-ref[data-missing="true"] {
-          background: #fef2f2; border-color: #fecaca; color: #b91c1c; cursor: default;
-        }
-        .dark .doc-body a.doc-ref { background: rgba(99,102,241,.18); border-color: rgba(129,140,248,.4); color: #c7d2fe; }
-        .dark .doc-body a.doc-ref:hover { background: rgba(99,102,241,.3); }
-        .dark .doc-body a.doc-ref[data-missing="true"] { background: rgba(239,68,68,.14); border-color: rgba(248,113,113,.4); color: #fca5a5; }
-      `}</style>
+      <style>{DOC_BODY_CSS}</style>
       <div className="absolute inset-x-0 bottom-0 top-[calc(100px+env(safe-area-inset-top))] md:top-[calc(90px+env(safe-area-inset-top))] flex items-center justify-center p-2 sm:p-4">
       <div
         className="relative paper-card rounded-2xl border border-black/10 dark:border-white/[0.2] shadow-2xl w-[min(1100px,96vw)] h-[820px] max-h-full flex overflow-hidden"
@@ -1300,7 +1305,7 @@ function LinkedDocWindow({
   );
 }
 
-function DocEditor({
+export function DocEditor({
   doc,
   onChange,
   onDelete,
@@ -1358,6 +1363,17 @@ function DocEditor({
   const [snapError, setSnapError] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState<string | null>(null);
 
+  // ---- editor undo/redo history ----
+  // Native contentEditable undo can't see our structural edits (heading/quote/list
+  // transforms move DOM nodes directly, outside execCommand), so ⌘Z silently stops
+  // working the moment you use one. We keep our own snapshot stack instead — it
+  // covers typing AND every toolbar action uniformly.
+  type EditSnap = { summary: string; content: string; focus: 'summary' | 'body' | null; offset: number };
+  const histStack = useRef<EditSnap[]>([]);
+  const histIndex = useRef(-1);
+  const histTimer = useRef<number | undefined>(undefined);
+  const applyingHist = useRef(false); // true while we restore, so the restore itself isn't recorded
+
   // Empty only when there's no text AND no block content (table/list/rule/image).
   const setEmpty = (el: HTMLDivElement | null) => {
     if (!el) return;
@@ -1379,7 +1395,117 @@ function DocEditor({
     normalizeTasks(bodyRef.current);
     setEmpty(summaryRef.current);
     setEmpty(bodyRef.current);
+    scheduleHistory();
     scheduleSave();
+  };
+
+  // ---- editor undo/redo implementation ----
+  // Which editor the caret is in, and the plain-text offset of the caret within it.
+  const caretOffsetIn = (host: HTMLElement): number => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return 0;
+    const r = sel.getRangeAt(0);
+    if (!host.contains(r.startContainer)) return 0;
+    const pre = r.cloneRange();
+    pre.selectNodeContents(host);
+    try {
+      pre.setEnd(r.startContainer, r.startOffset);
+    } catch {
+      return 0;
+    }
+    return pre.toString().length;
+  };
+  const placeCaretAtOffset = (host: HTMLElement, offset: number) => {
+    const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
+    let remaining = offset;
+    let node = walker.nextNode();
+    while (node) {
+      const len = node.nodeValue?.length ?? 0;
+      if (remaining <= len) {
+        const r = document.createRange();
+        r.setStart(node, remaining);
+        r.collapse(true);
+        const s = window.getSelection();
+        s?.removeAllRanges();
+        s?.addRange(r);
+        savedRange.current = r.cloneRange();
+        return;
+      }
+      remaining -= len;
+      node = walker.nextNode();
+    }
+    placeCaret(host, false); // offset past the end → land at the end
+    rememberSelection();
+  };
+  const currentEditSnap = (): EditSnap => {
+    const focus =
+      summaryRef.current && document.activeElement === summaryRef.current
+        ? 'summary'
+        : bodyRef.current && document.activeElement === bodyRef.current
+        ? 'body'
+        : null;
+    const host = focus === 'summary' ? summaryRef.current : focus === 'body' ? bodyRef.current : null;
+    return {
+      summary: summaryRef.current?.innerHTML ?? '',
+      content: bodyRef.current?.innerHTML ?? '',
+      focus,
+      offset: host ? caretOffsetIn(host) : 0,
+    };
+  };
+  // Commit the current state as a new history step (dropping any redo tail). No-op
+  // if nothing changed since the top of the stack.
+  const commitHistoryNow = () => {
+    window.clearTimeout(histTimer.current);
+    histTimer.current = undefined;
+    if (applyingHist.current) return;
+    const snap = currentEditSnap();
+    const top = histStack.current[histIndex.current];
+    if (top && top.summary === snap.summary && top.content === snap.content) {
+      top.focus = snap.focus; // keep the caret position fresh without a new step
+      top.offset = snap.offset;
+      return;
+    }
+    histStack.current = histStack.current.slice(0, histIndex.current + 1);
+    histStack.current.push(snap);
+    if (histStack.current.length > 200) histStack.current.shift();
+    histIndex.current = histStack.current.length - 1;
+  };
+  const scheduleHistory = () => {
+    if (applyingHist.current) return;
+    window.clearTimeout(histTimer.current);
+    histTimer.current = window.setTimeout(commitHistoryNow, 450);
+  };
+  const restoreEditSnap = (snap: EditSnap) => {
+    applyingHist.current = true;
+    if (summaryRef.current && summaryRef.current.innerHTML !== snap.summary) {
+      summaryRef.current.innerHTML = snap.summary;
+    }
+    if (bodyRef.current && bodyRef.current.innerHTML !== snap.content) {
+      bodyRef.current.innerHTML = snap.content;
+    }
+    normalizeTasks(summaryRef.current);
+    normalizeTasks(bodyRef.current);
+    setEmpty(summaryRef.current);
+    setEmpty(bodyRef.current);
+    refreshDocRefs();
+    const host = snap.focus === 'summary' ? summaryRef.current : snap.focus === 'body' ? bodyRef.current : null;
+    if (host) {
+      host.focus();
+      placeCaretAtOffset(host, snap.offset);
+    }
+    applyingHist.current = false;
+    scheduleSave(); // persist the undone/redone state
+  };
+  const undoEdit = () => {
+    commitHistoryNow(); // capture any uncommitted typing as its own step first
+    if (histIndex.current <= 0) return;
+    histIndex.current -= 1;
+    restoreEditSnap(histStack.current[histIndex.current]);
+  };
+  const redoEdit = () => {
+    if (histIndex.current >= histStack.current.length - 1) return;
+    histIndex.current += 1;
+    restoreEditSnap(histStack.current[histIndex.current]);
   };
 
   const snapshot = (): Partial<VisionDoc> => ({
@@ -1446,6 +1572,11 @@ function DocEditor({
     }
     // Baseline fingerprint = the state as loaded, so we never snapshot an unchanged page.
     lastSnapKey.current = `${doc.title} ${summaryRef.current?.innerHTML ?? ''} ${bodyRef.current?.innerHTML ?? ''}`;
+    // Seed the undo stack with the loaded state so the first ⌘Z has somewhere to land.
+    histStack.current = [
+      { summary: summaryRef.current?.innerHTML ?? '', content: bodyRef.current?.innerHTML ?? '', focus: null, offset: 0 },
+    ];
+    histIndex.current = 0;
     refreshDocRefs();
     return () => {
       // Flush any pending edit when leaving this doc, and capture a final snapshot.
@@ -1455,6 +1586,7 @@ function DocEditor({
       }
       maybeSnapshot(true);
       window.clearTimeout(savedTimer.current);
+      window.clearTimeout(histTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1750,9 +1882,13 @@ function DocEditor({
     ensureFocus();
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
+    let range = sel.getRangeAt(0);
     const host = hostOf(range.commonAncestorContainer);
     if (!host) return;
+    // Wrap a loose first line into a <p> so a typed-but-unwrapped line turns INTO a
+    // list item instead of spawning a stray empty list beside it.
+    wrapLooseBlocks(host);
+    range = sel.rangeCount ? sel.getRangeAt(0) : range;
 
     const touches = (node: Node) => {
       try {
@@ -1841,8 +1977,14 @@ function DocEditor({
   // Re-type the selected top-level blocks (heading ⇄ body ⇄ quote), losslessly:
   // we only swap each block's tag and move its children across, never deleting
   // text. Clicking the current type again toggles back to a paragraph.
-  const setBlockType = (tag: string) => {
+  const setBlockType = (tag: string, resetSize = false) => {
     ensureFocus();
+    const pre = selRangeHost();
+    if (!pre) return;
+    // A freshly-typed first line is still a bare text node (no <p> yet), so there's
+    // no block for the command to act on — wrap it first. Nodes are moved, not
+    // recreated, so the live caret/selection survives.
+    wrapLooseBlocks(pre.host);
     const ctx = selRangeHost();
     if (!ctx) return;
     const { sel, range, host } = ctx;
@@ -1862,6 +2004,15 @@ function DocEditor({
       const nb = document.createElement(target);
       if (b.style.textAlign) nb.style.textAlign = b.style.textAlign;
       while (b.firstChild) nb.appendChild(b.firstChild);
+      // Picking a named style (Title/Heading/Body) should actually look like that
+      // style, so drop any leftover inline font-size that would otherwise win.
+      if (resetSize) {
+        nb.querySelectorAll('[style*="font-size"], font[size]').forEach((el) => {
+          if ((el as HTMLElement).tagName === 'FONT') el.removeAttribute('size');
+          else (el as HTMLElement).style.removeProperty('font-size');
+        });
+        nb.style.removeProperty('font-size');
+      }
       b.replaceWith(nb);
     });
 
@@ -1882,6 +2033,9 @@ function DocEditor({
   // so the caret stays put and nothing can be lost.
   const setAlign = (dir: 'left' | 'center' | 'right') => {
     ensureFocus();
+    const pre = selRangeHost();
+    if (!pre) return;
+    wrapLooseBlocks(pre.host);
     const ctx = selRangeHost();
     if (!ctx) return;
     const { range, host } = ctx;
@@ -2286,7 +2440,7 @@ function DocEditor({
                 key={f.label}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
-                  setBlockType(f.block.replace(/[<>]/g, ''));
+                  setBlockType(f.block.replace(/[<>]/g, ''), true);
                   setMenu(null);
                 }}
                 className="flex w-full items-baseline justify-between gap-4 px-3 py-2 rounded-lg hover:bg-stone-100 text-left transition-colors"
@@ -2669,6 +2823,23 @@ function DocEditor({
     const host = hostOf(node);
     if (!host) return;
 
+    // Our own undo/redo — native contentEditable undo can't replay our structural
+    // edits, so we drive the snapshot stack here. (VisionTab's global ⌘Z already
+    // bails on contenteditable targets, so there's no double-handling.)
+    const mod = e.metaKey || e.ctrlKey;
+    const lower = e.key.toLowerCase();
+    if (mod && lower === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) redoEdit();
+      else undoEdit();
+      return;
+    }
+    if (mod && lower === 'y') {
+      e.preventDefault();
+      redoEdit();
+      return;
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       const el = node.nodeType === 3 ? node.parentElement : (node as HTMLElement);
       const head = el?.closest?.('summary.doc-toggle-head') as HTMLElement | null;
@@ -2834,6 +3005,31 @@ function normalizeLoadedBlocks(host: HTMLElement) {
     else run.push(child);
   });
   flushBefore(null);
+}
+
+// Wrap any loose inline nodes that sit directly under the editor (bare text, a
+// lone <span>/<a>, etc.) into a <p>, so block-level toolbar commands always have
+// a real block to act on. Unlike normalizeLoadedBlocks this keeps soft <br> lines
+// together and only MOVES existing nodes — a live caret/selection stays valid.
+// No-op when the top level is already all blocks (the common case).
+function wrapLooseBlocks(host: HTMLElement) {
+  const isBlock = (n: Node) => n.nodeType === Node.ELEMENT_NODE && BLOCK_TAGS.has((n as Element).tagName);
+  if (Array.from(host.childNodes).every((n) => isBlock(n) || (n.nodeType === Node.TEXT_NODE && !n.nodeValue?.trim()))) {
+    return;
+  }
+  let run: Node[] = [];
+  const flush = (before: Node | null) => {
+    if (run.length === 0) return;
+    const p = document.createElement('p');
+    run.forEach((n) => p.appendChild(n)); // moves the node into the <p>
+    host.insertBefore(p, before);
+    run = [];
+  };
+  Array.from(host.childNodes).forEach((n) => {
+    if (isBlock(n)) flush(n);
+    else run.push(n);
+  });
+  flush(null);
 }
 
 // ---- list engine -----------------------------------------------------------
