@@ -70,7 +70,6 @@ export default function CreativeStrategistTab() {
   const [docs, setDocs] = useState<VisionDoc[]>([]);
   const docsRef = useRef<VisionDoc[]>([]);
   docsRef.current = docs;
-  const [docsLoaded, setDocsLoaded] = useState(false);
   const [dbDown, setDbDown] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<BoxKey | null>(null);
@@ -83,17 +82,32 @@ export default function CreativeStrategistTab() {
     toastTimer.current = setTimeout(() => setToast(null), 3200);
   }, []);
 
+  // Merge freshly-fetched rows into state WITHOUT clobbering pages already held
+  // (those may carry edits newer than the server copy) — only brand-new ids are added.
+  const addDocs = useCallback((rows: VisionDoc[]) => {
+    setDocs((prev) => {
+      const have = new Set(prev.map((d) => d.id));
+      const extra = rows.filter((r) => !r.deleted_at && !have.has(r.id));
+      return extra.length ? [...prev, ...extra] : prev;
+    });
+  }, []);
+
   // ---------- load ----------
+  // Three independent fetches so the planner paints as fast as possible:
+  //  1. this week's page straight from its id (one row — the instant paint),
+  //  2. the settings blob (single row — the authoritative stages/weeks map),
+  //  3. the full page list in the background (other weeks / history).
+  // The week no longer waits on (3); that bulk read was the "Preparing…" delay.
   useEffect(() => {
+    const seededWeekDocId = stratRef.current.weeks[weekStartISO(new Date())];
+    if (seededWeekDocId) {
+      db.visionDocs
+        .getById(seededWeekDocId)
+        .then((d) => d && addDocs([d]))
+        .catch(() => {});
+    }
+
     (async () => {
-      try {
-        const rows = await db.visionDocs.getAll();
-        setDocs(rows.filter((r) => !r.deleted_at));
-      } catch {
-        /* vision_docs table may be absent */
-      } finally {
-        setDocsLoaded(true);
-      }
       try {
         const s = await db.visionSettings.get();
         if (s && s.strategist != null) {
@@ -108,7 +122,15 @@ export default function CreativeStrategistTab() {
         setSettingsLoaded(true);
       }
     })();
-  }, []);
+
+    (async () => {
+      try {
+        addDocs(await db.visionDocs.getAll());
+      } catch {
+        /* vision_docs table may be absent — the per-id fetch still paints the week */
+      }
+    })();
+  }, [addDocs]);
 
   // Undo/redo: snapshots of the whole strategist blob. Because every writer
   // produces a brand-new object (spreads, never in-place mutation), each entry is
@@ -234,6 +256,22 @@ export default function CreativeStrategistTab() {
     async (startISO: string): Promise<string | null> => {
       const mapped = stratRef.current.weeks[startISO];
       if (mapped && docsRef.current.some((d) => d.id === mapped)) return mapped;
+      // Settings say this week already has a page, it's just not in our local list
+      // yet (the bulk load hasn't landed, or missed it). Trust the mapping and fetch
+      // that one page directly — never create a duplicate or get stuck because of a
+      // transient load miss. Only a genuinely-gone page falls through to a create.
+      if (mapped && !dbDown) {
+        try {
+          const existing = await db.visionDocs.getById(mapped);
+          if (existing && !existing.deleted_at) {
+            addDocs([existing]);
+            return mapped;
+          }
+        } catch {
+          // couldn't reach the row — keep the mapping, don't create a rival page
+          return mapped;
+        }
+      }
       if (ensuringRef.current.has(startISO)) return mapped ?? null; // a create is already in flight
       ensuringRef.current.add(startISO);
       try {
@@ -245,16 +283,18 @@ export default function CreativeStrategistTab() {
         ensuringRef.current.delete(startISO);
       }
     },
-    [addDoc, commit]
+    [addDoc, commit, addDocs, dbDown]
   );
 
   // The week currently shown in the planner box (defaults to this week).
   const [viewWeek, setViewWeek] = useState<string>(() => weekStartISO(new Date()));
   const [weekDocId, setWeekDocId] = useState<string | null>(null);
 
-  // Once both docs + settings have loaded, make sure the shown week's page exists.
+  // Resolve the shown week's page as soon as the settings blob is in (it carries the
+  // weeks→page map). We deliberately DON'T wait on the full doc list here — ensureWeek
+  // fetches the page by id if needed, so the planner paints without the bulk-load lag.
   useEffect(() => {
-    if (!docsLoaded || !settingsLoaded) return;
+    if (!settingsLoaded) return;
     let alive = true;
     ensureWeek(viewWeek).then((id) => {
       if (alive) setWeekDocId(id);
@@ -262,7 +302,7 @@ export default function CreativeStrategistTab() {
     return () => {
       alive = false;
     };
-  }, [docsLoaded, settingsLoaded, viewWeek, ensureWeek]);
+  }, [settingsLoaded, viewWeek, ensureWeek]);
 
   const weekDoc = useMemo(() => docs.find((d) => d.id === weekDocId) || null, [docs, weekDocId]);
 
@@ -588,35 +628,67 @@ function StagesView({
 // 02 · Planner
 // ---------------------------------------------------------------------------
 
-// A stripped text peek of today's section, shown in the grid card.
+// Matches a day heading by its text ("Thu · Nov 5") even if editing flattened the
+// <h3 data-day> into a styled <p> that lost the tag + anchor.
+const DAY_LABEL_RE = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) · [A-Z][a-z]{2} \d{1,2}\b/;
+
+// Renders read-only doc HTML and scales it DOWN to fit its box when there's a lot,
+// so the whole day's plan stays visible in the card instead of being clipped. CSS
+// transforms don't change layout size, so scrollHeight stays the true natural
+// height — no measure/scale feedback loop.
+function FitBox({ html }: { html: string }) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    const inner = innerRef.current;
+    if (!box || !inner) return;
+    const fit = () => {
+      const availH = box.clientHeight;
+      const needH = inner.scrollHeight;
+      setScale(needH > availH && availH > 0 ? Math.max(0.45, availH / needH) : 1);
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [html]);
+  return (
+    <div ref={boxRef} className="w-full h-full overflow-hidden">
+      <div
+        ref={innerRef}
+        className="doc-body ink-text text-[13px] leading-relaxed"
+        style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: `${100 / scale}%` }}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    </div>
+  );
+}
+
+// The grid card: shows today's section exactly as written (lists, to-dos, formatting),
+// read-only, filling the card and shrinking to fit when there's more.
 function PlannerPreview({ doc, onOpen }: { doc: VisionDoc | null; onOpen: () => void }) {
   const today = todayISO();
   const dayLabel = weekDays(weekStartISO(new Date())).find((d) => d.iso === today)?.label ?? today;
-  // Pull any text the user wrote right under today's heading, for a live peek.
-  const peek = useMemo(() => {
+  // Grab the real HTML the user wrote under TODAY's heading — up to the next day.
+  const html = useMemo(() => {
     if (!doc?.content) return '';
     const div = document.createElement('div');
     div.innerHTML = doc.content;
     const head = div.querySelector(`[data-day="${today}"]`);
     let node = head?.nextElementSibling as Element | null;
-    const bits: string[] = [];
-    // Collect only what sits under TODAY's heading — stop at the next day's
-    // heading. Headings are normally <h3 data-day=…>, but editing can flatten one
-    // into a styled <p> that keeps the "Thu · Nov 5" text yet loses the tag AND
-    // the data-day anchor — so also stop on anything that *reads* like a day label.
-    const DAY_LABEL = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) · [A-Z][a-z]{2} \d{1,2}\b/;
+    const parts: string[] = [];
     while (node) {
       const t = (node.textContent || '').trim();
-      const isDayBoundary =
-        /^H[1-6]$/.test(node.tagName) ||
-        node.hasAttribute('data-day') ||
-        !!node.querySelector('[data-day]') ||
-        DAY_LABEL.test(t);
-      if (isDayBoundary) break;
-      if (t) bits.push(t);
+      // Stop at the next day boundary only — a real day heading (data-day), a mangled
+      // one (reads like a label), never on the user's own sub-headings.
+      if (node.hasAttribute('data-day') || !!node.querySelector('[data-day]') || DAY_LABEL_RE.test(t)) break;
+      // Skip the seeded empty "<p><br></p>" lines; keep anything with text or a block.
+      if (t || node.querySelector('img,table,ul,ol,hr')) parts.push(node.outerHTML);
       node = node.nextElementSibling;
     }
-    return bits.join(' · ');
+    return parts.join('');
   }, [doc?.content, today]);
 
   return (
@@ -624,8 +696,8 @@ function PlannerPreview({ doc, onOpen }: { doc: VisionDoc | null; onOpen: () => 
       <div className="text-[11px] font-bold tracking-widest uppercase ink-text-muted">Today</div>
       <div className="mt-1 text-lg font-black ink-text">{dayLabel}</div>
       <div className="mt-3 flex-1 min-h-0 overflow-hidden rounded-xl border border-black/5 dark:border-white/[0.1] bg-black/[0.015] dark:bg-white/[0.02] p-3">
-        {peek ? (
-          <p className="text-[13px] ink-text leading-relaxed line-clamp-6">{peek}</p>
+        {html ? (
+          <FitBox html={html} />
         ) : (
           <p className="text-[13px] ink-text-muted/70">Nothing yet for today. Open to plan your day.</p>
         )}

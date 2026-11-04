@@ -505,6 +505,19 @@ export const db = {
       return data || [];
     },
 
+    // Fetch a single page by id — a one-row read used to paint the current week's
+    // planner instantly, without waiting on the full getAll() list.
+    getById: async (id: string): Promise<VisionDoc | null> => {
+      const { data, error } = await supabase
+        .from('vision_docs')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+
     add: async (
       doc: Partial<Omit<VisionDoc, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
     ): Promise<VisionDoc> => {
