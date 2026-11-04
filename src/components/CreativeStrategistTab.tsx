@@ -658,7 +658,7 @@ function FitBox({ html }: { html: string }) {
     <div ref={boxRef} className="w-full h-full overflow-hidden">
       <div
         ref={innerRef}
-        className="doc-body ink-text text-[13px] leading-relaxed"
+        className="doc-body ink-text text-[16px] leading-relaxed"
         style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: `${100 / scale}%` }}
         dangerouslySetInnerHTML={{ __html: html }}
       />
