@@ -115,6 +115,46 @@ export interface StageBubble {
   y: number;
 }
 
+/** One of the three identity stages of the Creative Strategist tab. The active
+ * stage (first not-done) drives the tab's name: Creative Strategist → Business →
+ * Enlightenment. `target` is the condition to reach it (e.g. "₹1cr in bank"). */
+export interface StrategistStage {
+  name: string;
+  target: string;
+  /** Optional "time limit" for the stage, as 'YYYY-MM-DD'. */
+  deadline: string | null;
+  done: boolean;
+}
+
+/** A single todo on the Creative Strategist weekly/monthly goals checklists. */
+export interface StrategistGoal {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+/** A free-floating text box on the Creative Strategist notes canvas. `x`/`y` are
+ * fractions (0..1) of the page so boxes keep their spot on resize (mirrors
+ * StageBubble). `color` is a hex accent for the box text. */
+export interface StrategistNote {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  color: string;
+}
+
+/** Everything the Creative Strategist tab stores, kept as one blob in
+ * `vision_settings.strategist` (same grab-bag convention as stage_bubbles). */
+export interface StrategistState {
+  /** The 3 identity stages; normalised to length 3 in the UI. */
+  stages: StrategistStage[];
+  /** Auto-planner page map: week-start 'YYYY-MM-DD' (Monday) → VisionDoc id. */
+  weeks: Record<string, string>;
+  goals: { weekly: StrategistGoal[]; monthly: StrategistGoal[] };
+  notes: StrategistNote[];
+}
+
 /** One of the three "focus things" pinned to the Vision nav bar. */
 export interface FocusPillar {
   /** Short heading shown on the pill (the topic). */
@@ -139,6 +179,8 @@ export interface VisionSettings {
   track_focus_note: string;
   /** The 3 focus pillars shown in the Vision nav bar. Always normalised to length 3 in the UI. */
   focus_pillars: FocusPillar[];
+  /** All Creative Strategist tab state (stages, auto-planner week map, goals, notes). */
+  strategist: StrategistState;
   updated_at: string;
 }
 

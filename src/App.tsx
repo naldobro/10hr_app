@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { db } from './lib/database';
 import { undoManager } from './lib/undoManager';
-import type { FocusPillar } from './types';
+import type { FocusPillar, StrategistStage } from './types';
 import Navigation from './components/Navigation';
 import TrackTab from './components/TrackTab';
 import StatisticsTab from './components/StatisticsTab';
 import VisionTab from './components/VisionTab';
+import CreativeStrategistTab from './components/CreativeStrategistTab';
+import { normalizeStrategist, activeStageName, STRATEGIST_LS_KEY } from './lib/strategist';
 
 // Always work with exactly three focus pillars, whatever the stored array looks like.
 function normalizePillars(raw: unknown): FocusPillar[] {
@@ -20,9 +22,33 @@ function normalizePillars(raw: unknown): FocusPillar[] {
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'track' | 'statistics' | 'vision'>('track');
+  const [activeTab, setActiveTab] = useState<'track' | 'statistics' | 'vision' | 'strategist'>('track');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [streakDays, setStreakDays] = useState(0);
+
+  // The active Creative Strategist stage names the nav tab. Owned here so the
+  // label shows on every tab; kept in sync with the tab via localStorage (seed)
+  // + the 'strategist:stageschanged' window event (live, same bridge as pillars).
+  const [strategistStages, setStrategistStages] = useState<StrategistStage[]>(() => {
+    try {
+      return normalizeStrategist(JSON.parse(localStorage.getItem(STRATEGIST_LS_KEY) || '{}')).stages;
+    } catch {
+      return normalizeStrategist({}).stages;
+    }
+  });
+
+  useEffect(() => {
+    db.visionSettings
+      .get()
+      .then((s) => {
+        if (s?.strategist != null) setStrategistStages(normalizeStrategist(s.strategist).stages);
+      })
+      .catch(() => {});
+    const onStages = (e: Event) =>
+      setStrategistStages(normalizeStrategist({ stages: (e as CustomEvent).detail }).stages);
+    window.addEventListener('strategist:stageschanged', onStages);
+    return () => window.removeEventListener('strategist:stageschanged', onStages);
+  }, []);
 
   // The 3 focus pillars in the Vision nav bar. Seed from localStorage for an
   // instant paint, then reconcile with Supabase.
@@ -154,10 +180,13 @@ function App() {
         focusPillars={focusPillars}
         onFocusPillarsChange={updateFocusPillars}
         onCommitPillars={recordPillarUndo}
+        strategistLabel={activeStageName(strategistStages)}
       />
 
       {activeTab === 'vision' ? (
         <VisionTab />
+      ) : activeTab === 'strategist' ? (
+        <CreativeStrategistTab />
       ) : (
         <main
           className="relative pb-12 px-3 sm:px-6 lg:px-8 max-w-[1400px] mx-auto"
