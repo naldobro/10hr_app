@@ -58,3 +58,40 @@ export function seedDayHeadersHTML(startISO: string): string {
     .map((d) => `<h3 data-day="${d.iso}">${d.label}</h3><p><br></p>`)
     .join('');
 }
+
+/**
+ * Re-assert the day headings in a week page as managed structure.
+ *
+ * Day headings carry the `data-day` anchor that "jump to today" and the today-peek
+ * depend on. But the planner body is a free-form contentEditable, and some edits
+ * (paste, select-across, a browser serialising a heading's computed CSS) can flatten
+ * an `<h3 data-day=…>` into a styled `<p><span style="font-size:1.2rem;font-weight:700">`
+ * — losing BOTH the tag and the anchor. Rather than try to block every browser quirk,
+ * we treat the headings as derived from the week definition and continuously repair
+ * them: any top-level block whose text is exactly a day label for this week is rewritten
+ * to the canonical `<h3 data-day="iso">Label</h3>`, dropping the mangled inline wrappers.
+ *
+ * Idempotent and conservative — only exact day-label matches are touched, everything the
+ * user actually wrote is left alone. Returns the original string unchanged when nothing
+ * needed fixing (so it won't churn the caret/DOM in the common case).
+ */
+export function repairWeekHeadings(html: string, startISO: string): string {
+  if (!html || typeof document === 'undefined') return html;
+  const labelToIso = new Map(weekDays(startISO).map((d) => [d.label, d.iso] as const));
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  let changed = false;
+  Array.from(div.children).forEach((el) => {
+    const label = (el.textContent || '').trim();
+    const iso = labelToIso.get(label);
+    if (!iso) return;
+    // Already the canonical anchored <h3> with no stray inline wrappers? Leave it.
+    if (el.tagName === 'H3' && el.getAttribute('data-day') === iso && el.children.length === 0) return;
+    const h3 = document.createElement('h3');
+    h3.setAttribute('data-day', iso);
+    h3.textContent = label;
+    el.replaceWith(h3);
+    changed = true;
+  });
+  return changed ? div.innerHTML : html;
+}

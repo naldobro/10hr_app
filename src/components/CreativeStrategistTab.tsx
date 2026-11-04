@@ -28,6 +28,7 @@ import {
   monthBucket,
   weekDays,
   seedDayHeadersHTML,
+  repairWeekHeadings,
 } from '../lib/plannerWeeks';
 import { DocEditor, DOC_BODY_CSS } from './PlannerPanel';
 
@@ -655,12 +656,24 @@ function PlannerView({
   const isThisWeek = weekISO === weekStartISO(new Date());
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Day headings are managed structure (see repairWeekHeadings). Re-assert them on
+  // the content the editor mounts with — this self-heals any page whose headings got
+  // flattened in an earlier session, so "jump to today" + the peek always find their
+  // anchors. The editor is uncontrolled (keyed on id), so a repaired doc only changes
+  // what it mounts from — it never rewrites the DOM under a live caret.
+  const fixedDoc = useMemo(
+    () => (doc ? { ...doc, content: repairWeekHeadings(doc.content || '', weekISO) } : null),
+    [doc, weekISO]
+  );
+
   // When the current week opens, scroll today's heading to the TOP of the page
   // (so the already-passed days tuck away above it and the later days are a
   // scroll down) and drop the caret just after it so the user can type straight
-  // away.
+  // away. Keyed on the doc *id* so it fires once per open — not on every edit,
+  // which would otherwise yank the caret back to today mid-sentence.
+  const docId = fixedDoc?.id ?? null;
   useEffect(() => {
-    if (!doc || !isThisWeek) return;
+    if (!docId || !isThisWeek) return;
     const t = setTimeout(() => {
       const root = scrollRef.current;
       if (!root) return;
@@ -680,7 +693,7 @@ function PlannerView({
       }
     }, 120);
     return () => clearTimeout(t);
-  }, [doc, isThisWeek, doc?.id]);
+  }, [docId, isThisWeek]);
 
   return (
     <div className="h-full flex flex-col">
@@ -704,8 +717,21 @@ function PlannerView({
         )}
       </div>
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-hidden">
-        {doc ? (
-          <DocEditor key={doc.id} doc={doc} onChange={(patch, persist) => onUpdate(doc.id, patch, persist)} onDelete={() => {}} onUploadImage={(blob, type) => db.visionImages.upload(blob, type)} nested />
+        {fixedDoc ? (
+          <DocEditor
+            key={fixedDoc.id}
+            doc={fixedDoc}
+            onChange={(patch, persist) =>
+              onUpdate(
+                fixedDoc.id,
+                patch.content != null ? { ...patch, content: repairWeekHeadings(patch.content, weekISO) } : patch,
+                persist
+              )
+            }
+            onDelete={() => {}}
+            onUploadImage={(blob, type) => db.visionImages.upload(blob, type)}
+            nested
+          />
         ) : (
           <div className="h-full grid place-items-center">
             <p className="text-sm ink-text-muted">Preparing this week’s page…</p>
