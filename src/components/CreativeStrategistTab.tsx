@@ -788,7 +788,7 @@ function PlannerView({
           </button>
         )}
       </div>
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-hidden">
+      <div ref={scrollRef} className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {fixedDoc ? (
           <DocEditor
             key={fixedDoc.id}
