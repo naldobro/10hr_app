@@ -887,19 +887,41 @@ function GoalList({ title, items, onChange }: { title: string; items: Strategist
 const NOTE_COLORS = ['#8b5cf6', '#10b981', '#f59e0b', '#0ea5e9', '#ef4444', '#ec4899'];
 
 function NotesPreview({ notes, onOpen }: { notes: StrategistNote[]; onOpen: () => void }) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [base, setBase] = useState({ w: 0, h: 0 });
+
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const measure = () => setBase({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
     <button onClick={onOpen} className="w-full h-full text-left p-4 flex flex-col">
-      <div className="flex-1 min-h-0 overflow-hidden rounded-xl border border-black/5 dark:border-white/[0.1] bg-black/[0.015] dark:bg-white/[0.02] p-3">
+      <div ref={wrapRef} className="relative flex-1 min-h-0 overflow-hidden rounded-xl border border-black/5 dark:border-white/[0.1] bg-black/[0.015] dark:bg-white/[0.02]">
         {notes.length === 0 ? (
-          <p className="text-[13px] ink-text-muted/70">A blank canvas. Open to scatter floating notes anywhere.</p>
+          <p className="absolute inset-0 grid place-items-center text-center p-3 text-[13px] ink-text-muted/70">A blank canvas. Open to scatter floating notes anywhere.</p>
         ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {notes.slice(0, 8).map((n) => (
-              <span key={n.id} className="inline-block max-w-full truncate text-[12px] font-medium px-2 py-1 rounded-md" style={{ color: n.color, background: `${n.color}1a` }}>
-                {n.text || 'note'}
-              </span>
-            ))}
-          </div>
+          notes.map((n) => (
+            <div
+              key={n.id}
+              className="absolute select-none pointer-events-none"
+              style={{ left: n.x * base.w, top: n.y * base.h, transform: 'translate(-50%,-50%)' }}
+            >
+              <div className="rounded-lg px-2 py-1 border bg-white dark:bg-black dyn-sheen" style={{ borderColor: `${n.color}66` }}>
+                <span
+                  className="block text-[11px] font-medium leading-snug whitespace-pre-wrap break-words max-w-[9rem] line-clamp-4"
+                  style={{ color: n.color }}
+                >
+                  {n.text || 'note'}
+                </span>
+              </div>
+            </div>
+          ))
         )}
       </div>
       <div className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-bold self-start" style={{ color: ACCENT.notes }}>
@@ -1039,6 +1061,12 @@ function NotesCanvas({ notes, onChange }: { notes: StrategistNote[]; onChange: (
                   <textarea
                     autoFocus
                     rows={1}
+                    ref={(el) => {
+                      if (el) {
+                        el.style.height = 'auto';
+                        el.style.height = el.scrollHeight + 'px';
+                      }
+                    }}
                     value={editing!.text}
                     onChange={(e) => {
                       setEditing({ id: n.id, text: e.target.value });
@@ -1050,7 +1078,7 @@ function NotesCanvas({ notes, onChange }: { notes: StrategistNote[]; onChange: (
                       if (e.key === 'Escape') commitText(n.id, n.text);
                     }}
                     placeholder="type a note…"
-                    className="block bg-transparent outline-none resize-none overflow-hidden text-[14px] font-medium leading-relaxed w-[18rem] max-w-[60vw] ink-text placeholder:ink-text-muted/50"
+                    className="block bg-transparent outline-none resize-none overflow-hidden text-[14px] font-medium leading-snug w-[22rem] max-w-[46vw] ink-text placeholder:ink-text-muted/50"
                   />
                 ) : (
                   <span className="text-[14px] font-medium leading-snug whitespace-pre-wrap max-w-[46vw] break-words" style={{ color: n.color }}>
