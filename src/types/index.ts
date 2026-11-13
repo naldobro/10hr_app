@@ -124,6 +124,8 @@ export interface StrategistStage {
   /** Optional "time limit" for the stage, as 'YYYY-MM-DD'. */
   deadline: string | null;
   done: boolean;
+  /** Free-form bullet points — the specific thought process for this stage. */
+  bullets?: string[];
 }
 
 /** A single todo on the Creative Strategist weekly/monthly goals checklists. */

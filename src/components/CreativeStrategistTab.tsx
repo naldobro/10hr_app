@@ -494,6 +494,79 @@ function StagePill({ stage }: { stage: StrategistStage }) {
   );
 }
 
+// The per-stage bullet list — a quick, specific thought process under each stage.
+// Read-only dots in the compact card; editable inputs (add / edit / remove) when
+// the Stages box is expanded.
+function StageBullets({
+  accent,
+  compact,
+  bullets,
+  onChange,
+}: {
+  accent: string;
+  compact?: boolean;
+  bullets: string[];
+  onChange: (next: string[]) => void;
+}) {
+  if (compact) {
+    if (bullets.length === 0) return null;
+    return (
+      <ul className="mt-2.5 space-y-1">
+        {bullets.map((b, i) => (
+          <li key={i} className="flex items-start gap-2 text-[12.5px] leading-snug ink-text">
+            <span className="mt-[7px] w-1.5 h-1.5 rounded-full flex-none" style={{ background: accent }} />
+            <span className="min-w-0 break-words">{b}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  const setAt = (i: number, text: string) => onChange(bullets.map((b, j) => (j === i ? text : b)));
+  const removeAt = (i: number) => onChange(bullets.filter((_, j) => j !== i));
+  const add = () => onChange([...bullets, '']);
+
+  return (
+    <div className="mt-3 space-y-1.5">
+      {bullets.map((b, i) => (
+        <div key={i} className="group flex items-start gap-2">
+          <span className="mt-[11px] w-1.5 h-1.5 rounded-full flex-none" style={{ background: accent }} />
+          <input
+            value={b}
+            autoFocus={b === ''}
+            onChange={(e) => setAt(i, e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                add();
+              }
+              if (e.key === 'Backspace' && b === '') {
+                e.preventDefault();
+                removeAt(i);
+              }
+            }}
+            placeholder="a specific thought…"
+            className="flex-1 text-[13px] ink-text bg-transparent outline-none border-b border-transparent focus:border-black/20 dark:focus:border-white/25 placeholder:ink-text-muted/60"
+          />
+          <button
+            onClick={() => removeAt(i)}
+            className="opacity-0 group-hover:opacity-100 ink-text-muted hover:ink-text transition flex-none mt-[3px]"
+            title="Remove point"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ))}
+      <button
+        onClick={add}
+        className="inline-flex items-center gap-1 text-[12px] font-semibold ink-text-muted hover:ink-text transition mt-0.5"
+      >
+        <Plus className="w-3.5 h-3.5" style={{ color: accent }} /> Add point
+      </button>
+    </div>
+  );
+}
+
 function StagesView({
   strat,
   activeIdx,
@@ -610,6 +683,9 @@ function StagesView({
                       </>
                     )}
                   </div>
+
+                  {/* bullets — the specific thought process for this stage */}
+                  <StageBullets accent={accent} compact={compact} bullets={s.bullets ?? []} onChange={(next) => onEdit(i, { bullets: next })} />
                 </div>
               </div>
             </div>

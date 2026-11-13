@@ -30,6 +30,7 @@ export function normalizeStrategist(raw: unknown): StrategistState {
       target: typeof s?.target === 'string' ? s.target : def.target,
       deadline: typeof s?.deadline === 'string' ? s.deadline : null,
       done: s?.done === true,
+      bullets: Array.isArray(s?.bullets) ? s!.bullets.filter((b): b is string => typeof b === 'string') : [],
     };
   });
   return {
