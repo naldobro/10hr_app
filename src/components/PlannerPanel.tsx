@@ -38,11 +38,25 @@ import {
   Link2,
   ClipboardPaste,
   History,
+  LayoutGrid,
 } from 'lucide-react';
 import { VisionDoc, VisionDocSnapshot } from '../types';
 import { GOAL_COLORS } from '../lib/visionUtils';
 import { db } from '../lib/database';
 import ColorPicker from './ColorPicker';
+import GalleryLightbox from './GalleryLightbox';
+import {
+  DOC_GALLERY_CSS,
+  GALLERY_COLS,
+  createGallery,
+  createGalleryItem,
+  galleryOf,
+  hydrateGalleries,
+  refreshAllGalleryMeta,
+  refreshGalleryMeta,
+  stripPending,
+  syncNoteEmpty,
+} from '../lib/docGallery';
 
 interface PlannerPanelProps {
   docs: VisionDoc[];
@@ -260,7 +274,7 @@ export const DOC_BODY_CSS = `
         .dark .doc-body a.doc-ref { background: rgba(99,102,241,.18); border-color: rgba(129,140,248,.4); color: #c7d2fe; }
         .dark .doc-body a.doc-ref:hover { background: rgba(99,102,241,.3); }
         .dark .doc-body a.doc-ref[data-missing="true"] { background: rgba(239,68,68,.14); border-color: rgba(248,113,113,.4); color: #fca5a5; }
-      `;
+      ` + DOC_GALLERY_CSS;
 
 export default function PlannerPanel({
   docs,
@@ -1336,6 +1350,13 @@ export function DocEditor({
   // coords) used to place the outline + drag handle.
   const selImgRef = useRef<HTMLImageElement | null>(null);
   const [imgBox, setImgBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  // Image galleries: the full-screen viewer, the gallery a file pick is aimed at,
+  // and the tile being dragged to reorder.
+  const [lightbox, setLightbox] = useState<{ gallery: HTMLElement; item: HTMLElement } | null>(null);
+  const galInputRef = useRef<HTMLInputElement>(null);
+  const galTargetRef = useRef<HTMLElement | null>(null);
+  const dragItemRef = useRef<HTMLElement | null>(null);
+  const dropHiliteTimer = useRef<number | undefined>(undefined);
   const [title, setTitle] = useState(doc.title);
   const [color, setColor] = useState(doc.color || '#0ea5e9');
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -1378,7 +1399,7 @@ export function DocEditor({
   const setEmpty = (el: HTMLDivElement | null) => {
     if (!el) return;
     const hasText = !!(el.textContent && el.textContent.trim());
-    const hasBlocks = !!el.querySelector('table, hr, img, ul, ol, .doc-toggle');
+    const hasBlocks = !!el.querySelector('table, hr, img, ul, ol, .doc-toggle, .doc-gallery');
     el.dataset.empty = hasText || hasBlocks ? 'false' : 'true';
   };
 
@@ -1393,6 +1414,8 @@ export function DocEditor({
   const afterEdit = () => {
     normalizeTasks(summaryRef.current);
     normalizeTasks(bodyRef.current);
+    refreshAllGalleryMeta(summaryRef.current);
+    refreshAllGalleryMeta(bodyRef.current);
     setEmpty(summaryRef.current);
     setEmpty(bodyRef.current);
     scheduleHistory();
@@ -1446,8 +1469,8 @@ export function DocEditor({
         : null;
     const host = focus === 'summary' ? summaryRef.current : focus === 'body' ? bodyRef.current : null;
     return {
-      summary: summaryRef.current?.innerHTML ?? '',
-      content: bodyRef.current?.innerHTML ?? '',
+      summary: stripPending(summaryRef.current),
+      content: stripPending(bodyRef.current),
       focus,
       offset: host ? caretOffsetIn(host) : 0,
     };
@@ -1511,8 +1534,8 @@ export function DocEditor({
   const snapshot = (): Partial<VisionDoc> => ({
     title: meta.current.title,
     color: meta.current.color,
-    summary: summaryRef.current?.innerHTML ?? '',
-    content: bodyRef.current?.innerHTML ?? '',
+    summary: stripPending(summaryRef.current),
+    content: stripPending(bodyRef.current),
   });
 
   const persistNow = () => {
@@ -1528,8 +1551,8 @@ export function DocEditor({
   // since the last one and (unless forced) at most once per interval. Fire-and-
   // forget — a missing table / offline just means no snapshot this time.
   const maybeSnapshot = (force = false) => {
-    const summaryHtml = summaryRef.current?.innerHTML ?? '';
-    const contentHtml = bodyRef.current?.innerHTML ?? '';
+    const summaryHtml = stripPending(summaryRef.current);
+    const contentHtml = stripPending(bodyRef.current);
     const key = `${meta.current.title} ${summaryHtml} ${contentHtml}`;
     if (key === lastSnapKey.current) return; // nothing new to capture
     if (!force && Date.now() - lastSnapAt.current < SNAPSHOT_INTERVAL_MS) return;
@@ -1563,11 +1586,13 @@ export function DocEditor({
     if (summaryRef.current) {
       summaryRef.current.innerHTML = doc.summary || '';
       normalizeLoadedBlocks(summaryRef.current);
+      hydrateGalleries(summaryRef.current);
       setEmpty(summaryRef.current);
     }
     if (bodyRef.current) {
       bodyRef.current.innerHTML = doc.content || '';
       normalizeLoadedBlocks(bodyRef.current);
+      hydrateGalleries(bodyRef.current);
       setEmpty(bodyRef.current);
     }
     // Baseline fingerprint = the state as loaded, so we never snapshot an unchanged page.
@@ -2123,21 +2148,26 @@ export function DocEditor({
   // uploaded to storage so the doc HTML holds only a short URL (fast to save/load,
   // no bloat over the years). If the upload fails — offline, bucket not set up —
   // we embed the image inline as a data URL so it's never silently lost.
+  const imageFileToSrc = async (file: File): Promise<string | null> => {
+    const { blob, type } = await compressImage(file);
+    let src: string | null = null;
+    if (onUploadImage) {
+      try {
+        src = await onUploadImage(blob, type);
+      } catch {
+        src = null; // fall through to inline embedding
+      }
+    }
+    if (!src) src = await blobToDataUrl(blob).catch(() => null);
+    return src;
+  };
+
   const insertImageFiles = async (files: File[]) => {
     const images = files.filter((f) => f.type.startsWith('image/'));
     if (images.length === 0) return;
     ensureFocus();
     for (const file of images) {
-      const { blob, type } = await compressImage(file);
-      let src: string | null = null;
-      if (onUploadImage) {
-        try {
-          src = await onUploadImage(blob, type);
-        } catch {
-          src = null; // fall through to inline embedding
-        }
-      }
-      if (!src) src = await blobToDataUrl(blob).catch(() => null);
+      const src = await imageFileToSrc(file);
       if (!src) continue;
       // Keep the caret inside the editor even if focus drifted during the upload.
       ensureFocus();
@@ -2148,13 +2178,215 @@ export function DocEditor({
     afterEdit();
   };
 
+  // ---- image galleries ----
+  // Add images to a gallery. Tiles appear instantly (local preview, pulsing) and
+  // all uploads run in parallel; each tile swaps to its permanent URL when done.
+  // Pending tiles are never saved (stripPending), so a half-finished upload can't
+  // leave a dead blob: link in the doc.
+  const addFilesToGallery = async (gallery: HTMLElement, files: File[], before?: Element | null) => {
+    const images = files.filter((f) => f.type.startsWith('image/'));
+    if (images.length === 0) return;
+    const grid = gallery.querySelector(':scope > .doc-gal-grid') as HTMLElement | null;
+    if (!grid) return;
+    const anchor = before && before.parentElement === grid ? before : grid.querySelector(':scope > .doc-gal-add');
+    const tiles = images.map((file) => {
+      const preview = URL.createObjectURL(file);
+      const tile = createGalleryItem(preview, true);
+      grid.insertBefore(tile, anchor);
+      return { file, tile, preview };
+    });
+    refreshGalleryMeta(gallery);
+    await Promise.all(
+      tiles.map(async ({ file, tile, preview }) => {
+        const src = await imageFileToSrc(file).catch(() => null);
+        if (src && tile.isConnected) {
+          const img = tile.querySelector('img');
+          if (img) img.src = src;
+          delete tile.dataset.pending;
+        } else {
+          tile.remove();
+        }
+        URL.revokeObjectURL(preview);
+      })
+    );
+    refreshGalleryMeta(gallery);
+    afterEdit();
+  };
+
+  // The block the caret sits in: a direct child of the editor or of a toggle body.
+  const caretBlock = (): { host: HTMLDivElement; block: HTMLElement | null; parent: HTMLElement } | null => {
+    const node = window.getSelection()?.anchorNode ?? null;
+    const host = hostOf(node);
+    if (!host) return null;
+    let block: HTMLElement | null = node && (node.nodeType === 3 ? node.parentElement : (node as HTMLElement));
+    while (block && block.parentElement && block.parentElement !== host && !block.parentElement.matches('.doc-toggle-body')) {
+      block = block.parentElement;
+    }
+    if (block === host) block = null;
+    return { host, block, parent: (block?.parentElement as HTMLElement) || host };
+  };
+
+  // Toolbar: drop a new gallery at the caret and open the picker for it.
+  const insertGallery = () => {
+    ensureFocus();
+    const inGal = galleryOf(window.getSelection()?.anchorNode ?? null);
+    if (inGal && hostOf(inGal)) {
+      openGalleryPicker(inGal);
+      return;
+    }
+    const at = caretBlock();
+    const host = at?.host ?? bodyRef.current;
+    if (!host) return;
+    const g = createGallery();
+    const after = document.createElement('p');
+    after.appendChild(document.createElement('br'));
+    const block = at?.block ?? null;
+    const parent = at?.parent ?? host;
+    if (block && isEmptyBlock(block)) parent.replaceChild(g, block);
+    else if (block) parent.insertBefore(g, block.nextSibling);
+    else host.appendChild(g);
+    parent.insertBefore(after, g.nextSibling);
+    placeCaret(after, true);
+    rememberSelection();
+    afterEdit();
+    commitHistoryNow();
+    openGalleryPicker(g);
+  };
+
+  const openGalleryPicker = (g: HTMLElement) => {
+    galTargetRef.current = g;
+    galInputRef.current?.click();
+  };
+
+  // Clicks inside a gallery. Returns true when it handled the click.
+  const handleGalleryClick = (e: React.MouseEvent, target: HTMLElement): boolean => {
+    const g = galleryOf(target);
+    if (!g || !hostOf(g)) return false;
+    const action = (target.closest('[data-g]') as HTMLElement | null);
+    const item = target.closest('figure.doc-gal-item') as HTMLElement | null;
+    const removeBtn = g.querySelector('[data-g="remove"]') as HTMLElement | null;
+    if (removeBtn && action !== removeBtn) removeBtn.removeAttribute('data-armed');
+    if (action) {
+      e.preventDefault();
+      switch (action.dataset.g) {
+        case 'pick':
+          if (item) item.dataset.picked = item.dataset.picked === 'true' ? 'false' : 'true';
+          break;
+        case 'del':
+          item?.remove();
+          break;
+        case 'open':
+          if (item && !item.dataset.pending) setLightbox({ gallery: g, item });
+          return true;
+        case 'add':
+          openGalleryPicker(g);
+          return true;
+        case 'filter':
+          if (g.dataset.filter === 'picked') delete g.dataset.filter;
+          else g.dataset.filter = 'picked';
+          break;
+        case 'cols': {
+          const i = GALLERY_COLS.indexOf(Number(g.dataset.cols));
+          g.dataset.cols = String(GALLERY_COLS[(i + 1) % GALLERY_COLS.length]);
+          break;
+        }
+        case 'remove':
+          // Two-step delete: first click arms the button, second click removes.
+          if (galleryOfItemsCount(g) > 0 && action.dataset.armed !== '1') {
+            action.dataset.armed = '1';
+            window.setTimeout(() => action.removeAttribute('data-armed'), 3000);
+            return true;
+          }
+          g.remove();
+          break;
+        default:
+          return false;
+      }
+      refreshGalleryMeta(g);
+      afterEdit();
+      commitHistoryNow();
+      return true;
+    }
+    if (item && target.closest('.doc-gal-media')) {
+      e.preventDefault();
+      if (!item.dataset.pending) setLightbox({ gallery: g, item });
+      return true;
+    }
+    return true; // title / note clicks: let the browser place the caret, nothing else
+  };
+  const galleryOfItemsCount = (g: HTMLElement) => g.querySelectorAll('figure.doc-gal-item').length;
+
+  // ---- gallery drag to reorder (and drop files onto a gallery) ----
+  const clearDropMarks = () => {
+    document.querySelectorAll('.doc-gal-item.drop-before, .doc-gal-item.drop-after').forEach((n) =>
+      n.classList.remove('drop-before', 'drop-after')
+    );
+    document.querySelectorAll('.doc-gallery.is-drop').forEach((n) => n.classList.remove('is-drop'));
+  };
+  const onEditorDragStart = (e: React.DragEvent) => {
+    const media = (e.target as HTMLElement).closest?.('.doc-gal-media') as HTMLElement | null;
+    const item = media?.closest('figure.doc-gal-item') as HTMLElement | null;
+    if (!item) return;
+    dragItemRef.current = item;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/x-doc-gal', '1');
+    const img = item.querySelector('img');
+    if (img) e.dataTransfer.setDragImage(img, img.width / 2, img.height / 2);
+    window.setTimeout(() => item.classList.add('is-dragging'), 0);
+  };
+  const onEditorDragEnd = () => {
+    dragItemRef.current?.classList.remove('is-dragging');
+    dragItemRef.current = null;
+    clearDropMarks();
+  };
+  const dropSlot = (e: React.DragEvent): { grid: HTMLElement; before: Element | null; over: HTMLElement | null } | null => {
+    const t = e.target as HTMLElement;
+    const g = galleryOf(t);
+    if (!g || !hostOf(g)) return null;
+    const grid = g.querySelector(':scope > .doc-gal-grid') as HTMLElement | null;
+    if (!grid) return null;
+    const over = t.closest('figure.doc-gal-item') as HTMLElement | null;
+    if (!over) return { grid, before: grid.querySelector(':scope > .doc-gal-add'), over: null };
+    const r = over.getBoundingClientRect();
+    const after = e.clientX > r.left + r.width / 2;
+    return { grid, before: after ? over.nextElementSibling : over, over };
+  };
+  const onEditorDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    const slot = dropSlot(e);
+    clearDropMarks();
+    if (!slot) return;
+    if (dragItemRef.current) {
+      e.dataTransfer.dropEffect = 'move';
+      if (slot.over && slot.over !== dragItemRef.current) {
+        const r = slot.over.getBoundingClientRect();
+        slot.over.classList.add(e.clientX > r.left + r.width / 2 ? 'drop-after' : 'drop-before');
+      }
+    } else if (Array.from(e.dataTransfer.types || []).includes('Files')) {
+      e.dataTransfer.dropEffect = 'copy';
+      slot.grid.parentElement?.classList.add('is-drop');
+      window.clearTimeout(dropHiliteTimer.current);
+      dropHiliteTimer.current = window.setTimeout(clearDropMarks, 200);
+    }
+  };
+
   // Screenshots / copied images arrive as clipboard files — grab them before the
   // default paste turns them into anything lossy (or nothing at all).
   const onEditorPaste = (e: React.ClipboardEvent) => {
     const files = Array.from(e.clipboardData?.files || []).filter((f) => f.type.startsWith('image/'));
+    const inGal = galleryOf(window.getSelection()?.anchorNode ?? null);
     if (files.length > 0) {
       e.preventDefault();
-      void insertImageFiles(files);
+      if (inGal && hostOf(inGal)) void addFilesToGallery(inGal, files);
+      else void insertImageFiles(files);
+      return;
+    }
+    // Inside a gallery note/title, only ever paste plain text (no blocks).
+    if (inGal) {
+      e.preventDefault();
+      const text = (e.clipboardData?.getData('text/plain') ?? '').replace(/\r\n?/g, '\n');
+      if (text) document.execCommand('insertText', false, text);
+      afterEdit();
       return;
     }
     e.preventDefault();
@@ -2230,10 +2462,34 @@ export function DocEditor({
   };
 
   const onEditorDrop = (e: React.DragEvent) => {
+    const slot = dropSlot(e);
+    const dragged = dragItemRef.current;
+    if (dragged) {
+      // Reorder (or move a tile into another gallery).
+      e.preventDefault();
+      clearDropMarks();
+      if (slot && slot.before !== dragged) {
+        const from = galleryOf(dragged);
+        slot.grid.insertBefore(dragged, slot.before);
+        if (from) refreshGalleryMeta(from);
+        const to = galleryOf(slot.grid);
+        if (to) refreshGalleryMeta(to);
+        afterEdit();
+        commitHistoryNow();
+      }
+      onEditorDragEnd();
+      return;
+    }
     const files = Array.from(e.dataTransfer?.files || []).filter((f) => f.type.startsWith('image/'));
-    if (files.length === 0) return;
+    clearDropMarks();
+    if (files.length === 0) {
+      if (slot) e.preventDefault(); // never let stray HTML land inside a gallery
+      return;
+    }
     e.preventDefault();
-    void insertImageFiles(files);
+    const g = slot ? galleryOf(slot.grid) : null;
+    if (g && slot) void addFilesToGallery(g, files, slot.before);
+    else void insertImageFiles(files);
   };
 
   const pickImage = () => {
@@ -2552,6 +2808,7 @@ export function DocEditor({
         </Menu>
         <TB onClick={() => exec('insertHorizontalRule')} title="Divider line"><Minus className="w-4 h-4" /></TB>
         <TB onClick={pickImage} title="Insert image (or just paste / drop one)"><ImageIcon className="w-4 h-4" /></TB>
+        <TB onClick={insertGallery} title="Image gallery — many images, a note on each, pick favourites"><LayoutGrid className="w-4 h-4" /></TB>
 
         {/* add an inline sub-page, or link an existing page — hidden inside a linked window */}
         {(onOpenDoc || onCreateInlinePage) && (
@@ -2631,7 +2888,9 @@ export function DocEditor({
             onClick={onTaskClick}
             onPaste={onEditorPaste}
             onDrop={onEditorDrop}
-            onDragOver={(e) => e.preventDefault()}
+            onDragStart={onEditorDragStart}
+            onDragEnd={onEditorDragEnd}
+            onDragOver={onEditorDragOver}
             onBlur={persistNow}
             data-placeholder="List what you need to get done…"
             className="doc-body text-[14px] ink-text"
@@ -2646,7 +2905,9 @@ export function DocEditor({
           onClick={onTaskClick}
           onPaste={onEditorPaste}
           onDrop={onEditorDrop}
-          onDragOver={(e) => e.preventDefault()}
+          onDragStart={onEditorDragStart}
+          onDragEnd={onEditorDragEnd}
+          onDragOver={onEditorDragOver}
           onBlur={persistNow}
           data-placeholder="Write your action plan…"
           className="doc-body min-h-[240px] text-[15px] ink-text"
@@ -2663,7 +2924,30 @@ export function DocEditor({
             e.target.value = ''; // let the same file be picked again later
           }}
         />
+        {/* Hidden picker for adding images to a gallery. */}
+        <input
+          ref={galInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            const g = galTargetRef.current;
+            const files = Array.from(e.target.files || []);
+            e.target.value = '';
+            if (g && g.isConnected) void addFilesToGallery(g, files);
+          }}
+        />
       </div>
+
+      {lightbox && (
+        <GalleryLightbox
+          gallery={lightbox.gallery}
+          startItem={lightbox.item}
+          onClose={() => setLightbox(null)}
+          onEdited={afterEdit}
+        />
+      )}
 
       {/* Resize overlay for the selected image — portaled so it's never clipped. */}
       {imgBox &&
@@ -2840,6 +3124,24 @@ export function DocEditor({
       return;
     }
 
+    // Inside a gallery's title/note: Enter is a soft line break in a note and
+    // "done" in the title; never split the island into paragraphs.
+    const galText = (node.nodeType === 3 ? node.parentElement : (node as HTMLElement))?.closest?.(
+      '.doc-gal-note, .doc-gal-title'
+    ) as HTMLElement | null;
+    if (galText) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (galText.matches('.doc-gal-title')) galText.blur();
+        else document.execCommand('insertLineBreak');
+        afterEdit();
+      } else if ((e.key === 'Backspace' || e.key === 'Delete') && !(galText.textContent ?? '').length) {
+        e.preventDefault(); // empty note: don't let the delete escape into the doc
+      }
+      if (galText.matches('.doc-gal-note')) window.setTimeout(() => syncNoteEmpty(galText), 0);
+      return;
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       const el = node.nodeType === 3 ? node.parentElement : (node as HTMLElement);
       const head = el?.closest?.('summary.doc-toggle-head') as HTMLElement | null;
@@ -2874,6 +3176,7 @@ export function DocEditor({
       while (block && block.parentElement && block.parentElement !== host) block = block.parentElement;
       if (!block || block.parentElement !== host) return;
       if (block.matches?.('details.doc-toggle')) return; // caret is already inside a toggle
+      if (block.matches?.('.doc-gallery')) return;
 
       const probe = range.cloneRange();
       probe.selectNodeContents(block);
@@ -2882,6 +3185,18 @@ export function DocEditor({
         probe.setEnd(range.startContainer, range.startOffset);
         if (probe.toString().length !== 0) return; // not at the block's start
         const prev = block.previousElementSibling as HTMLElement | null;
+        // A gallery is never swallowed by Backspace from the line below it — use
+        // its own delete button. An empty line just goes away.
+        if (prev?.matches?.('.doc-gallery')) {
+          e.preventDefault();
+          if (isEmptyBlock(block) && block.nextElementSibling) {
+            const next = block.nextElementSibling as HTMLElement;
+            block.remove();
+            placeCaret(next, true);
+            afterEdit();
+          }
+          return;
+        }
         if (prev?.matches?.('details.doc-toggle')) {
           e.preventDefault();
           (prev as HTMLDetailsElement).open = true;
@@ -2893,6 +3208,10 @@ export function DocEditor({
         probe.setStart(range.endContainer, range.endOffset);
         if (probe.toString().length !== 0) return; // not at the block's end
         const next = block.nextElementSibling as HTMLElement | null;
+        if (next?.matches?.('.doc-gallery')) {
+          e.preventDefault();
+          return;
+        }
         if (next?.matches?.('details.doc-toggle')) {
           e.preventDefault();
           (next as HTMLDetailsElement).open = true;
@@ -2906,6 +3225,7 @@ export function DocEditor({
 
   function onTaskClick(e: React.MouseEvent) {
     const target = e.target as HTMLElement;
+    if (handleGalleryClick(e, target)) return;
     // Linked-page chip: open it in a window (unless this editor is itself a linked
     // window — depth cap — or the target page no longer exists).
     const ref = target.closest?.('a.doc-ref') as HTMLElement | null;
@@ -2959,7 +3279,7 @@ function placeCaretInToggleBody(det: HTMLElement, atStart: boolean) {
 }
 
 function isEmptyBlock(block: HTMLElement): boolean {
-  return (block.textContent ?? '').trim() === '' && !block.querySelector('img,table,hr,ul,ol,details');
+  return (block.textContent ?? '').trim() === '' && !block.querySelector('img,table,hr,ul,ol,details,.doc-gallery');
 }
 
 // Real block-level tags. Everything else at the top level of an editor is "loose"
